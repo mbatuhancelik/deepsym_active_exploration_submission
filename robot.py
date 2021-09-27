@@ -1,97 +1,95 @@
 import time
 import os
 import random
-import pkgutil
 
 import numpy as np
 import pybullet as p
-import pybullet_data
-
 from scipy.spatial.transform import Rotation
 
-def move(robot, targetPositions=None, targetVelocities=None):
-    if targetPositions is None:
-        p.setJointMotorControlArray(
-            bodyUniqueId=robot,
-            jointIndices=range(len(targetVelocities)),
-            controlMode=p.VELOCITY_CONTROL,
-            targetVelocities=targetVelocities,
-        )
-    elif targetVelocities is None:
-        p.setJointMotorControlArray(
-            bodyUniqueId=robot,
-            jointIndices=range(len(targetPositions)),
-            controlMode=p.POSITION_CONTROL,
-            targetPositions=targetPositions,
-        )
-    else:
-        print("You should provide at least one target.")
+import manipulators
+import utils
 
-GUI = 1
-if GUI:
-    physicsClient = p.connect(p.GUI)
-else:
-    physicsClient = p.connect(p.DIRECT)
-    egl = pkgutil.get_loader("eglRenderer")
-    p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
-p.setAdditionalSearchPath(pybullet_data.getDataPath())
-p.setGravity(0,0,-9.8)
+utils.initialize_env(gui=1)
 
-planeId = p.loadURDF("plane.urdf")
-robot = p.loadURDF("ur10e/ur10e.urdf", [0, 0, 0.6])
+ur10 = manipulators.UR10([0, 0, 0.65])
+gripper = manipulators.Robotiq3fGripper()
+ur10.print_links()
+gripper.print_links()
 
-numJoints = p.getNumJoints(robot)
-robot_joints = []
-for i in range(numJoints):
-    robot_joints.append(p.addUserDebugParameter("j"+str(i), -np.pi, np.pi, 0))
+ur10.attach_tool(tool=gripper, position=(0, -0.04, 0))
+robot_start = [np.pi/2, -np.pi/3, np.pi/2, -2*np.pi/3, -np.pi/2, 0]
+ur10.move_j(robot_start, t=2, sleep=True)
 
-base = p.loadURDF("robotiq-3f-gripper/robotiq-3f-gripper_articulated.urdf")
-constraint_id = p.createConstraint(
-    parentBodyUniqueId=robot,
-    parentLinkIndex=6,
-    childBodyUniqueId=base,
-    childLinkIndex=-1,
-    jointType=p.JOINT_FIXED,
-    jointAxis=(0, 0, 0),
-    parentFramePosition=(0, 0, 0),
-    childFramePosition=(0, -0.04, 0),
-    childFrameOrientation=p.getQuaternionFromEuler([0, 0, 0]))
+p.loadURDF("table/table.urdf", [0, 0.7, 0])
 
-numJoints2 = p.getNumJoints(base)
-gripper_joints = []
-for i in range(numJoints2):
-    gripper_joints.append(p.addUserDebugParameter("g"+str(i), -np.pi, np.pi, 0))
+collisionShapeId = p.createCollisionShape(
+    shapeType=p.GEOM_BOX,
+    # radius=0.05,
+    halfExtents=[0.05, 0.05, 0.05]
+)
+visualShapeId = p.createVisualShape(
+    shapeType=p.GEOM_BOX,
+    # radius=0.05,
+    halfExtents=[0.05, 0.05, 0.05],
+    rgbaColor=[1, 0, 0, 1],
+    specularColor=[0.4, 0.4, 0.0]
+)
 
-it = 0
-quat = Rotation.from_euler("zyx", [0, 0, -90], degrees=True).as_quat()
+p.createMultiBody(
+    baseMass=1,
+    baseCollisionShapeIndex=collisionShapeId,
+    baseVisualShapeIndex=visualShapeId,
+    basePosition=[0, 0.7, 0.65])
+p.createMultiBody(
+    baseMass=1,
+    baseCollisionShapeIndex=collisionShapeId,
+    baseVisualShapeIndex=visualShapeId,
+    basePosition=[0.3, 0.7, 0.65])
+p.createMultiBody(
+    baseMass=1,
+    baseCollisionShapeIndex=collisionShapeId,
+    baseVisualShapeIndex=visualShapeId,
+    basePosition=[-0.3, 0.7, 0.65])
+
+ur10.tool.release()
+ur10.move_p([-0.3, 0.7, 1.2], p.getQuaternionFromEuler([-np.pi/2, 0, np.pi]), t=2, sleep=True)
+ur10_states = ur10.get_joint_states()
+print(" ".join(["%.2f" % j[3] for j in ur10_states]))
+gripper_states = ur10.tool.get_joint_states()
+print(" ".join(["%.2f" % j[3] for j in gripper_states]))
+height = 1.2
+force = np.linalg.norm(ur10.get_joint_states()[5][2][:3])
+while force < 30:
+    ur10.move_p([-0.3, 0.7, height], p.getQuaternionFromEuler([-np.pi/2, 0, np.pi]), t=1/240, sleep=True)
+    print("h: %.3f, F=%.3f" % (height, force))
+    height -= 0.001
+    force = np.linalg.norm(ur10.get_joint_states()[5][2][:3])
+ur10.move_p([-0.3, 0.7, height+0.02], p.getQuaternionFromEuler([-np.pi/2, 0, np.pi]), t=1, sleep=True)
+
+threshold = 60
+ur10.tool.grasp(threshold)
+
+ur10.move_p([-0.3, 0.7, 1.0], p.getQuaternionFromEuler([-np.pi/2, 0, np.pi]), t=3, sleep=True)
+ur10.move_p([0.3, 0.7, 1.0], p.getQuaternionFromEuler([-np.pi/2, 0, np.pi]), t=3, sleep=True)
+ur10.tool.release()
+# ur10.move_p([-0.3, 0.7, 0.83], p.getQuaternionFromEuler([-np.pi/2, 0, 0]), t=2, sleep=True)
+# states = ur10.get_joint_states()
+# print(" ".join(["%.2f" % j[3] for j in states]))
+# states = ur10.tool.get_joint_states()
+# print(" ".join(["%.2f" % j[3] for j in states]))
+
+ur10.add_debug_param()
+ur10.tool.add_debug_param()
+# p.setRealTimeSimulation(1)
 while True:
-    # joints = np.zeros(numJoints)
-    # for i in range(numJoints):
-    #     joints[i] = p.readUserDebugParameter(robot_joints[i])
-    # move(robot, targetPositions=joints)
-
-    # joints = np.zeros(numJoints2)
-    # for i in range(numJoints2):
-    #     joints[i] = p.readUserDebugParameter(gripper_joints[i])
-    # move(base, targetPositions=joints)
-    # p.stepSimulation()
-
+    # states = ur10.get_joint_states()
+    # print(" ".join(["%.2f" % j[3] for j in states]))
+    print("="*24)
+    states = ur10.tool.get_joint_states()
+    for i, j in enumerate(states):
+        print(f"{ur10.tool.names[i].decode('utf-8')}: F={np.linalg.norm(j[2][:3]):.2f}, M={np.linalg.norm(j[2][3:]):.2f}")
+    # print(" ".join(["%.2f" % j[3] for j in states]))
+    ur10.update_debug()
+    ur10.tool.update_debug()
+    time.sleep(1/240)
     p.stepSimulation()
-    position, orientation = p.getBasePositionAndOrientation(robot)
-    jointInfo = p.getJointStates(robot, range(numJoints))
-    jointPosition = [jointInfo[i][0] for i in range(numJoints)]
-    jointVelocity = [jointInfo[i][1] for i in range(numJoints)]
-
-    angle = (it / 240) * np.pi * 2
-    target_joints = p.calculateInverseKinematics(
-        bodyUniqueId=robot,
-        endEffectorLinkIndex=6,
-        targetPosition=[0.6 + np.cos(angle)*0.1, np.sin(angle)*0.1, 1],
-        targetOrientation=quat,
-        lowerLimits=[-2*np.pi, -np.pi, 0, -np.pi, -np.pi, -np.pi],
-        upperLimits=[2*np.pi, 0, np.pi, np.pi, np.pi, np.pi],
-        jointRanges=[4*np.pi, 2*np.pi, 2*np.pi, 2*np.pi, 2*np.pi, 2*np.pi],
-        restPoses=[0, -np.pi/4, np.pi/2, 0, 0, 0]
-    )
-    move(robot, targetPositions=target_joints)
-    it += 1
