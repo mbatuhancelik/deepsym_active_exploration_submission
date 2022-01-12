@@ -5,6 +5,7 @@ import pybullet as p
 
 PI = 3.1415926589793
 
+
 class Manipulator:
     def __init__(self, path, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
         self.id = p.loadURDF(
@@ -51,7 +52,6 @@ class Manipulator:
                 p.stepSimulation()
                 if sleep:
                     time.sleep(1/240)
-
 
     def move_v(self, velocity, t=None, sleep=False):
         assert len(self.joints) > 0
@@ -119,6 +119,7 @@ class Manipulator:
             print("%d - collision margin: %.3f" % (i, s[11]))
             print("-"*20)
 
+
 class UR10(Manipulator):
     def __init__(self, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
         super(UR10, self).__init__("ur10e/ur10e.urdf", position, orientation)
@@ -155,6 +156,7 @@ class UR10(Manipulator):
             # restPoses=(0, -PI/4, PI/2, 0, 0, 0))
         self.move_j(target_joints, t=t, sleep=sleep)
 
+
 class Robotiq3fGripper(Manipulator):
     def __init__(self, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
         super(Robotiq3fGripper, self).__init__("robotiq-3f-gripper/robotiq-3f-gripper_articulated.urdf", position, orientation)
@@ -168,8 +170,7 @@ class Robotiq3fGripper(Manipulator):
         #     controlMode=p.POSITION_CONTROL,
         #     targetPositions=[-1.2217, -1.2217, -1.2217],
         #     forces=[100, 100, 100])
-        # for _ in range(240):
-        #     p.stepSimulation()
+        # for _ in range(240):        #     p.stepSimulation()
         #     time.sleep(1/240)
         # p.setJointMotorControlArray(
         #     bodyUniqueId=self.id,
@@ -192,7 +193,7 @@ class Robotiq3fGripper(Manipulator):
         self.move_j(
           [0.0, 0.0495, 0., -0.255,
            0.0, 0.0495, 0., -0.255,
-               0.0495, 0., -0.255], t=1, sleep=True)
+           0.0495, 0., -0.255], t=1, sleep=True)
         # self.move_v(
         #     [0, -self.vel, 0, 0,
         #      0, -self.vel, 0, 0,
@@ -201,7 +202,6 @@ class Robotiq3fGripper(Manipulator):
         #     [0, -force, -force, -force,
         #      0, -force, -force, -force,
         #         -force, -force, -force], max_force=self.max_force)
-
 
     def grasp(self, threshold):
         state = self.get_joint_states()

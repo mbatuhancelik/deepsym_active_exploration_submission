@@ -1,2 +1,5 @@
 *.sublime-workspace
 __pycache__
+data
+.ipynb_checkpoints
+nle_data
