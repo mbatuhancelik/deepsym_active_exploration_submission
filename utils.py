@@ -3,6 +3,7 @@ import pkgutil
 import pybullet as p
 import pybullet_data
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 
 def initialize_env(gui=1, timestep=1/240):
@@ -82,3 +83,50 @@ def create_tabletop():
     objects["wall4"] = create_object(p.GEOM_BOX, mass=0, size=[0.01, 1.0, 0.05],
                                      position=[1.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
     return objects
+
+
+def get_image(eye_position, target_position, up_vector, height, width):
+    viewMatrix = p.computeViewMatrix(cameraEyePosition=eye_position,
+                                     cameraTargetPosition=target_position,
+                                     cameraUpVector=up_vector)
+    projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.01, farVal=2.5)
+    img = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
+    return img
+
+
+def create_camera(position, rotation, static=True):
+    baseCollision = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+    targetCollision = p.createCollisionShape(shapeType=p.GEOM_CYLINDER, radius=0.005, height=0.01)
+    baseVisual = p.createVisualShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02], rgbaColor=[0, 0, 0, 1])
+    targetVisual = p.createVisualShape(shapeType=p.GEOM_CYLINDER, radius=0.005, length=0.01, rgbaColor=[0.8, 0.8, 0.8, 1.0])
+
+    # base = create_object(obj_type=p.GEOM_SPHERE, size=0.1, position=position, rotation=rotation)
+    # target = create_object(obj_T)
+    mass = 0 if static else 0.1
+    obj_id = p.createMultiBody(baseMass=mass,
+                               baseCollisionShapeIndex=-1,
+                               baseVisualShapeIndex=-1,
+                               basePosition=position,
+                               baseOrientation=p.getQuaternionFromEuler(rotation),
+                               linkMasses=[mass, mass],
+                               linkCollisionShapeIndices=[baseCollision, targetCollision],
+                               linkVisualShapeIndices=[baseVisual, targetVisual],
+                               linkPositions=[[0, 0, 0], [0.02, 0, 0]],
+                               linkOrientations=[[0, 0, 0, 1], p.getQuaternionFromEuler([0., np.pi/2, 0])],
+                               linkInertialFramePositions=[[0, 0, 0], [0, 0, 0]],
+                               linkInertialFrameOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
+                               linkParentIndices=[0, 1],
+                               linkJointTypes=[p.JOINT_FIXED, p.JOINT_FIXED],
+                               linkJointAxis=[[0, 0, 0], [0, 0, 0]])
+
+    return obj_id
+
+
+def get_image_from_cam(camera_id, height, width):
+    cam_state = p.getLinkStates(camera_id, [0, 1])
+    base_pos = cam_state[0][0]
+    up_vector = Rotation.from_quat(cam_state[0][1]).as_matrix()[:, -1]
+    target_pos = cam_state[1][0]
+    target_vec = np.array(target_pos) - np.array(base_pos)
+    target_vec = (target_vec / np.linalg.norm(target_vec))
+    return get_image(base_pos+target_vec*0.04, base_pos+target_vec, up_vector, height, width)
