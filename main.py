@@ -1,141 +1,138 @@
 import time
 import os
 import random
-import pkgutil
 
 import numpy as np
 import pybullet as p
-import pybullet_data
 
-from scipy.spatial.transform import Rotation
+import manipulators
+import utils
 
-def move(robot, targetPositions=None, targetVelocities=None):
-    if targetPositions is None:
-        p.setJointMotorControlArray(
-            bodyUniqueId=robot,
-            jointIndices=range(len(targetVelocities)),
-            controlMode=p.VELOCITY_CONTROL,
-            targetVelocities=targetVelocities,
-        )
-    elif targetVelocities is None:
-        p.setJointMotorControlArray(
-            bodyUniqueId=robot,
-            jointIndices=range(len(targetPositions)),
-            controlMode=p.POSITION_CONTROL,
-            targetPositions=targetPositions,
-        )
-    else:
-        print("Birini vermek zorundasin!")
+utils.initialize_env(gui=1)
 
-GUI = 1
+base = utils.create_object(p.GEOM_BOX, density=0, size=[0.15, 0.15, 0.2], position=[0., 0., 0.2], color=[0.5, 0.5, 0.5, 1.0], with_link=True)
+table = utils.create_object(p.GEOM_BOX, density=0, size=[0.5, 1.0, 0.2], position=[0.8, 0, 0.2], color=[1.0, 1.0, 1.0, 1.0])
+# walls
+utils.create_object(p.GEOM_BOX, density=0, size=[0.5, 0.01, 0.05], position=[0.8, -1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+utils.create_object(p.GEOM_BOX, density=0, size=[0.5, 0.01, 0.05], position=[0.8, 1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+utils.create_object(p.GEOM_BOX, density=0, size=[0.01, 1.0, 0.05], position=[0.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
+utils.create_object(p.GEOM_BOX, density=0, size=[0.01, 1.0, 0.05], position=[1.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
 
-if GUI:
-    physicsClient = p.connect(p.GUI)
-else:
-    physicsClient = p.connect(p.DIRECT)
-    egl = pkgutil.get_loader("eglRenderer")
-    p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
+# agent = manipulators.Manipulator("franka_panda/panda.urdf", position=[0., 0., 0.4], ik_idx=11)
+agent = manipulators.Manipulator("ur10e/ur10e.urdf", position=[0., 0., 0.4], ik_idx=10)
+constraint_id = p.createConstraint(parentBodyUniqueId=base, parentLinkIndex=0,
+                                   childBodyUniqueId=agent.id, childLinkIndex=-1,
+                                   jointType=p.JOINT_FIXED, jointAxis=(0, 0, 0),
+                                   parentFramePosition=(0, 0, 0),
+                                   childFramePosition=(0.0, 0.0, -0.2),
+                                   childFrameOrientation=(0, 0, 0, 1))
+p.changeConstraint(constraint_id, maxForce=10000)
+# robot_start = [0.9, -0.34, 0.35, -2.48, 0.141, 2.16, 1.05, 0, 0]
+robot_start = [np.pi/2, -np.pi/3, np.pi/2, -2*np.pi/3, -np.pi/2, 0, 0, 0]
+agent.set_joint_position(robot_start, t=2)
 
-p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
-# p.setRealTimeSimulation(1)
-# p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+# for _ in range(50):
+#     obj_type = np.random.choice([p.GEOM_BOX, p.GEOM_SPHERE, p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+#     x = np.random.uniform(1.1, 0.4)
+#     y = np.random.uniform(-0.9, 0.9)
+#     z = np.random.uniform(0.6, 0.7)
+#     size = np.random.uniform(0.015, 0.035, (3,)).tolist()
+#     if obj_type == p.GEOM_CYLINDER:
+#         rotation = [0, 0, 0]
+#     else:
+#         rotation = np.random.uniform(0, 90, (3,)).tolist()
+#     if obj_type == p.GEOM_BOX:
+#         if np.random.rand() < 0.5:
+#             size = [np.random.uniform(0., 0.2), np.random.uniform(0.01, 0.015),
+#                     np.random.uniform(0.015, 0.025)]
+#     utils.create_object(obj_type=obj_type, size=size, position=[x, y, z],
+#                         rotation=rotation)
 
-p.setGravity(0,0,-9.8)
-planeId = p.loadURDF("plane.urdf")
-startOrientation = p.getQuaternionFromEuler([0,0,0])
-objId = p.loadSDF("kuka_iiwa/kuka_with_gripper2.sdf")[0]
-p.resetBasePositionAndOrientation(objId, [0, 0, 0.6], [0, 0, 0, 1])
-# objId = p.loadURDF("kuka_iiwa/model.urdf", [0, 0, 0.6])
-# objId = p.loadURDF("ur5.urdf", [0, 0, 0.6])
-p.loadURDF("table/table.urdf", [0, -0.7, 0.])
+p.setJointMotorControlArray(bodyUniqueId=agent.id,
+                            jointIndices=agent.joints[-2:],
+                            controlMode=p.POSITION_CONTROL,
+                            targetPositions=[0.04, 0.04],
+                            forces=agent.forces[-2:])
+for _ in range(40):
+    p.stepSimulation()
+    time.sleep(1/240)
 
-# p.loadURDF("cube_small.urdf", [0, -0.7, 1.])
-viewMatrix = p.computeViewMatrix(
-    cameraEyePosition=[0, -0.7, 1.7],
-    cameraTargetPosition=[0, -0.7, 0],
-    cameraUpVector=[0, 1, 0]
-    )
-projectionMatrix = p.computeProjectionMatrixFOV(
-    fov=45,
-    aspect=1.0,
-    nearVal=0.01,
-    farVal=5
-    )
+utils.create_object(p.GEOM_BOX, [0.025, 0.025, 0.025], [0.6, 0., 0.6])
 
-collisionShapeId = p.createCollisionShape(
-    shapeType=p.GEOM_BOX,
-    # radius=0.05,
-    halfExtents=[0.05, 0.05, 0.05]
-)
-visualShapeId = p.createVisualShape(
-    shapeType=p.GEOM_BOX,
-    # radius=0.05,
-    halfExtents=[0.05, 0.05, 0.05],
-    rgbaColor=[1, 0, 0, 1],
-    specularColor=[0.4, 0.4, 0.0]
-)
+agent.set_cartesian_position([0.6, 0.0, 0.7], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
+agent.set_cartesian_position([0.6, 0.0, 0.41], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
 
-p.createMultiBody(
-    baseMass=0.05,
-    baseCollisionShapeIndex=collisionShapeId,
-    baseVisualShapeIndex=visualShapeId,
-    basePosition=[0, -0.7, 0.65])
-p.createMultiBody(
-    baseMass=0.05,
-    baseCollisionShapeIndex=collisionShapeId,
-    baseVisualShapeIndex=visualShapeId,
-    basePosition=[0.3, -0.7, 0.65])
-p.createMultiBody(
-    baseMass=0.05,
-    baseCollisionShapeIndex=collisionShapeId,
-    baseVisualShapeIndex=visualShapeId,
-    basePosition=[-0.3, -0.7, 0.65])
+p.setJointMotorControlArray(bodyUniqueId=agent.id,
+                            jointIndices=agent.joints[-2:],
+                            controlMode=p.POSITION_CONTROL,
+                            targetPositions=[0.0, 0.0],
+                            forces=agent.forces[-2:])
+for _ in range(40):
+    p.stepSimulation()
+    time.sleep(1/240)
 
-# for i in range(20):
-#     p.createMultiBody(
-#         baseMass=0.01,
-#         baseCollisionShapeIndex=p.createCollisionShape(p.GEOM_SPHERE, radius=0.01),
-#         basePosition=[0.5, -0.7, 0.66+i*0.02]
-#     )
+agent.set_cartesian_position([0.6, 0.0, 0.7], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
+agent.set_cartesian_position([0.5, 0.0, 0.7], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
 
-numJoints = p.getNumJoints(objId)
-print(f"This have {numJoints} joints.")
-for i in range(numJoints):
-    print(p.getJointInfo(objId, i))
-# exit()
+p.setJointMotorControlArray(bodyUniqueId=agent.id,
+                            jointIndices=agent.joints[-2:],
+                            controlMode=p.POSITION_CONTROL,
+                            targetPositions=[0.04, 0.04],
+                            forces=agent.forces[-2:])
+for _ in range(40):
+    p.stepSimulation()
+    time.sleep(1/240)
 
-rnd = np.random.randn(numJoints)*0.1
-quat = Rotation.from_euler("zyx", [0, 180, 0], degrees=True).as_quat()
-target_joints = p.calculateInverseKinematics(
-    bodyUniqueId=objId,
-    endEffectorLinkIndex=7,
-    targetPosition=[0.4, -0.7, 0.9],
-    targetOrientation=quat
-)
-move(objId, targetPositions=target_joints)
-
-it = 0
 while True:
     p.stepSimulation()
-    position, orientation = p.getBasePositionAndOrientation(objId)
-    jointInfo = p.getJointStates(objId, range(numJoints))
-    jointPosition = [jointInfo[i][0] for i in range(numJoints)]
-    jointVelocity = [jointInfo[i][1] for i in range(numJoints)]
 
-    angle = (it / 240) * np.pi * 2
-    target_joints = p.calculateInverseKinematics(
-        bodyUniqueId=objId,
-        endEffectorLinkIndex=7,
-        targetPosition=[np.cos(angle)*0.1, -0.6+np.sin(angle)*0.1, 0.9],
-        targetOrientation=quat
-    )
-    move(objId, targetPositions=target_joints)
-    it += 1
+# gripper_status = 0.0
+# dT = [-0.01, 0.0, 0.01]
+# dR = [-np.pi/90, 0, np.pi/90]  # [-2, 0, 2] degrees
+# dx = np.random.choice(dT)
+# dy = np.random.choice(dT)
+# dz = np.random.choice(dT)
+# dr = np.random.choice(dR)
 
-    # noise = np.random.randn(numJoints)*0.01
-    # rnd = rnd + noise
-    # move(objId, targetPositions=rnd)
+# it = 0
+# start = time.time()
+# while True:
+#     if np.random.rand() < 0.1:
+#         dx = np.random.choice(dT)
+#     if np.random.rand() < 0.1:
+#         dy = np.random.choice(dT)
+#     if np.random.rand() < 0.1:
+#         dz = np.random.choice(dT)
+#     if np.random.rand() < 0.1:
+#         dr = np.random.choice(dR)
 
-    p.getCameraImage(width=128, height=128, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
-    # print(", ".join(["%.3f" % jointPosition[i] for i in range(numJoints)]))
-p.disconnect()
+#     position, quaternion = agent.get_tip_pose()
+#     position = list(position)
+#     rotation = list(p.getEulerFromQuaternion(quaternion))
+#     position[0] = np.clip(position[0]+dx, 0.4, 1.1)
+#     position[1] = np.clip(position[1]+dy, -0.9, 0.9)
+#     position[2] = np.clip(position[2]+dz, 0.42, 0.5)
+#     rotation[2] = np.clip(rotation[2]+dr, -np.pi, np.pi)
+
+#     agent.set_cartesian_position(position=position, orientation=p.getQuaternionFromEuler([np.pi, 0, rotation[2]]))
+
+#     if np.random.rand() < 0.01:
+#         gripper_status = 0.04 - gripper_status
+#         p.setJointMotorControlArray(
+#             bodyUniqueId=agent.id,
+#             jointIndices=agent.joints[-2:],
+#             controlMode=p.POSITION_CONTROL,
+#             targetPositions=[gripper_status, gripper_status],
+#             forces=agent.forces[-2:])
+#         for _ in range(40):
+#             p.stepSimulation()
+#             # time.sleep(1/240)
+
+#     it += 1
+#     p.stepSimulation()
+#     # time.sleep(1/240)
+#     if it % 1000 == 0:
+#         end = time.time()
+#         sim_time = it * (1/240)
+#         real_time = end - start
+#         print(f"RT={real_time:.2f}, ST={sim_time:.2f},  Factor={(sim_time/real_time):.3f}")
