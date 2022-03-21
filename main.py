@@ -54,6 +54,31 @@ for _ in range(50):
     utils.create_object(obj_type=obj_type, size=size, position=[x, y, z],
                         rotation=rotation, color=color)
 
+
+camera = utils.create_camera([0.6, 0.0, 0.5], rotation=[0., 0, 4*np.pi/4], static=False)
+camera_st = utils.create_camera([1.3, -1.0, 1.5], rotation=[np.pi/6, 0, 3*np.pi/4], static=True)
+
+for _ in range(40):
+    p.stepSimulation()
+    time.sleep(1/240)
+
+p.setJointMotorControlArray(
+    bodyUniqueId=agent.id,
+    jointIndices=agent.joints[-2:],
+    controlMode=p.POSITION_CONTROL,
+    targetPositions=[0.04, 0.04],
+    forces=[10, 10])
+for _ in range(40):
+    p.stepSimulation()
+    time.sleep(1/240)
+agent.set_cartesian_position([0.6, 0.0, 0.41], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
+p.setJointMotorControlArray(
+    bodyUniqueId=agent.id,
+    jointIndices=agent.joints[-2:],
+    controlMode=p.POSITION_CONTROL,
+    targetPositions=[0.0, 0.0],
+    forces=[10, 10])
+
 for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
@@ -88,7 +113,7 @@ while True:
 
     agent.set_cartesian_position(position=position, orientation=p.getQuaternionFromEuler([np.pi, 0, rotation[2]]))
 
-    if np.random.rand() < 0.01:
+    if np.random.rand() < 0.00:
         gripper_status = 0.04 - gripper_status
         p.setJointMotorControlArray(
             bodyUniqueId=agent.id,
@@ -102,6 +127,14 @@ while True:
 
     it += 1
     p.stepSimulation()
+    
+    if it % 24 == 0:
+        # width, height, rgb, depth, seg = utils.get_image([1.3, -1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
+        # width, height, rgb, depth, seg = utils.get_image([1.3, 1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
+        # width, height, rgb, depth, seg = utils.get_image([0.8, 0, 2.4], [0.8, 0., 0.4], [1, 0, 0], 128, 128)
+        # utils.get_image_from_cam(camera, 128, 128)
+        utils.get_image_from_cam(camera_st, 128, 128)
+
     # time.sleep(1/240)
     if it % 1000 == 0:
         end = time.time()
