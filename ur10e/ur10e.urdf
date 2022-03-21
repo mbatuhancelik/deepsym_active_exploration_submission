@@ -21,6 +21,10 @@
     <color rgba="0.4 0.4 0.4 1.0"/>
   </material>
 
+  <material name="panda_white">
+    <color rgba="1. 1. 1. 1."/>
+  </material>
+
   <link name="base_link">
     <visual>
       <geometry>
@@ -34,7 +38,7 @@
       </geometry>
     </collision>
     <inertial>
-      <!-- originally, mass was 4.0 -->
+      <!-- alper: originally, mass was 4.0 -->
       <mass value="0.0"/> 
       <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
       <inertia ixx="0.0061063308908" ixy="0.0" ixz="0.0" iyy="0.0061063308908" iyz="0.0" izz="0.01125"/>
@@ -196,100 +200,9 @@
       <inertia ixx="0.00014434577559500002" ixy="0.0" ixz="0.0" iyy="0.00014434577559500002" iyz="0.0" izz="0.00020452500000000002"/>
     </inertial>
   </link>
-<!--   <joint name="ee_fixed_joint" type="fixed">
-    <parent link="wrist_3_link"/>
-    <child link="ee_link"/>
-    <origin rpy="0.0 0.0 1.5707963267948966" xyz="0.0 0.117 0.0"/>
-  </joint> -->
-<!--   <link name="ee_link">
-    <collision>
-      <geometry>
-        <box size="0.01 0.01 0.01"/>
-      </geometry>
-      <origin rpy="0 0 0" xyz="-0.01 0 0"/>
-    </collision>
-    <inertial>
-      <mass value="0.0"/>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-    </inertial>
-  </link> -->
 
-<!--   <transmission name="shoulder_pan_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="shoulder_pan_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="shoulder_pan_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="shoulder_lift_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="shoulder_lift_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="shoulder_lift_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="elbow_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="elbow_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="elbow_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="wrist_1_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="wrist_1_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="wrist_1_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="wrist_2_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="wrist_2_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="wrist_2_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="wrist_3_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="wrist_3_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="wrist_3_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission> -->
-
- <!-- ROS base_link to UR 'Base' Coordinates transform -->
-<!--   <link name="base">
-    <inertial>
-      <mass value="0.0"/>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-    </inertial>
-  </link> -->
-<!--   <joint name="base_link-base_fixed_joint" type="fixed">
-    NOTE: this rotation is only needed as long as base_link itself is
-                 not corrected wrt the real robot (ie: rotated over 180
-                 degrees)
-     
-    <origin rpy="0 0 -3.141592653589793" xyz="0 0 0"/>
-    <parent link="base_link"/>
-    <child link="base"/>
-  </joint> -->
-  <!-- Frame coincident with all-zeros TCP on UR controller -->
   <link name="tool0">
-    <!-- I added inertial -->
+    <!-- alper: I added inertial -->
     <inertial>
       <mass value="0.0"/>
       <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
@@ -302,10 +215,111 @@
     <parent link="wrist_3_link"/>
     <child link="tool0"/>
   </joint>
-<!--   <link name="world"/>
-  <joint name="world_joint" type="fixed">
-    <parent link="world"/>
-    <child link="base_link"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-  </joint> -->
+
+  <joint name="panda_hand_joint" type="fixed">
+    <parent link="tool0"/>
+    <child link="panda_hand"/>
+    <origin rpy="-1.57 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link name="panda_hand">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0.04"/>
+       <mass value=".81"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <mesh filename="package://visual/hand.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://collision/hand.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+  <link name="panda_leftfinger">
+    <contact>
+      <friction_anchor/>
+      <stiffness value="30000.0"/>
+      <damping value="1000.0"/>
+      <spinning_friction value="0.1"/>
+      <lateral_friction value="1.0"/>
+    </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0.01 0.02"/>
+       <mass value="0.1"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <mesh filename="package://visual/finger.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://collision/finger.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+  <link name="panda_rightfinger">
+    <contact>
+      <friction_anchor/>
+      <stiffness value="30000.0"/>
+      <damping value="1000.0"/>
+      <spinning_friction value="0.1"/>
+      <lateral_friction value="1.0"/>
+    </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 -0.01 0.02"/>
+       <mass value="0.1"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://visual/finger.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://collision/finger.obj"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+  <joint name="panda_finger_joint1" type="prismatic">
+    <parent link="panda_hand"/>
+    <child link="panda_leftfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+  </joint>
+  <joint name="panda_finger_joint2" type="prismatic">
+    <parent link="panda_hand"/>
+    <child link="panda_rightfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+    <mimic joint="panda_finger_joint1"/>
+  </joint>
+  <link name="panda_grasptarget">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value="0.0"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+  </link>
+  <joint name="panda_grasptarget_hand" type="fixed">
+    <parent link="panda_hand"/>
+    <child link="panda_grasptarget"/>
+    <origin rpy="0 0 0" xyz="0 0 0.105"/>
+  </joint>
 </robot>
