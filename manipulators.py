@@ -1,9 +1,6 @@
 import time
 
-import numpy as np
 import pybullet as p
-
-PI = 3.1415926589793
 
 
 class Manipulator:
@@ -63,7 +60,7 @@ class Manipulator:
             endEffectorLinkIndex=self.ik_idx,
             targetPosition=position,
             targetOrientation=orientation)
-        self.set_joint_position(target_joints, t=t, sleep=sleep)
+        self.set_joint_position(target_joints[:-2], t=t, sleep=sleep)
 
     def set_joint_position(self, position, velocity=None, t=None, sleep=False):
         assert len(self.joints) > 0
@@ -71,7 +68,7 @@ class Manipulator:
         if velocity is not None:
             p.setJointMotorControlArray(
                 bodyUniqueId=self.id,
-                jointIndices=self.joints,
+                jointIndices=self.joints[:-2],
                 controlMode=p.POSITION_CONTROL,
                 targetPositions=position,
                 targetVelocities=velocity,
@@ -79,10 +76,10 @@ class Manipulator:
         else:
             p.setJointMotorControlArray(
                 bodyUniqueId=self.id,
-                jointIndices=self.joints,
+                jointIndices=self.joints[:-2],
                 controlMode=p.POSITION_CONTROL,
                 targetPositions=position,
-                forces=self.forces)
+                forces=self.forces[:-2])
 
         if t is not None:
             iters = int(t*self._freq)
