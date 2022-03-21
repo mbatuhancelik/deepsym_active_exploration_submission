@@ -24,7 +24,7 @@ class RBM(torch.nn.Module):
         return prob, sample
 
     def energy(self, v, h):
-        return -(v @ self.a + h @ self.b + ((v @ self.w)*h).sum(dim=-1)) 
+        return -(v @ self.a + h @ self.b + ((v @ self.w)*h).sum(dim=-1))
 
     def gibbs_k(self, h, k, prob=False):
         for _ in range(k):
@@ -40,3 +40,5 @@ class RBM(torch.nn.Module):
 
     def extra_repr(self):
         return "v_dim={}, h_dim={}".format(self.v_dim, self.h_dim)
+
+
