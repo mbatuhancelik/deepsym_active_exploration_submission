@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 import pybullet as p
+from scipy.spatial.transform import Rotation
 
 import manipulators
 import utils
@@ -54,9 +55,8 @@ for _ in range(50):
     utils.create_object(obj_type=obj_type, size=size, position=[x, y, z],
                         rotation=rotation, color=color)
 
-
 camera = utils.create_camera([0.6, 0.0, 0.5], rotation=[0., 0, 4*np.pi/4], static=False)
-camera_st = utils.create_camera([1.3, -1.0, 1.5], rotation=[np.pi/6, 0, 3*np.pi/4], static=True)
+# camera_st = utils.create_camera([1.3, -1.0, 1.5], rotation=[0, np.pi/4, 2*np.pi/3], static=True)
 
 for _ in range(40):
     p.stepSimulation()
@@ -83,7 +83,7 @@ for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
 
-gripper_status = 0.0
+gripper_open = True
 dT = [-0.01, 0.0, 0.01]
 dR = [-np.pi/90, 0, np.pi/90]  # [-2, 0, 2] degrees
 dx = np.random.choice(dT)
@@ -113,17 +113,13 @@ while True:
 
     agent.set_cartesian_position(position=position, orientation=p.getQuaternionFromEuler([np.pi, 0, rotation[2]]))
 
-    if np.random.rand() < 0.00:
-        gripper_status = 0.04 - gripper_status
-        p.setJointMotorControlArray(
-            bodyUniqueId=agent.id,
-            jointIndices=agent.joints[-2:],
-            controlMode=p.POSITION_CONTROL,
-            targetPositions=[gripper_status, gripper_status],
-            forces=[10, 10])
-        for _ in range(40):
-            p.stepSimulation()
-            # time.sleep(1/240)
+    if np.random.rand() < 0.10:
+        if gripper_open:
+            agent.close_gripper(t=40)
+            gripper_open = False
+        else:
+            agent.open_gripper(t=40)
+            gripper_open = True
 
     it += 1
     p.stepSimulation()
@@ -131,9 +127,9 @@ while True:
     if it % 24 == 0:
         # width, height, rgb, depth, seg = utils.get_image([1.3, -1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
         # width, height, rgb, depth, seg = utils.get_image([1.3, 1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
-        # width, height, rgb, depth, seg = utils.get_image([0.8, 0, 2.4], [0.8, 0., 0.4], [1, 0, 0], 128, 128)
+        width, height, rgb, depth, seg = utils.get_image([0.8, 0, 2.4], [0.8, 0., 0.4], [1, 0, 0], 128, 128)
         # utils.get_image_from_cam(camera, 128, 128)
-        utils.get_image_from_cam(camera_st, 128, 128)
+        # utils.get_image_from_cam(camera_st, 128, 128)
 
     # time.sleep(1/240)
     if it % 1000 == 0:

@@ -16,7 +16,6 @@ class Manipulator:
         self.joints = []
         self.names = []
         self.forces = []
-
         self.fixed_joints = []
         self.fixed_names = []
         for i in range(p.getNumJoints(self.id)):
@@ -28,7 +27,6 @@ class Manipulator:
             else:
                 self.fixed_joints.append(i)
                 self.fixed_names.append(info[1])
-
         self.joints = tuple(self.joints)
         self.names = tuple(self.names)
         self.num_joints = len(self.joints)
@@ -64,7 +62,6 @@ class Manipulator:
 
     def set_joint_position(self, position, velocity=None, t=None, sleep=False):
         assert len(self.joints) > 0
-
         if velocity is not None:
             p.setJointMotorControlArray(
                 bodyUniqueId=self.id,
@@ -80,46 +77,44 @@ class Manipulator:
                 controlMode=p.POSITION_CONTROL,
                 targetPositions=position,
                 forces=self.forces[:-2])
-
-        if t is not None:
-            iters = int(t*self._freq)
-            for _ in range(iters):
-                p.stepSimulation()
-                if sleep:
-                    time.sleep(self._timestep)
+        self._waitsleep(t, sleep)
 
     def set_joint_velocity(self, velocity, t=None, sleep=False):
         assert len(self.joints) > 0
-
         p.setJointMotorControlArray(
             bodyUniqueId=self.id,
             jointIndices=self.joints,
             controlMode=p.VELOCITY_CONTROL,
             targetVelocities=velocity,
             forces=self.forces)
-
-        if t is not None:
-            iters = int(t*self._freq)
-            for _ in range(iters):
-                p.stepSimulation()
-                if sleep:
-                    time.sleep(self._timestep)
+        self._waitsleep(t, sleep)
 
     def set_joint_torque(self, torque, t=None, sleep=False):
         assert len(self.joints) > 0
-
         p.setJointMotorControlArray(
             bodyUniqueId=self.id,
             jointIndices=self.joints,
             controlMode=p.TORQUE_CONTROL,
             forces=torque)
+        self._waitsleep(t, sleep)
 
-        if t is not None:
-            iters = int(t*self._freq)
-            for _ in range(iters):
-                p.stepSimulation()
-                if sleep:
-                    time.sleep(self._timestep)
+    # this is only specific to UR10 + panda_gripper
+    def open_gripper(self, t=None, sleep=False):
+        self._set_gripper([0.04, 0.04])
+
+    # this is only specific to UR10 + panda_gripper
+    def close_gripper(self, t=None, sleep=False):
+        self._set_gripper([0.0, 0.0])
+
+    # this is only specific to UR10 + panda_gripper
+    def _set_gripper(self, target_position, t=None, sleep=False):
+        p.setJointMotorControlArray(
+            bodyUniqueId=self.id,
+            jointIndices=self.joints[-2:],
+            controlMode=p.POSITION_CONTROL,
+            targetPositions=target_position,
+            forces=[10, 10])
+        self._waitsleep(t, sleep)
 
     # TODO: make this only joint position, joint velocity etc.
     def get_joint_states(self):
@@ -147,3 +142,11 @@ class Manipulator:
                 break
         if len(target_angles) == len(self.joints):
             self.set_joint_position(target_angles)
+
+    def _waitsleep(self, t, sleep):
+        if t is not None:
+            iters = int(t*self._freq)
+            for _ in range(iters):
+                p.stepSimulation()
+                if sleep:
+                    time.sleep(self._timestep)
