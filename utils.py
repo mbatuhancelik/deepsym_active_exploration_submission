@@ -89,7 +89,7 @@ def get_image(eye_position, target_position, up_vector, height, width):
     viewMatrix = p.computeViewMatrix(cameraEyePosition=eye_position,
                                      cameraTargetPosition=target_position,
                                      cameraUpVector=up_vector)
-    projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.01, farVal=2.5)
+    projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.1, farVal=2.5)
     img = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
     return img
 

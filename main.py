@@ -94,14 +94,15 @@ dr = np.random.choice(dR)
 it = 0
 start = time.time()
 while True:
-    if np.random.rand() < 0.1:
-        dx = np.random.choice(dT)
-    if np.random.rand() < 0.1:
-        dy = np.random.choice(dT)
-    if np.random.rand() < 0.1:
-        dz = np.random.choice(dT)
-    if np.random.rand() < 0.1:
-        dr = np.random.choice(dR)
+    if it % 24 == 0:
+        if np.random.rand() < 0.5:
+            dx = np.random.choice(dT)
+        if np.random.rand() < 0.5:
+            dy = np.random.choice(dT)
+        if np.random.rand() < 0.5:
+            dz = np.random.choice(dT)
+        if np.random.rand() < 0.5:
+            dr = np.random.choice(dR)
 
     position, quaternion = agent.get_tip_pose()
     position = list(position)
@@ -113,13 +114,14 @@ while True:
 
     agent.set_cartesian_position(position=position, orientation=p.getQuaternionFromEuler([np.pi, 0, rotation[2]]))
 
-    if np.random.rand() < 0.10:
-        if gripper_open:
-            agent.close_gripper(t=40)
-            gripper_open = False
-        else:
-            agent.open_gripper(t=40)
-            gripper_open = True
+    if it % 24 == 0:
+        if np.random.rand() < 0.50:
+            if gripper_open:
+                agent.close_gripper(t=40)
+                gripper_open = False
+            else:
+                agent.open_gripper(t=40)
+                gripper_open = True
 
     it += 1
     p.stepSimulation()
