@@ -1,7 +1,8 @@
 *.sublime-workspace
 __pycache__
 data
+save
+out
 .ipynb_checkpoints
-nle_data
 *.ipynb
 .DS_Store
