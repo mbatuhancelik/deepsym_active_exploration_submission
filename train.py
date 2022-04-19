@@ -22,8 +22,6 @@ STATE_BITS = 50
 NUM_EPOCH = 30
 LR = 0.0001
 BATCH_SIZE = 128
-N = 100000
-LOOP_PER_EPOCH = N // BATCH_SIZE
 
 encoder = torch.nn.Sequential(
     blocks.ConvBlock(in_channels=3, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
