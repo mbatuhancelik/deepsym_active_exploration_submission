@@ -4,6 +4,7 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 from scipy.spatial.transform import Rotation
+import torch
 
 
 def initialize_env(gui=1, timestep=1/240):
@@ -72,7 +73,7 @@ def create_tabletop():
     objects["base"] = create_object(p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],
                                     position=[0., 0., 0.2], color=[0.5, 0.5, 0.5, 1.0], with_link=True)
     objects["table"] = create_object(p.GEOM_BOX, mass=0, size=[0.5, 1.0, 0.2],
-                                     position=[0.8, 0, 0.2], color=[1.0, 1.0, 1.0, 1.0])
+                                     position=[0.8, 0, 0.2], color=[0.0, 1.0, 0.0, 1.0])
     # walls
     objects["wall1"] = create_object(p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
                                      position=[0.8, -1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
@@ -89,9 +90,9 @@ def get_image(eye_position, target_position, up_vector, height, width):
     viewMatrix = p.computeViewMatrix(cameraEyePosition=eye_position,
                                      cameraTargetPosition=target_position,
                                      cameraUpVector=up_vector)
-    projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.1, farVal=2.5)
-    img = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
-    return img
+    projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.1, farVal=5.0)
+    _, _, rgb, _, _ = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
+    return rgb
 
 
 def create_camera(position, rotation, static=True):
@@ -130,3 +131,62 @@ def get_image_from_cam(camera_id, height, width):
     target_vec = np.array(target_pos) - np.array(base_pos)
     target_vec = (target_vec / np.linalg.norm(target_vec))
     return get_image(base_pos+target_vec*0.04, base_pos+target_vec, up_vector, height, width)
+
+
+def get_parameter_count(model):
+    total_num = 0
+    for param in model.parameters():
+        total_num += param.shape.numel()
+    return total_num
+
+
+def print_module(module, name, space):
+    L = len(name)
+    line = " "*space+"-"*(L+4)
+    print(line)
+    print(" "*space+"  "+name+"  ")
+    print(line)
+    module_str = module.__repr__()
+    print("\n".join([" "*space+mstr for mstr in module_str.split("\n")]))
+
+#####################################
+
+
+def decimal_to_binary(number_list, length=None):
+    binaries = [format(x, "0"+str(length)+"b") for x in number_list]
+    return binaries
+
+
+def binary_to_decimal(x):
+    '''
+    Parameters
+    ----------
+    x : torch.Tensor
+        N by D where N is the number of binary vectors
+    
+    Returns
+    -------
+    dec_tensor : torch.Tensor
+        N length tensor that contains the decimal encodings
+    '''
+    N, D = x.shape
+    dec_tensor = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
+    for i in reversed(range(D)):
+        multiplier = 2**i
+        dec_tensor += multiplier * x[:, D-i-1].int()
+    return dec_tensor
+
+
+def binary_tensor_to_str(x):
+    return ["".join([str(x_ii.int().item()) for x_ii in x_i]) for x_i in x]
+
+
+def str_to_binary_tensor(x):
+    return torch.tensor([[int(i) for i in x_i] for x_i in x], dtype=torch.float)
+
+
+def in_array(element, array):
+    for i, e_i in enumerate(array):
+        if element.is_equal(e_i):
+            return True, i
+    return False, None
