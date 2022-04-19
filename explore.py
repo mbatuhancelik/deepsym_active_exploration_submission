@@ -2,15 +2,14 @@ import time
 
 import numpy as np
 import pybullet as p
-from scipy.spatial.transform import Rotation
+import torch
 
 import manipulators
 import utils
 
-utils.initialize_env(gui=1)
+utils.initialize_env(gui=0)
 env_objects = utils.create_tabletop()
 
-# agent = manipulators.Manipulator("franka_panda/panda.urdf", position=[0., 0., 0.4], ik_idx=11)
 agent = manipulators.Manipulator("ur10e/ur10e.urdf", position=[0., 0., 0.4], ik_idx=10)
 # attach UR10 to a base
 constraint_id = p.createConstraint(parentBodyUniqueId=env_objects["base"], parentLinkIndex=0,
@@ -28,14 +27,14 @@ c = p.createConstraint(agent.id, 8, agent.id, 9,
                        childFramePosition=[0, 0, 0])
 p.changeConstraint(c, gearRatio=-1, erp=0.1, maxForce=50)
 
-# robot_start = [0.9, -0.34, 0.35, -2.48, 0.141, 2.16, 1.05, 0, 0]
 robot_start = [np.pi/2, -np.pi/3, np.pi/2, -2*np.pi/3, -np.pi/2, 0]
 agent.set_joint_position(robot_start, t=2)
 agent.set_cartesian_position([0.6, 0.0, 0.7], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
 
 # generate random objects
-for _ in range(50):
-    obj_type = np.random.choice([p.GEOM_BOX, p.GEOM_SPHERE, p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+for _ in range(10):
+    # obj_type = np.random.choice([p.GEOM_BOX, p.GEOM_SPHERE, p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+    obj_type = p.GEOM_BOX
     x = np.random.uniform(1.1, 0.4)
     y = np.random.uniform(-0.9, 0.9)
     z = np.random.uniform(0.6, 0.7)
@@ -48,61 +47,81 @@ for _ in range(50):
         color = [0.0, 0.0, 1.0, 1.0]
     if obj_type == p.GEOM_BOX:
         color = [1.0, 0.0, 0.0, 1.0]
-        if np.random.rand() < 0.5:
-            size = [np.random.uniform(0., 0.2), np.random.uniform(0.01, 0.015),
-                    np.random.uniform(0.015, 0.025)]
-            color = [0.0, 1.0, 1.0, 1.0]
+        # if np.random.rand() < 0.5:
+        #     size = [np.random.uniform(0., 0.2), np.random.uniform(0.01, 0.015),
+        #             np.random.uniform(0.015, 0.025)]
+        #     color = [0.0, 1.0, 1.0, 1.0]
     utils.create_object(obj_type=obj_type, size=size, position=[x, y, z],
                         rotation=rotation, color=color)
-
-camera = utils.create_camera([0.6, 0.0, 0.5], rotation=[0., 0, 4*np.pi/4], static=False)
-# camera_st = utils.create_camera([1.3, -1.0, 1.5], rotation=[0, np.pi/4, 2*np.pi/3], static=True)
 
 for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
 
-p.setJointMotorControlArray(
-    bodyUniqueId=agent.id,
-    jointIndices=agent.joints[-2:],
-    controlMode=p.POSITION_CONTROL,
-    targetPositions=[0.04, 0.04],
-    forces=[10, 10])
+agent.open_gripper()
 for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
 agent.set_cartesian_position([0.6, 0.0, 0.41], orientation=p.getQuaternionFromEuler([np.pi, 0, 0]), t=2, sleep=True)
-p.setJointMotorControlArray(
-    bodyUniqueId=agent.id,
-    jointIndices=agent.joints[-2:],
-    controlMode=p.POSITION_CONTROL,
-    targetPositions=[0.0, 0.0],
-    forces=[10, 10])
+agent.close_gripper()
 
 for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
 
+DATA_SIZE = 100000
+state_vector = torch.zeros(DATA_SIZE, 3, 128, 128, dtype=torch.uint8)
+action_vector = torch.zeros(DATA_SIZE, 13, dtype=torch.uint8)
+
 gripper_open = True
 dT = [-0.01, 0.0, 0.01]
 dR = [-np.pi/90, 0, np.pi/90]  # [-2, 0, 2] degrees
-dx = np.random.choice(dT)
-dy = np.random.choice(dT)
-dz = np.random.choice(dT)
-dr = np.random.choice(dR)
+d_action = np.zeros(5, dtype=np.int32)
+d_action[:4] = np.random.randint(0, 3, (4,))
+dx = dT[d_action[0]]
+dy = dT[d_action[1]]
+dz = dT[d_action[2]]
+dr = dR[d_action[3]]
+eye3 = np.eye(3)
 
+frame = 0
 it = 0
 start = time.time()
-while True:
-    if it % 24 == 0:
+while it < DATA_SIZE:
+    if frame % 24 == 0:
+        rgb = utils.get_image([2.0, 0.0, 2.5], [0.8, 0., 0.4], [0, 0, 1], 128, 128)[:, :, :3]
+        state_vector[it] = torch.tensor(np.transpose(rgb, (2, 0, 1)))
+
         if np.random.rand() < 0.5:
-            dx = np.random.choice(dT)
+            d_action[0] = np.random.randint(0, 3)
         if np.random.rand() < 0.5:
-            dy = np.random.choice(dT)
+            d_action[1] = np.random.randint(0, 3)
         if np.random.rand() < 0.5:
-            dz = np.random.choice(dT)
+            d_action[2] = np.random.randint(0, 3)
         if np.random.rand() < 0.5:
-            dr = np.random.choice(dR)
+            d_action[3] = np.random.randint(0, 3)
+
+        if np.random.rand() < 0.50:
+            d_action[4] = 1
+            if gripper_open:
+                agent.close_gripper(t=40)
+                gripper_open = False
+            else:
+                agent.open_gripper(t=40)
+                gripper_open = True
+        else:
+            d_action[4] = 0
+
+        action_vector[it] = torch.tensor(np.concatenate([eye3[d_action[0]], eye3[d_action[1]], eye3[d_action[2]], eye3[d_action[3]], [d_action[4]]], axis=0))
+
+        dx = dT[d_action[0]]
+        dy = dT[d_action[1]]
+        dz = dT[d_action[2]]
+        dr = dR[d_action[3]]
+
+        it += 1
+        if it % 1000 == 0:
+            print(f"{100*it/DATA_SIZE:.1f}% completed.")
 
     position, quaternion = agent.get_tip_pose()
     position = list(position)
@@ -111,33 +130,17 @@ while True:
     position[1] = np.clip(position[1]+dy, -0.9, 0.9)
     position[2] = np.clip(position[2]+dz, 0.42, 0.5)
     rotation[2] = np.clip(rotation[2]+dr, -np.pi, np.pi)
-
     agent.set_cartesian_position(position=position, orientation=p.getQuaternionFromEuler([np.pi, 0, rotation[2]]))
-
-    if it % 24 == 0:
-        if np.random.rand() < 0.50:
-            if gripper_open:
-                agent.close_gripper(t=40)
-                gripper_open = False
-            else:
-                agent.open_gripper(t=40)
-                gripper_open = True
-
-    it += 1
     p.stepSimulation()
-    
-    if it % 24 == 0:
-        # width, height, rgb, depth, seg = utils.get_image([1.3, -1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
-        # width, height, rgb, depth, seg = utils.get_image([1.3, 1.0, 1.4], [0.8, 0., 0.4], [0, 0, 1], 128, 128)
-        width, height, rgb, depth, seg = utils.get_image([0.8, 0, 2.4], [0.8, 0., 0.4], [1, 0, 0], 128, 128)
-        # utils.get_image_from_cam(camera, 128, 128)
-        # utils.get_image_from_cam(camera_st, 128, 128)
+    frame += 1
 
-    # time.sleep(1/240)
-    if it % 1000 == 0:
+    if frame % 1000 == 0:
         end = time.time()
-        sim_time = it * (1/240)
+        sim_time = frame * (1/240)
         real_time = end - start
         start = end
-        it = 0
+        frame = 0
         print(f"RT={real_time:.2f}, ST={sim_time:.2f},  Factor={(sim_time/real_time):.3f}")
+
+torch.save(state_vector, "data/state.pt")
+torch.save(action_vector, "data/action.pt")
