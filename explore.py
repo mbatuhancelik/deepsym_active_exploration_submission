@@ -132,7 +132,7 @@ while it < DATA_SIZE:
     position, quaternion = agent.get_tip_pose()
     position = list(position)
     rotation = list(p.getEulerFromQuaternion(quaternion))
-    position[0] = np.clip(position[0]+dx, 0.4, 1.1)
+    position[0] = np.clip(position[0]+dx, 0.5, 1.1)
     position[1] = np.clip(position[1]+dy, -0.9, 0.9)
     position[2] = np.clip(position[2]+dz, 0.42, 0.5)
     rotation[2] = np.clip(rotation[2]+dr, -np.pi, np.pi)
