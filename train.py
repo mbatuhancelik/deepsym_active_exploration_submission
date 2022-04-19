@@ -54,7 +54,7 @@ model.print_model()
 
 # collect data
 for e in range(NUM_EPOCH):
-    subprocess.run(["python", "explore.py", "-N", "10000"])
+    subprocess.run(["python", "explore.py", "-N", "10000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     data = StateActionDataset("./data")
     loader = torch.utils.data.DataLoader(data, batch_size=BATCH_SIZE, num_workers=12)
     model.train(1, loader)
