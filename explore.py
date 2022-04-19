@@ -1,4 +1,6 @@
 import time
+import os
+import argparse
 
 import numpy as np
 import pybullet as p
@@ -6,6 +8,10 @@ import torch
 
 import manipulators
 import utils
+
+parser = argparse.ArgumentParser("Explore environment.")
+parser.add_argument("-N", help="number of interactions", type=int, required=True)
+args = parser.parse_args()
 
 utils.initialize_env(gui=0)
 env_objects = utils.create_tabletop()
@@ -69,7 +75,7 @@ for _ in range(40):
     p.stepSimulation()
     time.sleep(1/240)
 
-DATA_SIZE = 100000
+DATA_SIZE = args.N
 state_vector = torch.zeros(DATA_SIZE, 3, 128, 128, dtype=torch.uint8)
 action_vector = torch.zeros(DATA_SIZE, 13, dtype=torch.uint8)
 
@@ -141,6 +147,9 @@ while it < DATA_SIZE:
         start = end
         frame = 0
         print(f"RT={real_time:.2f}, ST={sim_time:.2f},  Factor={(sim_time/real_time):.3f}")
+
+if not os.path.exists("data"):
+    os.makedirs("data")
 
 torch.save(state_vector, "data/state.pt")
 torch.save(action_vector, "data/action.pt")
