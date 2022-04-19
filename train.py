@@ -1,6 +1,7 @@
 """Train DeepSym"""
 import argparse
 import os
+import subprocess
 
 import torch
 
@@ -53,6 +54,9 @@ model = DeepSymbolGenerator(encoder=encoder, decoder=decoder, subnetworks=[],
                             device="cuda", lr=1e-4, path=args.s, coeff=9.0)
 model.print_model()
 
-data = StateActionDataset("./data")
-loader = torch.utils.data.DataLoader(data, batch_size=BATCH_SIZE, num_workers=12)
-model.train(NUM_EPOCH, loader)
+# collect data
+for e in range(NUM_EPOCH):
+    subprocess.run(["python", "explore.py", "-N", "10000"])
+    data = StateActionDataset("./data")
+    loader = torch.utils.data.DataLoader(data, batch_size=BATCH_SIZE, num_workers=12)
+    model.train(1, loader)
