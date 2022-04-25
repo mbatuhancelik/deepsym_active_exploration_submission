@@ -1,29 +1,26 @@
 import pkgutil
 
-import pybullet as p
-import pybullet_data
+import pybullet
+from pybullet_utils import bullet_client
 import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
 
 
-def initialize_env(gui=1, timestep=1/240):
+def connect(gui=1):
     if gui:
-        physicsClient = p.connect(p.GUI)
+        p = bullet_client.BulletClient(connection_mode=pybullet.GUI)
     else:
-        physicsClient = p.connect(p.DIRECT)
+        p = bullet_client.BulletClient(connection_mode=pybullet.DIRECT)
         egl = pkgutil.get_loader("eglRenderer")
-        if egl is not None:
+        if (egl):
             p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
-    p.setTimeStep(timestep)
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath())
-    p.setGravity(0, 0, -9.807)
-    p.loadURDF("plane.urdf")
-    return physicsClient
+        else:
+            p.loadPlugin("eglRendererPlugin")
+    return p
 
 
-def create_object(obj_type, size, position, rotation=[0, 0, 0], mass=1, color=None, with_link=False):
+def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color=None, with_link=False):
     collisionId = -1
     visualId = -1
 
@@ -68,34 +65,34 @@ def create_object(obj_type, size, position, rotation=[0, 0, 0], mass=1, color=No
     return obj_id
 
 
-def create_tabletop():
+def create_tabletop(p):
     objects = {}
-    objects["base"] = create_object(p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],
+    objects["base"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],
                                     position=[0., 0., 0.2], color=[0.5, 0.5, 0.5, 1.0], with_link=True)
-    objects["table"] = create_object(p.GEOM_BOX, mass=0, size=[0.5, 1.0, 0.2],
-                                     position=[0.8, 0, 0.2], color=[0.0, 1.0, 0.0, 1.0])
+    objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 1.0, 0.2],
+                                     position=[0.8, 0, 0.2], color=[1.0, 1.0, 1.0, 1.0])
     # walls
-    objects["wall1"] = create_object(p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
+    objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
                                      position=[0.8, -1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    objects["wall2"] = create_object(p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
+    objects["wall2"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
                                      position=[0.8, 1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    objects["wall3"] = create_object(p.GEOM_BOX, mass=0, size=[0.01, 1.0, 0.05],
+    objects["wall3"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1.0, 0.05],
                                      position=[0.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    objects["wall4"] = create_object(p.GEOM_BOX, mass=0, size=[0.01, 1.0, 0.05],
+    objects["wall4"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1.0, 0.05],
                                      position=[1.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
     return objects
 
 
-def get_image(eye_position, target_position, up_vector, height, width):
+def get_image(p, eye_position, target_position, up_vector, height, width):
     viewMatrix = p.computeViewMatrix(cameraEyePosition=eye_position,
                                      cameraTargetPosition=target_position,
                                      cameraUpVector=up_vector)
     projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.1, farVal=5.0)
-    _, _, rgb, _, _ = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
-    return rgb
+    _, _, rgb, depth, seg = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
+    return rgb, depth, seg
 
 
-def create_camera(position, rotation, static=True):
+def create_camera(p, position, rotation, static=True):
     baseCollision = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
     targetCollision = p.createCollisionShape(shapeType=p.GEOM_CYLINDER, radius=0.005, height=0.01)
     baseVisual = p.createVisualShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02], rgbaColor=[0, 0, 0, 1])
@@ -123,7 +120,7 @@ def create_camera(position, rotation, static=True):
     return obj_id
 
 
-def get_image_from_cam(camera_id, height, width):
+def get_image_from_cam(p, camera_id, height, width):
     cam_state = p.getLinkStates(camera_id, [0, 1])
     base_pos = cam_state[0][0]
     up_vector = Rotation.from_quat(cam_state[0][1]).as_matrix()[:, -1]
