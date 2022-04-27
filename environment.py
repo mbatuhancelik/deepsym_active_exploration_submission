@@ -75,16 +75,16 @@ class BlocksWorld:
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
-    def step(self, from_loc, to_loc):
+    def step(self, from_loc, to_loc, sleep=False):
         traj_time = 0.5
-        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True)
-        self.agent.set_cartesian_position(from_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True)
-        self.agent.close_gripper(traj_time, sleep=True)
-        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True)
-        self.agent.set_cartesian_position(to_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True)
-        self.agent._waitsleep(0.5)
-        self.agent.open_gripper(traj_time)
-        self.init_agent_pose(t=1.0)
+        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.close_gripper(traj_time, sleep=sleep)
+        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(to_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        self.agent.open_gripper(traj_time, sleep=sleep)
+        self.init_agent_pose(t=1.0, sleep=sleep)
 
     def _step(self, count=1):
         for _ in range(count):
