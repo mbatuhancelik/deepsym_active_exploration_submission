@@ -34,6 +34,16 @@ class GumbelSigmoidLayer(torch.nn.Module):
         return gumbel_sigmoid(x, self.T, self.hard)
 
 
+class GumbelSoftmaxLayer(torch.nn.Module):
+    def __init__(self, hard=False, T=1.0):
+        super(GumbelSoftmaxLayer, self).__init__()
+        self.hard = hard
+        self.T = T
+    
+    def forward(self, x):
+        return torch.nn.functional.gumbel_softmax(x, tau=self.T, hard=self.hard)
+
+
 class Linear(torch.nn.Module):
     """ linear layer with optional batch normalization. """
     def __init__(self, in_features, out_features, std=None, batch_norm=False, gain=None):
