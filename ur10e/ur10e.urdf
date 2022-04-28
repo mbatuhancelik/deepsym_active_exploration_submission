@@ -22,7 +22,7 @@
   </material>
 
   <material name="panda_white">
-    <color rgba="1. 1. 1. 1."/>
+    <color rgba="0.2 0.2 0.2 1."/>
   </material>
 
   <link name="base_link">
