@@ -46,12 +46,12 @@ class BlocksWorld:
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def init_objects(self):
-        for i in range(20):
+        for i in range(10):
             obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
             # obj_type = self._p.GEOM_BOX
             x = np.random.uniform(0.5, 1.0)
-            y = np.random.uniform(-0.9, 0.9)
-            z = np.random.uniform(0.6, 0.7)
+            y = np.random.uniform(-0.4, 0.4)
+            z = np.random.uniform(0.6, 0.65)
             size = np.random.uniform(0.015, 0.035, (3,)).tolist()
             # size = [0.025, 0.025, 0.025]
             if obj_type == self._p.GEOM_CYLINDER:
@@ -68,10 +68,10 @@ class BlocksWorld:
                             np.random.uniform(0.015, 0.025)]
                     color = [0.0, 1.0, 1.0, 1.0]
             self.obj_dict[i] = utils.create_object(p=self._p, obj_type=obj_type, size=size, position=[x, y, z],
-                                                   rotation=rotation, color=color, mass=0.1)
+                                                   rotation=rotation, color="random", mass=0.1)
 
     def state(self):
-        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.5, 0.0, 1.5], target_position=[0.8, 0., 0.4],
+        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.5, 0.0, 1.5], target_position=[0.9, 0., 0.4],
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
