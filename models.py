@@ -44,6 +44,8 @@ class DeepSymbolGenerator:
 
         self.criterion = torch.nn.MSELoss()
         self.iteration = 0
+        self.epoch = 0
+        self.best_loss = 1e100
         self.path = path
 
     def encode(self, x: torch.Tensor, eval_mode=False) -> torch.Tensor:
@@ -138,13 +140,13 @@ class DeepSymbolGenerator:
         return avg_loss, time_elapsed
 
     def train(self, epoch, loader):
-        best_loss = 1e100
         for e in range(epoch):
             epoch_loss, time_elapsed = self.one_pass_optimize(loader)
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
+            self.epoch += 1
+            if epoch_loss < self.best_loss:
+                self.best_loss = epoch_loss
                 self.save("_best")
-            print(f"epoch={e+1}, iter={self.iteration}, loss={epoch_loss:.5f}, elapsed={time_elapsed:.2f}")
+            print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}, elapsed={time_elapsed:.2f}")
             self.save("_last")
 
     def load(self, ext):
