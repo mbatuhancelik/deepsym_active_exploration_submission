@@ -187,3 +187,14 @@ def in_array(element, array):
         if element.is_equal(e_i):
             return True, i
     return False, None
+
+
+def segment_img_with_mask(img, mask):
+    N_obj = mask.max()
+    segmented_imgs = []
+    for i in range(N_obj+1):
+        obj_mask = (mask == i).float()
+        seg_img = img * obj_mask
+        segmented_imgs.append(seg_img)
+    segmented_imgs = torch.stack(segmented_imgs)
+    return segmented_imgs
