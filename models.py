@@ -4,13 +4,14 @@ import time
 import torch
 
 import utils
+from blocks import GumbelSigmoidLayer
 
 
 class DeepSymbolGenerator:
     """DeepSym model from https://arxiv.org/abs/2012.02532"""
 
     def __init__(self, encoder: torch.nn.Module, decoder: torch.nn.Module,
-                 device: str, lr: float, path: str, coeff: float = 1.0):
+                 device: str, lr: float, path: str, coeff: float = 1.0, **kwargs):
         """
         Parameters
         ----------
@@ -189,6 +190,49 @@ class DeepSymv2(DeepSymbolGenerator):
 
     def concat(self, **kwargs):
         raise NotImplementedError
+
+
+class DeepSymv3(DeepSymbolGenerator):
+    def __init__(self, **kwargs):
+        super(DeepSymv3, self).__init__(**kwargs)
+        self.aggregator = kwargs.get("aggregator")
+        self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
+        self.optimizer.param_groups.append({"params": self.aggregator.parameters()})
+
+    def encode(self, x, eval_mode=False):
+        n_sample, n_seg, ch, h, w = x.shape
+        x = x.reshape(-1, ch, h, w)
+        h = self.encoder(x.to(self.device))
+        h = h.reshape(n_sample, n_seg, -1)
+        h_att, _ = self.aggregator(h, h, h)
+        h_att = self.discretization(h_att)
+        if eval_mode:
+            h_att = h_att.round()
+        return h_att
+
+    def concat(self, sample, eval_mode=False):
+        x = sample["state"]
+        h = self.encode(x, eval_mode)
+        a = sample["action"].to(self.device)
+        a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
+        z = torch.cat([h, a], dim=-1)
+        return z
+
+    def decode(self, z):
+        n_sample, n_seg, z_dim = z.shape
+        z = z.reshape(-1, z_dim)
+        e = self.decoder(z)
+        e = e.reshape(n_sample, n_seg, e.shape[1], e.shape[2], e.shape[3])
+        # average over different segmentations
+        e = e.mean(dim=1)
+        return e
+
+    def print_model(self, space=0, encoder_only=False):
+        utils.print_module(self.encoder, "Encoder", space)
+        if not encoder_only:
+            utils.print_module(self.aggregator, "Aggregator", space)
+            utils.print_module(self.discretization, "Discretization", space)
+            utils.print_module(self.decoder, "Decoder", space)
 
 
 class RBM(torch.nn.Module):
