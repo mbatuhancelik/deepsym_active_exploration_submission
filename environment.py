@@ -6,11 +6,14 @@ import manipulators
 
 
 class BlocksWorld:
-    def __init__(self, gui=0):
+    def __init__(self, gui=0, seed=None):
         self._p = utils.connect(gui)
-        self.reset()
+        self.reset(seed=seed)
 
-    def reset(self):
+    def reset(self, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+
         self._p.resetSimulation()
         self._p.configureDebugVisualizer(self._p.COV_ENABLE_GUI, 0)
         self._p.setAdditionalSearchPath(pybullet_data.getDataPath())
