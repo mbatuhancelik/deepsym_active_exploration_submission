@@ -10,8 +10,7 @@ class DeepSymbolGenerator:
     """DeepSym model from https://arxiv.org/abs/2012.02532"""
 
     def __init__(self, encoder: torch.nn.Module, decoder: torch.nn.Module,
-                 subnetworks: list, device: str, lr: float,
-                 path: str, coeff: float = 1.0):
+                 device: str, lr: float, path: str, coeff: float = 1.0):
         """
         Parameters
         ----------
@@ -19,9 +18,6 @@ class DeepSymbolGenerator:
             Encoder network.
         decoder : torch.nn.Module
             Decoder network.
-        subnetworks : list of torch.nn.Module
-            Optional list of subnetworks to use their output as input
-            for the decoder.
         device : str
             The device of the networks.
         lr : float
@@ -36,7 +32,6 @@ class DeepSymbolGenerator:
         self.coeff = coeff
         self.encoder = encoder
         self.decoder = decoder
-        self.subnetworks = subnetworks
 
         self.optimizer = torch.optim.Adam(lr=lr, params=[
             {"params": self.encoder.parameters()},
@@ -50,8 +45,7 @@ class DeepSymbolGenerator:
 
     def encode(self, x: torch.Tensor, eval_mode=False) -> torch.Tensor:
         """
-        Given a state, return its encoding with the current
-        encoder (i.e. no subnetwork code).
+        Given a state, return its encoding
 
         Parameters
         ----------
@@ -65,6 +59,7 @@ class DeepSymbolGenerator:
         """
         h = self.encoder(x.to(self.device))
         if eval_mode:
+            # TODO: this should be different for gumbel softmax version
             h = h.round()
         return h
 
@@ -82,18 +77,13 @@ class DeepSymbolGenerator:
         Returns
         -------
         z : torch.Tensor
-            The concatenation of the encoder's output, subnetworks'
-            encoders output, and the action vector (i.e. the input
-            of the decoder).
+            The concatenation of the encoder's output and the action vector
+            (i.e. the input of the decoder).
         """
-        h = []
         x = sample["state"]
-        h.append(self.encode(x, eval_mode))
-        for network in self.subnetworks:
-            with torch.no_grad():
-                h.append(network.encode(x, eval_mode))
-        h.append(sample["action"].to(self.device))
-        z = torch.cat(h, dim=-1)
+        h = self.encode(x, eval_mode)
+        a = sample["action"].to(self.device)
+        z = torch.cat([h, a], dim=-1)
         return z
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
@@ -173,16 +163,6 @@ class DeepSymbolGenerator:
         utils.print_module(self.encoder, "Encoder", space)
         if not encoder_only:
             utils.print_module(self.decoder, "Decoder", space)
-        if len(self.subnetworks) != 0:
-            print("-"*15)
-            print("  Subnetworks  ")
-            print("-"*15)
-
-        tab_length = 4
-        for i, network in enumerate(self.subnetworks):
-            print(" "*tab_length+"%d:" % (i+1))
-            network.print_model(space=space+tab_length, encoder_only=True)
-            print()
 
     def eval_mode(self):
         self.encoder.eval()

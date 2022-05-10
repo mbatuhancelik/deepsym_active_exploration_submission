@@ -57,8 +57,7 @@ decoder = torch.nn.Sequential(
 encoder.to(device)
 decoder.to(device)
 
-model = DeepSymbolGenerator(encoder=encoder, decoder=decoder, subnetworks=[],
-                            device=device, lr=args.lr, path=args.s, coeff=81.0)
+model = DeepSymbolGenerator(encoder=encoder, decoder=decoder, device=device, lr=args.lr, path=args.s, coeff=81.0)
 model.print_model()
 encoder_param_count = get_parameter_count(model.encoder)
 decoder_param_count = get_parameter_count(model.decoder)
