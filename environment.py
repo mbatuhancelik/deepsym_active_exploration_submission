@@ -49,8 +49,9 @@ class BlocksWorld:
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def init_objects(self):
-        for i in range(10):
-            obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+        for i in range(20):
+            # obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+            obj_type = self._p.GEOM_BOX
             # obj_type = self._p.GEOM_BOX
             x = np.random.uniform(0.5, 1.0)
             y = np.random.uniform(-0.4, 0.4)
@@ -66,7 +67,7 @@ class BlocksWorld:
                 color = [0.0, 0.0, 1.0, 1.0]
             if obj_type == self._p.GEOM_BOX:
                 color = [1.0, 0.0, 0.0, 1.0]
-                if np.random.rand() < 0.5:
+                if np.random.rand() < 0.4:
                     size = [np.random.uniform(0., 0.2), np.random.uniform(0.01, 0.015),
                             np.random.uniform(0.015, 0.025)]
                     color = [0.0, 1.0, 1.0, 1.0]
