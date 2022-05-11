@@ -44,12 +44,20 @@ class BlocksWorld:
         self._step(40)
         self.agent.open_gripper(1, sleep=True)
 
+    def reset_objects(self):
+        for key in self.obj_dict:
+            obj_id = self.obj_dict[key]
+            self._p.removeBody(obj_id)
+        self.obj_dict = {}
+        self.init_objects()
+        self._step(240)
+
     def init_agent_pose(self, t=None, sleep=False, traj=False):
         angles = [-0.294, -1.650, 2.141, -2.062, -1.572, 1.277]
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def init_objects(self):
-        for i in range(20):
+        for i in range(10):
             # obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
             obj_type = self._p.GEOM_BOX
             # obj_type = self._p.GEOM_BOX
