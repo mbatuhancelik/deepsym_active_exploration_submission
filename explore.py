@@ -1,6 +1,5 @@
 import time
 import os
-import shutil
 import argparse
 from PIL import Image
 
@@ -12,11 +11,11 @@ import environment
 parser = argparse.ArgumentParser("Explore environment.")
 parser.add_argument("-N", help="number of interactions", type=int, required=True)
 parser.add_argument("-o", help="output folder", type=str, required=True)
+parser.add_argument("-i", help="offset index", type=int, required=True)
 args = parser.parse_args()
 
-if os.path.exists(args.o):
-    shutil.rmtree(args.o)
-os.makedirs(args.o)
+if not os.path.exists(args.o):
+    os.makedirs(args.o)
 
 
 def collect_rollout(env):
@@ -33,31 +32,27 @@ def collect_rollout(env):
     to_pos[2] = 0.75
     env.step(from_pos, to_pos)
     rgb_b, depth_b, seg_b = env.state()
-    return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_pos, to_pos)
+    return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id)
 
 
-env = environment.BlocksWorld(gui=1)
-actions = torch.zeros(args.N, 6, dtype=torch.float)
+env = environment.BlocksWorld(gui=0)
+actions = torch.zeros(args.N, 2, dtype=torch.int32)
 
 start = time.time()
 for i in range(args.N):
-    print(i)
-    (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_pos, to_pos) = collect_rollout(env)
+    save_idx = args.i + i
+    (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id) = collect_rollout(env)
 
-    Image.fromarray(rgb_a).save(os.path.join(args.o, f"{i}_a_rgb.png"))
-    np.save(os.path.join(args.o, f"{i}_a_depth.npy"), depth_a)
-    torch.save(torch.tensor(seg_a, dtype=torch.int32), os.path.join(args.o, f"{i}_a_seg.pt"))
-    # np.save(os.path.join(args.o, f"{i}_a_seg.npy"), seg_a)
+    Image.fromarray(rgb_a).save(os.path.join(args.o, f"{save_idx}_a_rgb.png"))
+    torch.save(torch.tensor(depth_a, dtype=torch.float), os.path.join(args.o, f"{save_idx}_a_depth.pt"))
+    torch.save(torch.tensor(seg_a, dtype=torch.int32), os.path.join(args.o, f"{save_idx}_a_seg.pt"))
 
-    Image.fromarray(rgb_b).save(os.path.join(args.o, f"{i}_b_rgb.png"))
-    np.save(os.path.join(args.o, f"{i}_b_depth.npy"), depth_b)
-    torch.save(torch.tensor(seg_b, dtype=torch.int32), os.path.join(args.o, f"{i}_b_seg.pt"))
-    # np.save(os.path.join(args.o, f"{i}_b_seg.npy"), seg_b)
-
-    actions[i, 0], actions[i, 1], actions[i, 2] = from_pos[0], from_pos[1], from_pos[2]
-    actions[i, 3], actions[i, 4], actions[i, 5] = to_pos[0], to_pos[1], to_pos[2]
+    Image.fromarray(rgb_b).save(os.path.join(args.o, f"{save_idx}_b_rgb.png"))
+    torch.save(torch.tensor(depth_b, dtype=torch.float), os.path.join(args.o, f"{save_idx}_b_depth.pt"))
+    torch.save(torch.tensor(seg_b, dtype=torch.int32), os.path.join(args.o, f"{save_idx}_b_seg.pt"))
+    actions[i, 0], actions[i, 1] = from_obj_id, to_obj_id
+    env.reset_objects()
 
 torch.save(actions, os.path.join(args.o, "action.pt"))
-print("%d" % args.N, file=open(os.path.join(args.o, "info.txt"), "w"))
 end = time.time()
 print(f"Completed in {end-start:.2f} seconds.")
