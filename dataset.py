@@ -46,7 +46,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
 class SAEFolder(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.folder_path = folder_path
-        self.N = int(open(os.path.join(folder_path, "info.txt"), "r").read().rstrip())
+        files = os.listdir(folder_path)
+        self.N = len(list(filter(lambda x:  x[-8:] == "a_seg.pt", files)))
+        # self.N = int(open(os.path.join(folder_path, "info.txt"), "r").read().rstrip())
         self.action = torch.load(os.path.join(folder_path, "action.pt"))
     
     def __len__(self):
@@ -59,7 +61,7 @@ class SAEFolder(torch.utils.data.Dataset):
         img_b = to_tensor(Image.open(path_b))
         sample = {}
         sample["state"] = img_a
-        sample["action"] = self.action[idx].float()
+        sample["action"] = self.action[idx]
         sample["effect"] = img_b - img_a
         return sample
 
@@ -85,7 +87,7 @@ class SegmentedSAEFolder(SAEFolder):
 
         sample = {}
         sample["state"] = padded
-        sample["action"] = self.action[idx].float()
+        sample["action"] = self.action[idx].long()
         sample["effect"] = img_b - img_a
         sample["pad_mask"] = pad_mask
         return sample
