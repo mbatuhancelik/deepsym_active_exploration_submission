@@ -199,12 +199,12 @@ class DeepSymv3(DeepSymbolGenerator):
         self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
         self.optimizer.param_groups.append({"params": self.aggregator.parameters()})
 
-    def encode(self, x, eval_mode=False):
+    def encode(self, x, pad_mask, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
         h = h.reshape(n_sample, n_seg, -1)
-        h_att, _ = self.aggregator(h, h, h)
+        h_att, _ = self.aggregator(h, h, h, key_padding_mask=~pad_mask.bool())
         h_att = self.discretization(h_att)
         if eval_mode:
             h_att = h_att.round()
@@ -212,20 +212,34 @@ class DeepSymv3(DeepSymbolGenerator):
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
-        h = self.encode(x, eval_mode)
-        a = sample["action"].to(self.device)
-        a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
+        h = self.encode(x, sample["pad_mask"], eval_mode)
+        n_sample, n_seg = h.shape[0], h.shape[1]
+        a = torch.tensor([[0., 1., 0.]], dtype=torch.float, device=x.device)
+        a = a.repeat(n_sample, 1)
+        a = a.unsqueeze(1).repeat(1, n_seg, 1)
+        a[torch.arange(n_sample), sample["action"][:, 0]] = torch.tensor([1., 0., 0.])
+        a[torch.arange(n_sample), sample["action"][:, 1]] = torch.tensor([0., 0., 1.])
+        # a = sample["action"].to(self.device)
+        # a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
         z = torch.cat([h, a], dim=-1)
         return z
 
-    def decode(self, z):
+    def decode(self, z, mask):
         n_sample, n_seg, z_dim = z.shape
         z = z.reshape(-1, z_dim)
         e = self.decoder(z)
         e = e.reshape(n_sample, n_seg, e.shape[1], e.shape[2], e.shape[3])
+        mask = mask.reshape(n_sample, n_seg, 1, 1, 1)
+        # turn off computation for padded parts
+        e_masked = e * mask
         # average over different segmentations
-        e = e.mean(dim=1)
-        return e
+        e_masked = e_masked.mean(dim=1)
+        return e_masked
+
+    def forward(self, sample, eval_mode=False):
+        z = self.concat(sample, eval_mode)
+        e = self.decode(z, sample["pad_mask"])
+        return z, e
 
     def print_model(self, space=0, encoder_only=False):
         utils.print_module(self.encoder, "Encoder", space)
