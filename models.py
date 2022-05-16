@@ -33,6 +33,7 @@ class DeepSymbolGenerator:
         self.coeff = coeff
         self.encoder = encoder
         self.decoder = decoder
+        self.lr = lr
 
         self.optimizer = torch.optim.Adam(lr=lr, params=[
             {"params": self.encoder.parameters()},
@@ -198,15 +199,29 @@ class DeepSymv3(DeepSymbolGenerator):
         self.encoder_att = kwargs.get("encoder_att")
         self.decoder_att = kwargs.get("decoder_att")
         self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
-        self.optimizer.param_groups.append({"params": self.encoder_att.parameters()})
-        self.optimizer.param_groups.append({"params": self.decoder_att.parameters()})
+        self.optimizer.param_groups.append(
+                {"params": self.encoder_att.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
+        self.optimizer.param_groups.append(
+                {"params": self.decoder_att.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
 
     def encode(self, x, pad_mask, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
         h = h.reshape(n_sample, n_seg, -1)
-        h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool())
+        h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device))
         h_att = self.discretization(h_att)
         if eval_mode:
             h_att = h_att.round()
@@ -216,15 +231,15 @@ class DeepSymv3(DeepSymbolGenerator):
         x = sample["state"]
         h = self.encode(x, sample["pad_mask"], eval_mode)
         n_sample, n_seg = h.shape[0], h.shape[1]
-        a = torch.tensor([[0., 1., 0.]], dtype=torch.float, device=x.device)
+        a = torch.tensor([[0., 1., 0.]], dtype=torch.float, device=self.device)
         a = a.repeat(n_sample, 1)
         a = a.unsqueeze(1).repeat(1, n_seg, 1)
-        a[torch.arange(n_sample), sample["action"][:, 0]] = torch.tensor([1., 0., 0.])
-        a[torch.arange(n_sample), sample["action"][:, 1]] = torch.tensor([0., 0., 1.])
+        a[torch.arange(n_sample, device=self.device), sample["action"][:, 0].to(self.device)] = torch.tensor([1., 0., 0.], device=self.device)
+        a[torch.arange(n_sample, device=self.device), sample["action"][:, 1].to(self.device)] = torch.tensor([0., 0., 1.], device=self.device)
         # a = sample["action"].to(self.device)
         # a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
         z = torch.cat([h, a], dim=-1)
-        z_att, _ = self.decoder_att(z, z, z, key_padding_mask=~sample["pad_mask"].bool())
+        z_att, _ = self.decoder_att(z, z, z, key_padding_mask=~sample["pad_mask"].bool().to(self.device))
         return z_att
 
     def decode(self, z, mask):
@@ -232,7 +247,7 @@ class DeepSymv3(DeepSymbolGenerator):
         z = z.reshape(-1, z_dim)
         e = self.decoder(z)
         e = e.reshape(n_sample, n_seg, -1)
-        mask = mask.reshape(n_sample, n_seg, 1)
+        mask = mask.reshape(n_sample, n_seg, 1).to(self.device)
         # turn off computation for padded parts
         e_masked = e * mask
         return e_masked

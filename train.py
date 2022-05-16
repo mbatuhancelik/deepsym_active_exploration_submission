@@ -35,7 +35,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 BN = True if args.bn == 1 else False
 
 encoder = torch.nn.Sequential(
-    blocks.ConvBlock(in_channels=3, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
+    blocks.ConvBlock(in_channels=4, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, batch_norm=BN),
