@@ -6,8 +6,8 @@ import subprocess
 import torch
 
 import blocks
-from models import DeepSymbolGenerator
-from dataset import StateActionDataset, StateActionEffectDataset
+from models import DeepSymv3
+from dataset import SegmentedSAEFolder
 from utils import get_parameter_count
 
 parser = argparse.ArgumentParser("Train DeepSym.")
@@ -44,35 +44,30 @@ encoder = torch.nn.Sequential(
     blocks.GumbelSigmoidLayer(hard=False, T=1.0)
 )
 
-decoder = torch.nn.Sequential(
-    # blocks.MLP([args.state_bits+args.action_bits, 512]),
-    blocks.Reshape([-1, args.state_bits+args.action_bits, 1, 1]),
-    blocks.ConvTransposeBlock(in_channels=args.state_bits+args.action_bits, out_channels=512, kernel_size=4, stride=1, padding=0, batch_norm=BN),
-    blocks.ConvTransposeBlock(in_channels=512, out_channels=256, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvTransposeBlock(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvTransposeBlock(in_channels=128, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    torch.nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=4, stride=2, padding=1)
-)
+encoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits, num_heads=4, batch_first=True)
+decoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits+args.action_bits, num_heads=1, batch_first=True)
+
+decoder = blocks.MLP([args.state_bits+args.action_bits, 128, 128, 128, 7], batch_norm=BN)
 
 encoder.to(device)
 decoder.to(device)
+encoder_att.to(device)
+decoder_att.to(device)
 
-model = DeepSymbolGenerator(encoder=encoder, decoder=decoder, device=device, lr=args.lr, path=args.s, coeff=81.0)
+model = DeepSymv3(encoder=encoder, decoder=decoder, encoder_att=encoder_att, decoder_att=decoder_att,
+                  device=device, lr=args.lr, path=args.s, coeff=1.0)
 model.print_model()
 encoder_param_count = get_parameter_count(model.encoder)
+encoder_att_param_count = get_parameter_count(model.encoder_att)
 decoder_param_count = get_parameter_count(model.decoder)
+decoder_att_param_count = get_parameter_count(model.decoder_att)
 print(f"Encoder params={encoder_param_count:,}")
+print(f"Encoder att. params={encoder_att_param_count:,}")
 print(f"Decoder params={decoder_param_count:,}")
-print(f"Total={encoder_param_count+decoder_param_count:,}")
+print(f"Decoder att. params={decoder_att_param_count:,}")
+print(f"Total={encoder_param_count+encoder_att_param_count+decoder_param_count+decoder_att_param_count:,}")
 
-# collect data
-for e in range(args.e):
-    subprocess.run(["python", "explore_crafter.py", "-N", "1024", "-o", args.d])
-
-    if args.dt == 0:
-        data = StateActionDataset(args.d)
-    else:
-        data = StateActionEffectDataset(args.d)
-
-    loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=12)
-    model.train(1, loader)
+valid_objects = {i: True for i in range(8, 18)}
+data = SegmentedSAEFolder(args.d, max_pad=10, valid_objects=valid_objects)
+loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=os.cpu_count())
+model.train(args.e, loader)
