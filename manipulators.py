@@ -61,6 +61,21 @@ class Manipulator:
             targetOrientation=orientation)
         self.set_joint_position(target_joints[:-2], t=t, sleep=sleep, traj=traj)
 
+    def move_in_cartesian(self, position, quaternion=None, t=1.0, sleep=False):
+        N = int(t * 240)
+
+        current_position, current_orientation = self.get_tip_pose()
+
+        position_traj = np.linspace(current_position, position, N+1)[1:]
+
+        for p_i in position_traj:
+            target_joints = self._p.calculateInverseKinematics(
+                bodyUniqueId=self.id,
+                endEffectorLinkIndex=self.ik_idx,
+                targetPosition=p_i,
+                targetOrientation=quaternion)
+            self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
+
     def set_joint_position(self, position, velocity=None, t=None, sleep=False, traj=False):
         assert len(self.joints) > 0
         if traj:
