@@ -1,5 +1,4 @@
 import os
-from PIL import Image
 
 import torch
 from torchvision import transforms
@@ -46,38 +45,55 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
 class SAEFolder(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.folder_path = folder_path
-        files = os.listdir(folder_path)
-        self.N = len(list(filter(lambda x:  x[-8:] == "a_seg.pt", files)))
-        # self.N = int(open(os.path.join(folder_path, "info.txt"), "r").read().rstrip())
-        self.action = torch.load(os.path.join(folder_path, "action.pt"))
-    
+        info = list(map(lambda x: int(x.rstrip()), open(os.path.join(folder_path, "info.txt"), "r").readlines()))
+        self.sample_per_partition = info[0]
+        self.num_partition = info[1]
+        self.N = self.sample_per_partition * self.num_partition
+
+        state = []
+        action = []
+        effect = []
+        # segmentation = []
+        for i in range(self.num_partition):
+            state.append(torch.load(os.path.join(folder_path, f"state_{i}.pt")))
+            action.append(torch.load(os.path.join(folder_path, f"action_{i}.pt")))
+            effect.append(torch.load(os.path.join(folder_path, f"effect_{i}.pt")))
+            # segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
+
+        self.state = torch.cat(state)
+        self.action = torch.cat(action)
+        self.effect = torch.cat(effect)
+        # self.segmentation = torch.cat(segmentation)
+        assert self.state.shape[0] == self.N
+        assert self.action.shape[0] == self.N
+        assert self.effect.shape[0] == self.N
+        # assert self.segmentation.shape[0] == self.N
+
     def __len__(self):
         return self.N
 
     def __getitem__(self, idx):
-        path_a = os.path.join(self.folder_path, "%d_a_rgb.png" % idx)
-        path_b = os.path.join(self.folder_path, "%d_b_rgb.png" % idx)
-        img_a = to_tensor(Image.open(path_a))
-        img_b = to_tensor(Image.open(path_b))
         sample = {}
-        sample["state"] = img_a
-        sample["action"] = self.action[idx]
-        sample["effect"] = img_b - img_a
+        sample["state"] = self.state[idx] / 255.0
+        sample["action"] = self.action[idx].long()
+        sample["effect"] = self.effect[idx]
         return sample
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad):
+    def __init__(self, folder_path, max_pad, valid_objects):
         super(SegmentedSAEFolder, self).__init__(folder_path)
         self.max_pad = max_pad
+        self.valid_objects = valid_objects
+
+        segmentation = []
+        for i in range(self.num_partition):
+            segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
+        self.segmentation = torch.cat(segmentation)
+        assert self.segmentation.shape[0] == self.N
 
     def __getitem__(self, idx):
-        path_a = os.path.join(self.folder_path, "%d_a_rgb.png" % idx)
-        path_b = os.path.join(self.folder_path, "%d_b_rgb.png" % idx)
-        img_a = to_tensor(Image.open(path_a))
-        img_b = to_tensor(Image.open(path_b))
-        mask_a = torch.load(os.path.join(self.folder_path, "%d_a_seg.pt" % idx))
-        seg_a = segment_img_with_mask(img_a, mask_a)
+        seg_a = segment_img_with_mask(self.state[idx], self.segmentation[idx], self.valid_objects)
         n_seg, ch, h, w = seg_a.shape
         n_seg = min(n_seg, self.max_pad)
         padded = torch.zeros(self.max_pad, ch, h, w)
@@ -86,8 +102,8 @@ class SegmentedSAEFolder(SAEFolder):
         pad_mask[:n_seg] = 1.0
 
         sample = {}
-        sample["state"] = padded
+        sample["state"] = padded / 255.0
         sample["action"] = self.action[idx].long()
-        sample["effect"] = img_b - img_a
+        sample["effect"] = self.effect[idx]
         sample["pad_mask"] = pad_mask
         return sample

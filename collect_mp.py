@@ -1,4 +1,5 @@
 import time
+import os
 import argparse
 import subprocess
 from multiprocessing import Process
@@ -17,7 +18,7 @@ if __name__ == "__main__":
     procs = []
     start = time.time()
     for i in range(args.p):
-        p = Process(target=collect, args=[str(args.N), args.d, str(i*args.N)])
+        p = Process(target=collect, args=[str(args.N), args.d, str(i)])
         p.start()
         procs.append(p)
 
@@ -25,4 +26,6 @@ if __name__ == "__main__":
         procs[i].join()
     end = time.time()
     elapsed = end - start
+    print(args.N, file=open(os.path.join(args.d, "info.txt"), "w"))
+    print(args.p, file=open(os.path.join(args.d, "info.txt"), "a"))
     print(f"Collected {args.p*args.N} samples in {elapsed:.2f} seconds. {args.p*args.N/elapsed}")

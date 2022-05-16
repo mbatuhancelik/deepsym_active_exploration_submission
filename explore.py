@@ -1,7 +1,6 @@
 import time
 import os
 import argparse
-from PIL import Image
 
 import torch
 import numpy as np
@@ -25,34 +24,38 @@ def collect_rollout(env):
     to_idx = np.random.randint(0, N)
     from_obj_id = env.obj_dict[from_idx]
     to_obj_id = env.obj_dict[to_idx]
-    from_pos, _ = env._p.getBasePositionAndOrientation(from_obj_id)
-    to_pos, _ = env._p.getBasePositionAndOrientation(to_obj_id)
-    from_pos = list(from_pos)
-    to_pos = list(to_pos)
-    to_pos[2] = 0.75
-    env.step(from_pos, to_pos)
+    effect = env.step(from_obj_id, to_obj_id)
     rgb_b, depth_b, seg_b = env.state()
-    return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id)
+    return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_idx, to_idx), effect
 
 
 env = environment.BlocksWorld(gui=0)
+N_obj = len(env.obj_dict)
+# env.reset_object_poses()
+np.random.seed()
+
+states = torch.zeros(args.N, 4, 256, 256, dtype=torch.uint8)
+segmentations = torch.zeros(args.N, 256, 256, dtype=torch.uint8)
 actions = torch.zeros(args.N, 2, dtype=torch.int32)
+effects = torch.zeros(args.N, N_obj, 7, dtype=torch.float)
 
 start = time.time()
 for i in range(args.N):
     save_idx = args.i + i
-    (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id) = collect_rollout(env)
+    (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
 
-    Image.fromarray(rgb_a).save(os.path.join(args.o, f"{save_idx}_a_rgb.png"))
-    torch.save(torch.tensor(depth_a, dtype=torch.float), os.path.join(args.o, f"{save_idx}_a_depth.pt"))
-    torch.save(torch.tensor(seg_a, dtype=torch.int32), os.path.join(args.o, f"{save_idx}_a_seg.pt"))
-
-    Image.fromarray(rgb_b).save(os.path.join(args.o, f"{save_idx}_b_rgb.png"))
-    torch.save(torch.tensor(depth_b, dtype=torch.float), os.path.join(args.o, f"{save_idx}_b_depth.pt"))
-    torch.save(torch.tensor(seg_b, dtype=torch.int32), os.path.join(args.o, f"{save_idx}_b_seg.pt"))
+    depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
+    states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
+    states[i, 3] = torch.tensor(depth_a, dtype=torch.uint8)
+    segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
     actions[i, 0], actions[i, 1] = from_obj_id, to_obj_id
+    effects[i] = torch.tensor(effect, dtype=torch.float)
+
     env.reset_objects()
 
-torch.save(actions, os.path.join(args.o, "action.pt"))
+torch.save(states, os.path.join(args.o, f"state_{args.i}.pt"))
+torch.save(actions, os.path.join(args.o, f"action_{args.i}.pt"))
+torch.save(effects, os.path.join(args.o, f"effect_{args.i}.pt"))
+torch.save(segmentations, os.path.join(args.o, f"segmentation_{args.i}.pt"))
 end = time.time()
 print(f"Completed in {end-start:.2f} seconds.")

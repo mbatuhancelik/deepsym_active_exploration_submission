@@ -189,12 +189,13 @@ def in_array(element, array):
     return False, None
 
 
-def segment_img_with_mask(img, mask):
+def segment_img_with_mask(img, mask, valid_objects):
     N_obj = mask.max()
     segmented_imgs = []
     for i in range(N_obj+1):
-        obj_mask = (mask == i).float()
-        seg_img = img * obj_mask
-        segmented_imgs.append(seg_img)
+        if i in valid_objects:
+            obj_mask = (mask == i).float()
+            seg_img = img * obj_mask
+            segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs

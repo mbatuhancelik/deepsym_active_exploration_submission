@@ -1,3 +1,4 @@
+import pybullet
 import pybullet_data
 import numpy as np
 
@@ -52,6 +53,16 @@ class BlocksWorld:
         self.init_objects()
         self._step(240)
 
+    def reset_object_poses(self):
+        for key in self.obj_dict:
+            x = np.random.uniform(0.5, 1.0)
+            y = np.random.uniform(-0.4, 0.4)
+            z = np.random.uniform(0.6, 0.65)
+            quat = pybullet.getQuaternionFromEuler(np.random.uniform(0, 90, (3,)).tolist())
+
+            self._p.resetBasePositionAndOrientation(self.obj_dict[key], [x, y, z], quat)
+        self._step(240)
+
     def init_agent_pose(self, t=None, sleep=False, traj=False):
         angles = [-0.294, -1.650, 2.141, -2.062, -1.572, 1.277]
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
@@ -68,17 +79,17 @@ class BlocksWorld:
             # size = [0.025, 0.025, 0.025]
             if obj_type == self._p.GEOM_CYLINDER:
                 rotation = [0, 0, 0]
-                color = [1.0, 1.0, 0.0, 1.0]
+                # color = [1.0, 1.0, 0.0, 1.0]
             else:
                 rotation = np.random.uniform(0, 90, (3,)).tolist()
                 # rotation = [0, 0, 0]
-                color = [0.0, 0.0, 1.0, 1.0]
+                # color = [0.0, 0.0, 1.0, 1.0]
             if obj_type == self._p.GEOM_BOX:
-                color = [1.0, 0.0, 0.0, 1.0]
+                # color = [1.0, 0.0, 0.0, 1.0]
                 if np.random.rand() < 0.4:
                     size = [np.random.uniform(0., 0.2), np.random.uniform(0.01, 0.015),
                             np.random.uniform(0.015, 0.025)]
-                    color = [0.0, 1.0, 1.0, 1.0]
+                    # color = [0.0, 1.0, 1.0, 1.0]
             self.obj_dict[i] = utils.create_object(p=self._p, obj_type=obj_type, size=size, position=[x, y, z],
                                                    rotation=rotation, color="random", mass=0.1)
 
@@ -87,16 +98,37 @@ class BlocksWorld:
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
-    def step(self, from_loc, to_loc, sleep=False):
+    def step(self, from_obj_id, to_obj_id, sleep=False):
+        from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
+        to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
+        to_pos = to_pos[:2] + (0.75,)
+
         traj_time = 0.5
-        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(from_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent.close_gripper(traj_time, sleep=sleep)
-        self.agent.set_cartesian_position(from_loc[:2]+[0.75], orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(to_loc, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(to_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
+
+        N_obj = len(self.obj_dict)
+        before_pose = np.zeros((N_obj, 7), dtype=np.float32)
+        for i in range(N_obj):
+            before_pos, before_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            before_pose[i][:3] = before_pos
+            before_pose[i][3:] = before_quat
+
         self.agent.open_gripper(traj_time, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
+    
+        after_pose = np.zeros((N_obj, 7), dtype=np.float32)
+        for i in range(N_obj):
+            after_pos, after_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            after_pose[i][:3] = after_pos
+            after_pose[i][3:] = after_quat
+
+        effect = after_pose - before_pose
+        return effect
 
     def _step(self, count=1):
         for _ in range(count):

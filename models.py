@@ -195,16 +195,18 @@ class DeepSymv2(DeepSymbolGenerator):
 class DeepSymv3(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(DeepSymv3, self).__init__(**kwargs)
-        self.aggregator = kwargs.get("aggregator")
+        self.encoder_att = kwargs.get("encoder_att")
+        self.decoder_att = kwargs.get("decoder_att")
         self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
-        self.optimizer.param_groups.append({"params": self.aggregator.parameters()})
+        self.optimizer.param_groups.append({"params": self.encoder_att.parameters()})
+        self.optimizer.param_groups.append({"params": self.decoder_att.parameters()})
 
     def encode(self, x, pad_mask, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
         h = h.reshape(n_sample, n_seg, -1)
-        h_att, _ = self.aggregator(h, h, h, key_padding_mask=~pad_mask.bool())
+        h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool())
         h_att = self.discretization(h_att)
         if eval_mode:
             h_att = h_att.round()
@@ -222,18 +224,17 @@ class DeepSymv3(DeepSymbolGenerator):
         # a = sample["action"].to(self.device)
         # a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
         z = torch.cat([h, a], dim=-1)
-        return z
+        z_att, _ = self.decoder_att(z, z, z, key_padding_mask=~sample["pad_mask"].bool())
+        return z_att
 
     def decode(self, z, mask):
         n_sample, n_seg, z_dim = z.shape
         z = z.reshape(-1, z_dim)
         e = self.decoder(z)
-        e = e.reshape(n_sample, n_seg, e.shape[1], e.shape[2], e.shape[3])
-        mask = mask.reshape(n_sample, n_seg, 1, 1, 1)
+        e = e.reshape(n_sample, n_seg, -1)
+        mask = mask.reshape(n_sample, n_seg, 1)
         # turn off computation for padded parts
         e_masked = e * mask
-        # average over different segmentations
-        e_masked = e_masked.mean(dim=1)
         return e_masked
 
     def forward(self, sample, eval_mode=False):
@@ -244,7 +245,8 @@ class DeepSymv3(DeepSymbolGenerator):
     def print_model(self, space=0, encoder_only=False):
         utils.print_module(self.encoder, "Encoder", space)
         if not encoder_only:
-            utils.print_module(self.aggregator, "Aggregator", space)
+            utils.print_module(self.encoder_att, "Encoder Attention", space)
+            utils.print_module(self.encoder_att, "Decoder Attention", space)
             utils.print_module(self.discretization, "Discretization", space)
             utils.print_module(self.decoder, "Decoder", space)
 
