@@ -6,7 +6,7 @@ import utils
 import manipulators
 
 
-class BlocksWorld:
+class GenericEnv:
     def __init__(self, gui=0, seed=None):
         self._p = utils.connect(gui)
         self.reset(seed=seed)
@@ -22,16 +22,14 @@ class BlocksWorld:
         self._p.loadURDF("plane.urdf")
 
         self.env_dict = utils.create_tabletop(self._p)
-        self.obj_dict = {}
         self.agent = manipulators.Manipulator(p=self._p, path="ur10e/ur10e.urdf", position=[0., 0., 0.4], ik_idx=10)
-        tool_constraint = self._p.createConstraint(parentBodyUniqueId=self.env_dict["base"], parentLinkIndex=0,
+        base_constraint = self._p.createConstraint(parentBodyUniqueId=self.env_dict["base"], parentLinkIndex=0,
                                                    childBodyUniqueId=self.agent.id, childLinkIndex=-1,
                                                    jointType=self._p.JOINT_FIXED, jointAxis=(0, 0, 0),
                                                    parentFramePosition=(0, 0, 0),
                                                    childFramePosition=(0.0, 0.0, -0.2),
                                                    childFrameOrientation=(0, 0, 0, 1))
-
-        self._p.changeConstraint(tool_constraint, maxForce=10000)
+        self._p.changeConstraint(base_constraint, maxForce=10000)
         # force grippers to act in sync
         mimic_constraint = self._p.createConstraint(self.agent.id, 8, self.agent.id, 9,
                                                     jointType=self._p.JOINT_GEAR,
@@ -40,6 +38,23 @@ class BlocksWorld:
                                                     childFramePosition=[0, 0, 0])
         self._p.changeConstraint(mimic_constraint, gearRatio=-1, erp=0.1, maxForce=50)
 
+    def init_agent_pose(self, t=None, sleep=False, traj=False):
+        angles = [-0.294, -1.650, 2.141, -2.062, -1.572, 1.277]
+        self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
+
+    def _step(self, count=1):
+        for _ in range(count):
+            self._p.stepSimulation()
+
+
+class BlocksWorld(GenericEnv):
+    def __init__(self, gui=0, seed=None):
+        super(BlocksWorld, self).__init__(gui=gui, seed=seed)
+
+    def reset(self, seed=None):
+        super(BlocksWorld, self).reset(seed=seed)
+
+        self.obj_dict = {}
         self.init_agent_pose(t=1)
         self.init_objects()
         self._step(40)
@@ -62,10 +77,6 @@ class BlocksWorld:
 
             self._p.resetBasePositionAndOrientation(self.obj_dict[key], [x, y, z], quat)
         self._step(240)
-
-    def init_agent_pose(self, t=None, sleep=False, traj=False):
-        angles = [-0.294, -1.650, 2.141, -2.062, -1.572, 1.277]
-        self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def init_objects(self):
         for i in range(10):
@@ -130,6 +141,69 @@ class BlocksWorld:
         effect = after_pose - before_pose
         return effect
 
-    def _step(self, count=1):
-        for _ in range(count):
-            self._p.stepSimulation()
+
+class PushEnv(GenericEnv):
+    def __init__(self, gui=0, seed=None):
+        super(PushEnv, self).__init__(gui=gui, seed=seed)
+
+    def reset(self, seed=None):
+        super(PushEnv, self).reset(seed=seed)
+
+        self.obj_dict = {}
+        self.init_agent_pose(t=1)
+        self.init_objects()
+        self._step(40)
+        self.agent.close_gripper(1, sleep=True)
+
+    def reset_objects(self):
+        for key in self.obj_dict:
+            obj_id = self.obj_dict[key]
+            self._p.removeBody(obj_id)
+        self.obj_dict = {}
+        self.init_objects()
+        self._step(240)
+
+    def init_objects(self):
+        obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
+        position = [0.8, 0.0, 0.6]
+        rotation = [0, 0, 0]
+        if self._p.GEOM_CYLINDER:
+            r = np.random.uniform(0.05, 0.15)
+            h = np.random.uniform(0.05, 0.15)
+            size = [r, h]
+        else:
+            r = np.random.uniform(0.05, 0.15)
+            size = [r, r, r]
+        size = np.random.uniform(0.015, 0.035, (3,)).tolist()
+
+        self.obj_dict[0] = utils.create_object(p=self._p, obj_type=obj_type, size=size, position=position,
+                                               rotation=rotation, color="random", mass=0.1)
+
+    def state(self):
+        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.5, 0.0, 1.5], target_position=[0.9, 0., 0.4],
+                                          up_vector=[0, 0, 1], height=256, width=256)
+        return rgb[:, :, :3], depth, seg
+
+    def step(self, action, sleep=False):
+        traj_time = 1
+
+        if action == 0:
+            self.agent.set_cartesian_position([0.8, -0.15, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, -0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.8, 0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.init_agent_pose(t=0.25, sleep=sleep)
+        elif action == 1:
+            self.agent.set_cartesian_position([0.95, 0.0, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.95, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.65, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.init_agent_pose(t=0.25, sleep=sleep)
+        elif action == 2:
+            self.agent.set_cartesian_position([0.8, 0.15, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, 0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.8, -0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.init_agent_pose(t=0.25, sleep=sleep)
+        elif action == 3:
+            self.agent.set_cartesian_position([0.65, 0.0, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.65, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.95, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.init_agent_pose(t=0.25, sleep=sleep)
