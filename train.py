@@ -1,7 +1,6 @@
 """Train DeepSym"""
 import argparse
 import os
-import subprocess
 
 import torch
 
