@@ -39,6 +39,7 @@ segmentations = torch.zeros(args.N, 256, 256, dtype=torch.uint8)
 actions = torch.zeros(args.N, 2, dtype=torch.int32)
 effects = torch.zeros(args.N, N_obj, 7, dtype=torch.float)
 
+prog_it = args.N // 20
 start = time.time()
 for i in range(args.N):
     save_idx = args.i + i
@@ -52,6 +53,9 @@ for i in range(args.N):
     effects[i] = torch.tensor(effect, dtype=torch.float)
 
     env.reset_objects()
+
+    if (i+1) % prog_it == 0:
+        print(f"Proc {args.i}: {100*(i+1)/args.N}% completed.")
 
 torch.save(states, os.path.join(args.o, f"state_{args.i}.pt"))
 torch.save(actions, os.path.join(args.o, f"action_{args.i}.pt"))
