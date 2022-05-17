@@ -43,11 +43,14 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
 
 
 class SAEFolder(torch.utils.data.Dataset):
-    def __init__(self, folder_path):
+    def __init__(self, folder_path, num_partition=None):
         self.folder_path = folder_path
         info = list(map(lambda x: int(x.rstrip()), open(os.path.join(folder_path, "info.txt"), "r").readlines()))
         self.sample_per_partition = info[0]
-        self.num_partition = info[1]
+        if num_partition is not None:
+            self.num_partition = num_partition
+        else:
+            self.num_partition = info[1]
         self.N = self.sample_per_partition * self.num_partition
 
         state = []
@@ -81,8 +84,8 @@ class SAEFolder(torch.utils.data.Dataset):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects):
-        super(SegmentedSAEFolder, self).__init__(folder_path)
+    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None):
+        super(SegmentedSAEFolder, self).__init__(folder_path, num_partition)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
 
