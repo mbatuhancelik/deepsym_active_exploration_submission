@@ -26,8 +26,12 @@ if not os.path.exists(args.s):
     os.makedirs(args.s)
 
 arg_dict = vars(args)
-for arg in arg_dict:
-    print(f"{arg}={arg_dict[arg]}", file=open(os.path.join(args.s, "args.txt"), "a"))
+for i, arg in enumerate(arg_dict):
+    if i == 0:
+        mode = "w"
+    else:
+        mode = "a"
+    print(f"{arg}={arg_dict[arg]}", file=open(os.path.join(args.s, "args.txt"), mode))
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
