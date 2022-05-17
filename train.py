@@ -56,15 +56,8 @@ decoder_att.to(device)
 model = DeepSymv3(encoder=encoder, decoder=decoder, encoder_att=encoder_att, decoder_att=decoder_att,
                   device=device, lr=args.lr, path=args.s, coeff=1.0)
 model.print_model()
-encoder_param_count = get_parameter_count(model.encoder)
-encoder_att_param_count = get_parameter_count(model.encoder_att)
-decoder_param_count = get_parameter_count(model.decoder)
-decoder_att_param_count = get_parameter_count(model.decoder_att)
-print(f"Encoder params={encoder_param_count:,}")
-print(f"Encoder att. params={encoder_att_param_count:,}")
-print(f"Decoder params={decoder_param_count:,}")
-print(f"Decoder att. params={decoder_att_param_count:,}")
-print(f"Total={encoder_param_count+encoder_att_param_count+decoder_param_count+decoder_att_param_count:,}")
+for name in model.module_names:
+    print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
 valid_objects = {i: True for i in range(8, 18)}
 data = SegmentedSAEFolder(args.d, max_pad=10, valid_objects=valid_objects)
