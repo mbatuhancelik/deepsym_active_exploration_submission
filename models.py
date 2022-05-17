@@ -2,6 +2,7 @@ import os
 import time
 
 import torch
+from tqdm import tqdm
 
 import utils
 from blocks import GumbelSigmoidLayer
@@ -120,7 +121,7 @@ class DeepSymbolGenerator:
     def one_pass_optimize(self, loader):
         avg_loss = 0.0
         start = time.time()
-        for i, sample in enumerate(loader):
+        for i, sample in enumerate(tqdm(loader)):
             self.optimizer.zero_grad()
             L = self.loss(sample)
             L.backward()
