@@ -44,6 +44,7 @@ class DeepSymbolGenerator:
         self.epoch = 0
         self.best_loss = 1e100
         self.path = path
+        self.module_names = ["encoder", "decoder"]
 
     def encode(self, x: torch.Tensor, eval_mode=False) -> torch.Tensor:
         """
@@ -142,29 +143,25 @@ class DeepSymbolGenerator:
             self.save("_last")
 
     def load(self, ext):
-        encoder_path = os.path.join(self.path, "encoder"+ext+".ckpt")
-        decoder_path = os.path.join(self.path, "decoder"+ext+".ckpt")
-        encoder_dict = torch.load(encoder_path)
-        decoder_dict = torch.load(decoder_path)
-        self.encoder.load_state_dict(encoder_dict)
-        self.decoder.load_state_dict(decoder_dict)
+        for name in self.module_names:
+            module_path = os.path.join(self.path, name+ext+".ckpt")
+            module_dict = torch.load(module_path)
+            getattr(self, name).load_state_dict(module_dict)
 
     def save(self, ext):
-        encoder_dict = self.encoder.eval().cpu().state_dict()
-        decoder_dict = self.decoder.eval().cpu().state_dict()
         if not os.path.exists(self.path):
             os.makedirs(self.path)
-        encoder_path = os.path.join(self.path, "encoder"+ext+".ckpt")
-        decoder_path = os.path.join(self.path, "decoder"+ext+".ckpt")
-        torch.save(encoder_dict, encoder_path)
-        torch.save(decoder_dict, decoder_path)
-        self.encoder.train().to(self.device)
-        self.decoder.train().to(self.device)
+
+        for name in self.module_names:
+            module = getattr(self, name)
+            module_dict = module.eval().cpu().state_dict()
+            module_path = os.path.join(self.path, name+ext+".ckpt")
+            torch.save(module_dict, module_path)
+            getattr(self, name).train().to(self.device)
 
     def print_model(self, space=0, encoder_only=False):
-        utils.print_module(self.encoder, "Encoder", space)
-        if not encoder_only:
-            utils.print_module(self.decoder, "Decoder", space)
+        for name in self.module_names:
+            utils.print_module(getattr(self, name), name, space)
 
     def eval_mode(self):
         self.encoder.eval()
@@ -215,6 +212,8 @@ class DeepSymv3(DeepSymbolGenerator):
                  "amsgrad": False,
                  "maximize": False,
                  "weight_decay": 0})
+        self.module_names.append("encoder_att")
+        self.module_names.append("decoder_att")
 
     def encode(self, x, pad_mask, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
@@ -256,14 +255,6 @@ class DeepSymv3(DeepSymbolGenerator):
         z = self.concat(sample, eval_mode)
         e = self.decode(z, sample["pad_mask"])
         return z, e
-
-    def print_model(self, space=0, encoder_only=False):
-        utils.print_module(self.encoder, "Encoder", space)
-        if not encoder_only:
-            utils.print_module(self.encoder_att, "Encoder Attention", space)
-            utils.print_module(self.encoder_att, "Decoder Attention", space)
-            utils.print_module(self.discretization, "Discretization", space)
-            utils.print_module(self.decoder, "Decoder", space)
 
 
 class RBM(torch.nn.Module):
