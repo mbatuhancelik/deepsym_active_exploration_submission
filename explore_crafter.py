@@ -43,8 +43,6 @@ while it < args.N:
         it += 1
         if it == args.N:
             break
-        if it % (args.N // 100) == 0:
-            print(f"{100*it/args.N}% completed.")
 
 print(f"Collected {args.N} interactions.")
 torch.save(state, os.path.join(args.o, "state.pt"))
