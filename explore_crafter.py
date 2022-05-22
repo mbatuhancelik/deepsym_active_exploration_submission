@@ -1,6 +1,5 @@
 import argparse
 import os
-import shutil
 
 import gym
 import crafter
@@ -10,11 +9,11 @@ import numpy as np
 parser = argparse.ArgumentParser("Explore the Crafter environment.")
 parser.add_argument("-N", help="number of interactions", type=int, required=True)
 parser.add_argument("-o", help="output folder", type=str, required=True)
+parser.add_argument("-i", help="index", type=int, required=True)
 args = parser.parse_args()
 
-if os.path.exists(args.o):
-    shutil.rmtree(args.o)
-os.makedirs(args.o)
+if not os.path.exists(args.o):
+    os.makedirs(args.o)
 
 # might have saved them into the folder, and also represent action
 # directly as an integer, not a vector. but whatever.
@@ -44,7 +43,6 @@ while it < args.N:
         if it == args.N:
             break
 
-print(f"Collected {args.N} interactions.")
-torch.save(state, os.path.join(args.o, "state.pt"))
-torch.save(action, os.path.join(args.o, "action.pt"))
-torch.save(effect, os.path.join(args.o, "effect.pt"))
+torch.save(state, os.path.join(args.o, f"state{args.i}.pt"))
+torch.save(action, os.path.join(args.o, f"action{args.i}.pt"))
+torch.save(effect, os.path.join(args.o, f"effect{args.i}.pt"))
