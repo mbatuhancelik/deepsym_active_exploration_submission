@@ -23,7 +23,7 @@ action = torch.zeros(args.N, 4, dtype=torch.uint8)
 effect = torch.zeros(args.N, 3, height, width, dtype=torch.int16)
 eye = torch.eye(4, dtype=torch.uint8)
 
-env = environment.TilePuzzleMNIST(size=args.s)
+env = environment.TilePuzzleMNIST(size=args.s, random=True)
 it = 0
 while it < args.N:
     obs = env.reset()
