@@ -6,3 +6,5 @@ out
 .ipynb_checkpoints
 *.ipynb
 .DS_Store
+*.out
+*.png
