@@ -107,6 +107,6 @@ class SegmentedSAEFolder(SAEFolder):
         sample = {}
         sample["state"] = padded / 255.0
         sample["action"] = self.action[idx].long()
-        sample["effect"] = self.effect[idx]
+        sample["effect"] = self.effect[idx][..., :3]
         sample["pad_mask"] = pad_mask
         return sample
