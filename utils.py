@@ -194,8 +194,10 @@ def segment_img_with_mask(img, mask, valid_objects):
     segmented_imgs = []
     for i in range(N_obj+1):
         if i in valid_objects:
-            obj_mask = (mask == i).float()
-            seg_img = img * obj_mask
-            segmented_imgs.append(seg_img)
+            obj_mask = (mask == i)
+            if obj_mask.any():
+                obj_mask = obj_mask.float()
+                seg_img = img * obj_mask
+                segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs
