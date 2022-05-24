@@ -256,6 +256,13 @@ class DeepSymv3(DeepSymbolGenerator):
         e = self.decode(z, sample["pad_mask"])
         return z, e
 
+    def loss(self, sample):
+        e_truth = sample["effect"].to(self.device)
+        _, e_pred = self.forward(sample)
+        mask = sample["pad_mask"].to(self.device).unsqueeze(2)
+        L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean()
+        return L
+
 
 class RBM(torch.nn.Module):
 
