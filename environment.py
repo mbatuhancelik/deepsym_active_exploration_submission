@@ -47,9 +47,15 @@ class GenericEnv:
         for _ in range(count):
             self._p.stepSimulation()
 
+    def __del__(self):
+        self._p.disconnect()
+
 
 class BlocksWorld(GenericEnv):
-    def __init__(self, gui=0, seed=None):
+    def __init__(self, gui=0, seed=None, min_objects=2, max_objects=5):
+        self.min_objects = min_objects
+        self.max_objects = max_objects
+        self.num_objects = None
         super(BlocksWorld, self).__init__(gui=gui, seed=seed)
 
     def reset(self, seed=None):
@@ -80,22 +86,17 @@ class BlocksWorld(GenericEnv):
         self._step(240)
 
     def init_objects(self):
-        for i in range(10):
-            # obj_type = np.random.choice([self._p.GEOM_BOX, self._p.GEOM_SPHERE, self._p.GEOM_CYLINDER], p=[0.6, 0.1, 0.3])
-            obj_type = self._p.GEOM_BOX
-            # obj_type = self._p.GEOM_BOX
+        self.num_objects = np.random.randint(self.min_objects, self.max_objects)
+        for i in range(self.num_objects):
+            obj_type = np.random.choice([self._p.GEOM_BOX], p=[1])
             x = np.random.uniform(0.5, 1.0)
             y = np.random.uniform(-0.4, 0.4)
             z = np.random.uniform(0.6, 0.65)
             size = np.random.uniform(0.015, 0.035, (3,)).tolist()
-            # size = [0.025, 0.025, 0.025]
-            if obj_type == self._p.GEOM_CYLINDER:
-                rotation = [0, 0, 0]
-                # color = [1.0, 1.0, 0.0, 1.0]
-            else:
-                rotation = np.random.uniform(0, 90, (3,)).tolist()
-                # rotation = [0, 0, 0]
-                # color = [0.0, 0.0, 1.0, 1.0]
+            rotation = np.random.uniform(0, 90, (3,)).tolist()
+            # if obj_type == self._p.GEOM_CAPSULE:
+            #     rotation = [0, 0, 0]
+
             if obj_type == self._p.GEOM_BOX:
                 # color = [1.0, 0.0, 0.0, 1.0]
                 if np.random.rand() < 0.4:
@@ -111,6 +112,13 @@ class BlocksWorld(GenericEnv):
         return rgb[:, :, :3], depth, seg
 
     def step(self, from_obj_id, to_obj_id, sleep=False):
+        N_obj = len(self.obj_dict)
+        before_pose = np.zeros((N_obj, 7), dtype=np.float32)
+        for i in range(N_obj):
+            before_pos, before_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            before_pose[i][:3] = before_pos
+            before_pose[i][3:] = before_quat
+
         from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
         to_pos = to_pos[:2] + (0.75,)
@@ -122,13 +130,6 @@ class BlocksWorld(GenericEnv):
         self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent.set_cartesian_position(to_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
-
-        N_obj = len(self.obj_dict)
-        before_pose = np.zeros((N_obj, 7), dtype=np.float32)
-        for i in range(N_obj):
-            before_pos, before_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
-            before_pose[i][:3] = before_pos
-            before_pose[i][3:] = before_quat
 
         self.agent.open_gripper(traj_time, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
