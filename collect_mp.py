@@ -10,7 +10,7 @@ def collect(num, folder, idx):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Train DeepSym.")
+    parser = argparse.ArgumentParser("Collect interaction data in parallel.")
     parser.add_argument("-d", help="data folder", type=str, required=True)
     parser.add_argument("-N", help="number of data per proc", type=int, required=True)
     parser.add_argument("-p", help="number of procs", type=int, required=True)

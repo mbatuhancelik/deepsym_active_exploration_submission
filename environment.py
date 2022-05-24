@@ -86,7 +86,7 @@ class BlocksWorld(GenericEnv):
         self._step(240)
 
     def init_objects(self):
-        self.num_objects = np.random.randint(self.min_objects, self.max_objects)
+        self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         for i in range(self.num_objects):
             obj_type = np.random.choice([self._p.GEOM_BOX], p=[1])
             x = np.random.uniform(0.5, 1.0)
