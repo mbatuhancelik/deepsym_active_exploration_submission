@@ -15,7 +15,7 @@ def collect_rollout(env):
     to_idx = np.random.randint(0, N)
     from_obj_id = env.obj_dict[from_idx]
     to_obj_id = env.obj_dict[to_idx]
-    effect = env.step(from_obj_id, to_obj_id, sleep=True)
+    effect = env.step(from_obj_id, to_obj_id)
     rgb_b, depth_b, seg_b = env.state()
     return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_idx, to_idx), effect
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld(gui=1, min_objects=1, max_objects=5)
+    env = environment.BlocksWorld(gui=0, min_objects=1, max_objects=5)
     # env.reset_object_poses()
     np.random.seed()
 
