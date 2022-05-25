@@ -42,28 +42,29 @@ encoder = torch.nn.Sequential(
     blocks.ConvBlock(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvBlock(in_channels=512, out_channels=args.state_bits, kernel_size=4, stride=2, padding=1, batch_norm=BN),
+    blocks.ConvBlock(in_channels=512, out_channels=1024, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.Avg([2, 3]),
+    blocks.MLP([1024, args.state_bits]),
     blocks.GumbelSigmoidLayer(hard=False, T=1.0)
 )
 
-encoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits, num_heads=4, batch_first=True)
+# encoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits, num_heads=4, batch_first=True)
 decoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits+args.action_bits, num_heads=1, batch_first=True)
 
-decoder = blocks.MLP([args.state_bits+args.action_bits, 128, 128, 128, 7], batch_norm=BN)
+decoder = blocks.MLP([args.state_bits+args.action_bits, 256, 256, 256, 3], batch_norm=BN)
 
 encoder.to(device)
 decoder.to(device)
-encoder_att.to(device)
+# encoder_att.to(device)
 decoder_att.to(device)
 
-model = DeepSymv3(encoder=encoder, decoder=decoder, encoder_att=encoder_att, decoder_att=decoder_att,
-                  device=device, lr=args.lr, path=args.s, coeff=1.0)
+model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att,
+                  device=device, lr=args.lr, path=args.s, coeff=1)
 model.print_model()
 for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
-valid_objects = {i: True for i in range(8, 18)}
-data = SegmentedSAEFolder(args.d, max_pad=10, valid_objects=valid_objects)
+valid_objects = {i: True for i in range(8, 13)}
+data = SegmentedSAEFolder(args.d, max_pad=5, valid_objects=valid_objects)
 loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=os.cpu_count())
 model.train(args.e, loader)
