@@ -19,6 +19,7 @@ parser.add_argument("-lr", help="learning rate", type=float, required=True)
 parser.add_argument("-e", help="num epochs", type=int, required=True)
 parser.add_argument("-bs", help="batch size", type=int, required=True)
 parser.add_argument("-bn", help="batch norm. True (1) or False (0)", type=int, required=True)
+parser.add_argument("-dv", help="device", default="cpu")
 args = parser.parse_args()
 
 
@@ -32,8 +33,6 @@ for i, arg in enumerate(arg_dict):
     else:
         mode = "a"
     print(f"{arg}={arg_dict[arg]}", file=open(os.path.join(args.s, "args.txt"), mode))
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 BN = True if args.bn == 1 else False
 
@@ -53,13 +52,13 @@ decoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits+args.action_
 
 decoder = blocks.MLP([args.state_bits+args.action_bits, 256, 256, 256, 3], batch_norm=BN)
 
-encoder.to(device)
-decoder.to(device)
-# encoder_att.to(device)
-decoder_att.to(device)
+encoder.to(args.dv)
+decoder.to(args.dv)
+# encoder_att.to(args.dv)
+decoder_att.to(args.dv)
 
 model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att,
-                  device=device, lr=args.lr, path=args.s, coeff=1)
+                  device=args.dv, lr=args.lr, path=args.s, coeff=1)
 model.print_model()
 for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
