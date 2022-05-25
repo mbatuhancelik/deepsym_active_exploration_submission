@@ -193,17 +193,17 @@ class DeepSymv2(DeepSymbolGenerator):
 class DeepSymv3(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(DeepSymv3, self).__init__(**kwargs)
-        self.encoder_att = kwargs.get("encoder_att")
+        # self.encoder_att = kwargs.get("encoder_att")
         self.decoder_att = kwargs.get("decoder_att")
-        self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
-        self.optimizer.param_groups.append(
-                {"params": self.encoder_att.parameters(),
-                 "lr": self.lr,
-                 "betas": (0.9, 0.999),
-                 "eps": 1e-8,
-                 "amsgrad": False,
-                 "maximize": False,
-                 "weight_decay": 0})
+        # self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
+        # self.optimizer.param_groups.append(
+        #         {"params": self.encoder_att.parameters(),
+        #          "lr": self.lr,
+        #          "betas": (0.9, 0.999),
+        #          "eps": 1e-8,
+        #          "amsgrad": False,
+        #          "maximize": False,
+        #          "weight_decay": 0})
         self.optimizer.param_groups.append(
                 {"params": self.decoder_att.parameters(),
                  "lr": self.lr,
@@ -212,7 +212,7 @@ class DeepSymv3(DeepSymbolGenerator):
                  "amsgrad": False,
                  "maximize": False,
                  "weight_decay": 0})
-        self.module_names.append("encoder_att")
+        # self.module_names.append("encoder_att")
         self.module_names.append("decoder_att")
 
     def encode(self, x, pad_mask, eval_mode=False):
@@ -220,11 +220,12 @@ class DeepSymv3(DeepSymbolGenerator):
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
         h = h.reshape(n_sample, n_seg, -1)
-        h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device))
-        h_att = self.discretization(h_att)
+        # h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device))
+        # h_att = self.discretization(h_att)
         if eval_mode:
-            h_att = h_att.round()
-        return h_att
+            # h_att = h_att.round()
+            h = h.round()
+        return h
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
