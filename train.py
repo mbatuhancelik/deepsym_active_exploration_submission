@@ -48,7 +48,8 @@ encoder = torch.nn.Sequential(
 )
 
 # encoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits, num_heads=4, batch_first=True)
-decoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits+args.action_bits, num_heads=1, batch_first=True)
+encoder_layer = torch.nn.TransformerEncoderLayer(d_model=args.state_bits+args.action_bits, nhead=1, batch_first=True)
+decoder_att = torch.nn.TransformerEncoder(encoder_layer, num_layers=4)
 
 decoder = blocks.MLP([args.state_bits+args.action_bits, 256, 256, 256, 3], batch_norm=BN)
 
