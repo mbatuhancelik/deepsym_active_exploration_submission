@@ -30,28 +30,32 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld(gui=0, min_objects=1, max_objects=5)
+    env = environment.BlocksWorld(gui=1, min_objects=1, max_objects=5)
     # env.reset_object_poses()
     np.random.seed()
 
-    states = torch.zeros(args.N, 4, 256, 256, dtype=torch.uint8)
+    states = torch.zeros(args.N, 1, 256, 256, dtype=torch.uint8)
     segmentations = torch.zeros(args.N, 256, 256, dtype=torch.uint8)
     actions = torch.zeros(args.N, 2, dtype=torch.int32)
     effects = torch.zeros(args.N, env.max_objects, 7, dtype=torch.float)
 
     prog_it = args.N // 20
     start = time.time()
+    env_it = 0
     for i in range(args.N):
+        env_it += 1
         save_idx = args.i + i
         (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
 
         depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
-        states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
-        states[i, 3] = torch.tensor(depth_a, dtype=torch.uint8)
+        # states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
+        states[i, 0] = torch.tensor(depth_a, dtype=torch.uint8)
         segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
         actions[i, 0], actions[i, 1] = from_obj_id, to_obj_id
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
-        env.reset_objects()
+        if (env_it) == len(env.obj_dict):
+            env_it = 0
+            env.reset_objects()
 
         if (i+1) % prog_it == 0:
             print(f"Proc {args.i}: {100*(i+1)/args.N}% completed.")

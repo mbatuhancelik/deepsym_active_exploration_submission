@@ -107,22 +107,23 @@ class BlocksWorld(GenericEnv):
                                                    rotation=rotation, color="random", mass=0.1)
 
     def state(self):
-        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.5, 0.0, 1.5], target_position=[0.9, 0., 0.4],
+        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.15, 0.0, 1.35], target_position=[0.9, 0., 0.4],
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
-    def step(self, from_obj_id, to_obj_id, sleep=False):
+    def state_obj_poses(self):
         N_obj = len(self.obj_dict)
-        before_pose = np.zeros((N_obj, 7), dtype=np.float32)
+        pose = np.zeros((N_obj, 7), dtype=np.float32)
         for i in range(N_obj):
-            before_pos, before_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
-            before_pose[i][:3] = before_pos
-            before_pose[i][3:] = before_quat
+            position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            pose[i][:3] = position
+            pose[i][3:] = quaternion
+        return pose
 
+    def step(self, from_obj_id, to_obj_id, sleep=False):
         from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
         to_pos = to_pos[:2] + (0.75,)
-
         traj_time = 0.5
         self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent.set_cartesian_position(from_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
@@ -130,16 +131,10 @@ class BlocksWorld(GenericEnv):
         self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent.set_cartesian_position(to_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
-
+        before_pose = self.state_obj_poses()
         self.agent.open_gripper(traj_time, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
-    
-        after_pose = np.zeros((N_obj, 7), dtype=np.float32)
-        for i in range(N_obj):
-            after_pos, after_quat = self._p.getBasePositionAndOrientation(self.obj_dict[i])
-            after_pose[i][:3] = after_pos
-            after_pose[i][3:] = after_quat
-
+        after_pose = self.state_obj_poses()
         effect = after_pose - before_pose
         return effect
 
