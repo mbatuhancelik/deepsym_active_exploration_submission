@@ -30,7 +30,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld(gui=1, min_objects=1, max_objects=5)
+    env = environment.BlocksWorld(gui=0, min_objects=1, max_objects=5)
     # env.reset_object_poses()
     np.random.seed()
 
