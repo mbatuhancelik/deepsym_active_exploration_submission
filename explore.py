@@ -42,10 +42,12 @@ if __name__ == "__main__":
     prog_it = args.N // 20
     start = time.time()
     env_it = 0
-    for i in range(args.N):
+    i = 0
+    while i < args.N:
         env_it += 1
-        save_idx = args.i + i
         (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
+        if seg_a.max() < 8:
+            continue
 
         depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
         # states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
@@ -57,8 +59,9 @@ if __name__ == "__main__":
             env_it = 0
             env.reset_objects()
 
-        if (i+1) % prog_it == 0:
-            print(f"Proc {args.i}: {100*(i+1)/args.N}% completed.")
+        i += 1
+        if i % prog_it == 0:
+            print(f"Proc {args.i}: {100*i/args.N}% completed.")
 
     torch.save(states, os.path.join(args.o, f"state_{args.i}.pt"))
     torch.save(actions, os.path.join(args.o, f"action_{args.i}.pt"))
