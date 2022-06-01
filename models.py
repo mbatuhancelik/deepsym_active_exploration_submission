@@ -239,7 +239,10 @@ class DeepSymv3(DeepSymbolGenerator):
         # a = sample["action"].to(self.device)
         # a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
         z = torch.cat([h, a], dim=-1)
-        z_att = self.decoder_att(z, src_key_padding_mask=~sample["pad_mask"].bool().to(self.device))
+        return z
+
+    def aggregate(self, z, pad_mask):
+        z_att = self.decoder_att(z, src_key_padding_mask=~pad_mask.bool().to(self.device))
         return z_att
 
     def decode(self, z, mask):
@@ -254,7 +257,8 @@ class DeepSymv3(DeepSymbolGenerator):
 
     def forward(self, sample, eval_mode=False):
         z = self.concat(sample, eval_mode)
-        e = self.decode(z, sample["pad_mask"])
+        z_att = self.aggregate(z, sample["pad_mask"])
+        e = self.decode(z_att, sample["pad_mask"])
         return z, e
 
     def loss(self, sample):
