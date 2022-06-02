@@ -139,6 +139,43 @@ class BlocksWorld(GenericEnv):
         return effect
 
 
+class BlocksWorld_v2(BlocksWorld):
+    def __init__(self, **kwargs):
+        super(BlocksWorld_v2, self).__init__(**kwargs)
+        self.ds = 0.1
+        self.traj_t = 1.0
+        self.min_y = -0.4
+        self.max_y = 0.4
+        self.min_x = 0.5
+        self.max_x = 1.0
+        self.min_z = 0.4
+        self.max_z = 0.75
+
+    def step(self, action_idx, sleep=False):
+        current_p, _ = self.agent.get_tip_pose()
+        target_p = list(current_p)
+        if action_idx in [0, 1, 2, 3, 4, 5]:
+            if action_idx == 0:    
+                target_p[1] = min(self.max_y, target_p[1]+self.ds)
+            elif action_idx == 1:
+                target_p[0] = max(self.min_x, target_p[0]-self.ds)
+            elif action_idx == 2:
+                target_p[1] = max(self.min_y, target_p[1]-self.ds)
+            elif action_idx == 3:
+                target_p[0] = min(self.max_x, target_p[0]+self.ds)
+            elif action_idx == 4:
+                target_p[2] = min(self.max_z, target_p[2]+self.ds)
+            elif action_idx == 5:
+                target_p[2] = max(self.min_z, target_p[2]-self.ds)
+            self.agent.move_in_cartesian(target_p, self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=self.traj_t, sleep=sleep)
+        elif action_idx == 6:
+            self.agent.open_gripper(self.traj_t, sleep=sleep)
+        elif action_idx == 7:
+            self.agent.close_gripper(self.traj_t, sleep=sleep)
+        self.agent._waitsleep(0.05)
+        return self.agent.get_joint_forces(), self.state()
+
+
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
         super(PushEnv, self).__init__(gui=gui, seed=seed)

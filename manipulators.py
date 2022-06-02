@@ -157,6 +157,10 @@ class Manipulator:
         joint_states = self.get_joint_states()
         return [joint[0] for joint in joint_states]
 
+    def get_joint_forces(self):
+        joint_states = self.get_joint_states()
+        return [joint[2][:3] for joint in joint_states]
+
     # of IK link
     def get_tip_pose(self):
         result = self._p.getLinkState(self.id, self.ik_idx)
