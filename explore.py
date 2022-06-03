@@ -9,15 +9,18 @@ import environment
 
 
 def collect_rollout(env):
-    N = len(env.obj_dict)
+    # N = len(env.obj_dict)
+    N = 6
     rgb_a, depth_a, seg_a = env.state()
     from_idx = np.random.randint(0, N)
     to_idx = np.random.randint(0, N)
-    from_obj_id = env.obj_dict[from_idx]
-    to_obj_id = env.obj_dict[to_idx]
-    effect = env.step(from_obj_id, to_obj_id)
-    rgb_b, depth_b, seg_b = env.state()
-    return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_idx, to_idx), effect
+    # from_obj_id = env.obj_dict[from_idx]
+    # to_obj_id = env.obj_dict[to_idx]
+    # effect = env.step(from_obj_id, to_obj_id)
+    effect = env.step(from_idx, to_idx)
+    # rgb_b, depth_b, seg_b = env.state()
+    # return (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_idx, to_idx), effect
+    return (rgb_a, depth_a, seg_a), (from_idx, to_idx), effect
 
 
 if __name__ == "__main__":
@@ -30,7 +33,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld(gui=0, min_objects=1, max_objects=5)
+    env = environment.BlocksWorld_v2(gui=1, min_objects=3, max_objects=3)
     # env.reset_object_poses()
     np.random.seed()
 
@@ -45,17 +48,18 @@ if __name__ == "__main__":
     i = 0
     while i < args.N:
         env_it += 1
-        (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
-        if seg_a.max() < 8:
-            continue
+        # (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
+        (rgb_a, depth_a, seg_a), (from_idx, to_idx), effect = collect_rollout(env)
+        # if seg_a.max() < 8:
+        #     continue
 
         depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
         # states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
         states[i, 0] = torch.tensor(depth_a, dtype=torch.uint8)
         segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
-        actions[i, 0], actions[i, 1] = from_obj_id, to_obj_id
+        actions[i, 0], actions[i, 1] = from_idx, to_idx
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
-        if (env_it) == len(env.obj_dict):
+        if (env_it) == 20:
             env_it = 0
             env.reset_objects()
 

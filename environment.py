@@ -130,7 +130,7 @@ class BlocksWorld(GenericEnv):
         self.agent.close_gripper(traj_time, sleep=sleep)
         self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
         self.agent.set_cartesian_position(to_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
-        self.agent._waitsleep(0.5, sleep=sleep)
+        # self.agent._waitsleep(0.5, sleep=sleep)
         before_pose = self.state_obj_poses()
         self.agent.open_gripper(traj_time, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
@@ -143,43 +143,51 @@ class BlocksWorld_v2(BlocksWorld):
     def __init__(self, **kwargs):
         super(BlocksWorld_v2, self).__init__(**kwargs)
         self.traj_t = 1.0
+        self.locations = {
+            0: [0.8, -0.18, 0.41],
+            1: [0.8, 0.0, 0.41],
+            2: [0.8, 0.18, 0.41],
+            3: [0.5, -0.3, 0.41],
+            4: [0.5, 0.0, 0.41],
+            5: [0.5, 0.3, 0.41]
+        }
 
     def init_objects(self):
+        self.num_objects = 3
         # self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
         #                                        size=[0.02, 0.02, 0.03], position=[0.5, -0.4, 0.6],
         #                                        rotation=[0, 0, 0], color="random", mass=0.1)
         self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=[0.02, 0.02, 0.1], position=[0.5, -0.3, 0.6],
+                                               size=[0.02, 0.02, 0.05], position=[0.5, -0.3, 0.6],
                                                rotation=[0, 0, 0], color="random", mass=0.1)
         self.obj_dict[1] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                                size=[0.02, 0.2, 0.02], position=[0.5, 0.0, 0.6],
                                                rotation=[0, 0, 0], color="random", mass=0.1)
         self.obj_dict[2] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=[0.02, 0.02, 0.1], position=[0.5, 0.3, 0.6],
+                                               size=[0.02, 0.02, 0.05], position=[0.5, 0.3, 0.6],
                                                rotation=[0, 0, 0], color="random", mass=0.1)
         # self.obj_dict[4] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
         #                                        size=[0.02, 0.02, 0.03], position=[0.5, 0.4, 0.6],
         #                                        rotation=[0, 0, 0], color="random", mass=0.1)
 
-    def step(self, from_obj_id, location_id, sleep=False):
-        from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
+    def step(self, from_loc, to_loc, sleep=False):
+        # from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_top_pos = from_pos[:2] + (0.75,)
-        if location_id == 0:
-            to_pos = [0.8, -0.18, 0.75]
-        elif location_id == 1:
-            to_pos = [0.8, 0.0, 0.75]
-        elif location_id == 2:
-            to_pos = [0.8, 0.18, 0.75]
+        from_pos = self.locations[from_loc]
+        from_top_pos = from_pos[:2] + [0.75]
+        to_pos = self.locations[to_loc]
+        to_top_pos = to_pos[:2] + [0.75]
 
         before_pose = self.state_obj_poses()        
         self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(from_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(to_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
         self.agent.open_gripper(self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
         after_pose = self.state_obj_poses()
         effect = after_pose - before_pose

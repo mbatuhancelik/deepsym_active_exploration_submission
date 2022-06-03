@@ -61,20 +61,34 @@ class Manipulator:
             targetOrientation=orientation)
         self.set_joint_position(target_joints[:-2], t=t, sleep=sleep, traj=traj)
 
-    def move_in_cartesian(self, position, quaternion=None, t=1.0, sleep=False):
+    def move_in_cartesian(self, position, orientation=None, t=1.0, sleep=False):
         N = int(t * 240)
 
         current_position, current_orientation = self.get_tip_pose()
 
         position_traj = np.linspace(current_position, position, N+1)[1:]
 
-        for p_i in position_traj:
+        running_force_feedback = np.zeros(8, dtype=np.float)
+        for i, p_i in enumerate(position_traj):
             target_joints = self._p.calculateInverseKinematics(
                 bodyUniqueId=self.id,
                 endEffectorLinkIndex=self.ik_idx,
                 targetPosition=p_i,
-                targetOrientation=quaternion)
+                targetOrientation=orientation)
             self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
+            force_feedback = np.array(self.get_joint_forces())
+            running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
+            if running_force_feedback[5] < -20.0:
+                # print("="*100)
+                for j in range(N//10):
+                    target_joints = self._p.calculateInverseKinematics(
+                        bodyUniqueId=self.id,
+                        endEffectorLinkIndex=self.ik_idx,
+                        targetPosition=position_traj[i-j],
+                        targetOrientation=orientation)
+                    self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
+                    force_feedback = np.array(self.get_joint_forces())
+                break
 
     def set_joint_position(self, position, velocity=None, t=None, sleep=False, traj=False):
         assert len(self.joints) > 0
