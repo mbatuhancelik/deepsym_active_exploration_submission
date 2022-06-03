@@ -25,6 +25,18 @@ class STLayer(torch.nn.Module):
         return self.func(x)
 
 
+class STSigmoid(torch.nn.Module):
+    def __init__(self):
+        super(STSigmoid, self).__init__()
+
+    def forward(self, x):
+        m = torch.distributions.Bernoulli(logits=x)
+        sample = m.sample()
+        probs = torch.sigmoid(x)
+        sample = sample + probs - probs.detach()
+        return sample
+
+
 class GumbelSigmoidLayer(torch.nn.Module):
     def __init__(self, hard=False, T=1.0):
         super(GumbelSigmoidLayer, self).__init__()
