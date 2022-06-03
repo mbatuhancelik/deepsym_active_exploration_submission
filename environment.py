@@ -142,38 +142,48 @@ class BlocksWorld(GenericEnv):
 class BlocksWorld_v2(BlocksWorld):
     def __init__(self, **kwargs):
         super(BlocksWorld_v2, self).__init__(**kwargs)
-        self.ds = 0.1
         self.traj_t = 1.0
-        self.min_y = -0.4
-        self.max_y = 0.4
-        self.min_x = 0.5
-        self.max_x = 1.0
-        self.min_z = 0.4
-        self.max_z = 0.75
 
-    def step(self, action_idx, sleep=False):
-        current_p, _ = self.agent.get_tip_pose()
-        target_p = list(current_p)
-        if action_idx in [0, 1, 2, 3, 4, 5]:
-            if action_idx == 0:    
-                target_p[1] = min(self.max_y, target_p[1]+self.ds)
-            elif action_idx == 1:
-                target_p[0] = max(self.min_x, target_p[0]-self.ds)
-            elif action_idx == 2:
-                target_p[1] = max(self.min_y, target_p[1]-self.ds)
-            elif action_idx == 3:
-                target_p[0] = min(self.max_x, target_p[0]+self.ds)
-            elif action_idx == 4:
-                target_p[2] = min(self.max_z, target_p[2]+self.ds)
-            elif action_idx == 5:
-                target_p[2] = max(self.min_z, target_p[2]-self.ds)
-            self.agent.move_in_cartesian(target_p, self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=self.traj_t, sleep=sleep)
-        elif action_idx == 6:
-            self.agent.open_gripper(self.traj_t, sleep=sleep)
-        elif action_idx == 7:
-            self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent._waitsleep(0.05)
-        return self.agent.get_joint_forces(), self.state()
+    def init_objects(self):
+        # self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+        #                                        size=[0.02, 0.02, 0.03], position=[0.5, -0.4, 0.6],
+        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
+        self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                               size=[0.02, 0.02, 0.1], position=[0.5, -0.3, 0.6],
+                                               rotation=[0, 0, 0], color="random", mass=0.1)
+        self.obj_dict[1] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                               size=[0.02, 0.2, 0.02], position=[0.5, 0.0, 0.6],
+                                               rotation=[0, 0, 0], color="random", mass=0.1)
+        self.obj_dict[2] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                               size=[0.02, 0.02, 0.1], position=[0.5, 0.3, 0.6],
+                                               rotation=[0, 0, 0], color="random", mass=0.1)
+        # self.obj_dict[4] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+        #                                        size=[0.02, 0.02, 0.03], position=[0.5, 0.4, 0.6],
+        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
+
+    def step(self, from_obj_id, location_id, sleep=False):
+        from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
+        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
+        from_top_pos = from_pos[:2] + (0.75,)
+        if location_id == 0:
+            to_pos = [0.8, -0.18, 0.75]
+        elif location_id == 1:
+            to_pos = [0.8, 0.0, 0.75]
+        elif location_id == 2:
+            to_pos = [0.8, 0.18, 0.75]
+
+        before_pose = self.state_obj_poses()        
+        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent.close_gripper(self.traj_t, sleep=sleep)
+        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(to_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        self.agent.open_gripper(self.traj_t, sleep=sleep)
+        self.init_agent_pose(t=1.0, sleep=sleep)
+        after_pose = self.state_obj_poses()
+        effect = after_pose - before_pose
+        return effect
 
 
 class PushEnv(GenericEnv):
