@@ -83,7 +83,8 @@ class Manipulator:
             N = int(t * 240)
             current_position = self.get_joint_position()[:-2]
             trajectory = np.linspace(current_position, position, N)
-            for t_i in trajectory:
+            running_force_feedback = np.zeros(8, dtype=np.float)
+            for i, t_i in enumerate(trajectory):
                 self._p.setJointMotorControlArray(
                     bodyUniqueId=self.id,
                     jointIndices=self.joints[:-2],
@@ -91,6 +92,23 @@ class Manipulator:
                     targetPositions=t_i,
                     forces=self.forces[:-2])
                 self._p.stepSimulation()
+                # print("%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f" % tuple(self.get_joint_forces()))
+                force_feedback = np.array(self.get_joint_forces())
+                running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
+                if running_force_feedback[5] < -20.0:
+                    # print("="*100)
+                    for j in range(N//10):
+                        self._p.setJointMotorControlArray(
+                            bodyUniqueId=self.id,
+                            jointIndices=self.joints[:-2],
+                            controlMode=self._p.POSITION_CONTROL,
+                            targetPositions=trajectory[i-j],
+                            forces=self.forces[:-2])
+                        self._p.stepSimulation()
+                        if sleep:
+                            time.sleep(self._timestep)
+                        force_feedback = np.array(self.get_joint_forces())
+                    break
                 if sleep:
                     time.sleep(self._timestep)
 
@@ -159,7 +177,7 @@ class Manipulator:
 
     def get_joint_forces(self):
         joint_states = self.get_joint_states()
-        return [joint[2][:3] for joint in joint_states]
+        return [joint[2][2] for joint in joint_states]
 
     # of IK link
     def get_tip_pose(self):
