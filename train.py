@@ -12,7 +12,6 @@ from utils import get_parameter_count
 parser = argparse.ArgumentParser("Train DeepSym.")
 parser.add_argument("-s", help="save folder", type=str, required=True)
 parser.add_argument("-d", help="data folder", type=str, required=True)
-parser.add_argument("-dt", help="dataset type. StateAction (0) or StateActionEffect (1)", type=int, required=True)
 parser.add_argument("-state_bits", help="state bits", type=int, required=True)
 parser.add_argument("-action_bits", help="action bits", type=int, required=True)
 parser.add_argument("-lr", help="learning rate", type=float, required=True)
