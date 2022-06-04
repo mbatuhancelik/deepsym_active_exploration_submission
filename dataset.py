@@ -83,6 +83,19 @@ class SAEFolder(torch.utils.data.Dataset):
         return sample
 
 
+class CrafterDataset(SAEFolder):
+    def __init__(self, folder_path, num_partition=None):
+        super(CrafterDataset, self).__init__(folder_path, num_partition)
+
+    def __getitem__(self, idx):
+        sample = {}
+        sample["state"] = self.state[idx].flatten(0, 1).float()
+        sample["action"] = self.action[idx].float()
+        sample["effect"] = self.effect[idx].flatten(0, 1).float()
+        sample["pad_mask"] = torch.ones(63)
+        return sample
+
+
 class SegmentedSAEFolder(SAEFolder):
     def __init__(self, folder_path, max_pad, valid_objects, num_partition=None):
         super(SegmentedSAEFolder, self).__init__(folder_path, num_partition)
