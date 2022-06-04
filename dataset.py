@@ -97,7 +97,7 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None):
+    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None, normalize=False):
         super(SegmentedSAEFolder, self).__init__(folder_path, num_partition)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
@@ -107,6 +107,14 @@ class SegmentedSAEFolder(SAEFolder):
             segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
         self.segmentation = torch.cat(segmentation)
         assert self.segmentation.shape[0] == self.N
+
+        if normalize:
+            effect_shape = self.effect.shape
+            effect = self.effect.reshape(0, -2)
+            self.eff_mu = effect.mean(dim=0)
+            self.eff_std = effect.std(dim=0)
+            effect = (effect - self.eff_mu) / (self.eff_std + 1e-6)
+            self.effect = effect.reshape(effect_shape)
 
     def __getitem__(self, idx):
         seg_a = segment_img_with_mask(self.state[idx], self.segmentation[idx], self.valid_objects)
