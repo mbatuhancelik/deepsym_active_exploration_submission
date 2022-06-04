@@ -269,6 +269,62 @@ class DeepSymv3(DeepSymbolGenerator):
         return L
 
 
+class DeepSymv4(DeepSymbolGenerator):
+    def __init__(self, **kwargs):
+        super(DeepSymv4, self).__init__(**kwargs)
+        self.decoder_att = kwargs.get("decoder_att")
+        self.optimizer.param_groups.append(
+                {"params": self.decoder_att.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
+        self.module_names.append("decoder_att")
+
+    def encode(self, x, pad_mask, eval_mode=False):
+        h = self.encoder(x.to(self.device))
+        if eval_mode:
+            h = h.round()
+        return h
+
+    def concat(self, sample, eval_mode=False):
+        x = sample["state"]
+        h = self.encode(x, sample["pad_mask"], eval_mode)
+        n_sample, n_seg = h.shape[0], h.shape[1]
+        a = sample["action"].repeat_interleave(n_seg, 0).reshape(n_sample, n_seg, 17).to(self.device)
+        z = torch.cat([h, a], dim=-1)
+        return z
+
+    def aggregate(self, z, pad_mask):
+        z_att = self.decoder_att(z, src_key_padding_mask=~pad_mask.bool().to(self.device))
+        return z_att
+
+    def decode(self, z, mask):
+        n_sample, n_seg, z_dim = z.shape
+        z = z.reshape(-1, z_dim)
+        e = self.decoder(z)
+        e = e.reshape(n_sample, n_seg, -1)
+        mask = mask.reshape(n_sample, n_seg, 1).to(self.device)
+        # turn off computation for padded parts
+        e_masked = e * mask
+        return e_masked
+
+    def forward(self, sample, eval_mode=False):
+        z = self.concat(sample, eval_mode)
+        z_att = self.aggregate(z, sample["pad_mask"])
+        e = self.decode(z_att, sample["pad_mask"])
+        return z, e
+
+    def loss(self, sample):
+        e_truth = sample["effect"].to(self.device)
+        _, e_pred = self.forward(sample)
+        mask = sample["pad_mask"].to(self.device).unsqueeze(2)
+        L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
+        return L
+
+
 class RBM(torch.nn.Module):
 
     def __init__(self, v_dim, h_dim):
