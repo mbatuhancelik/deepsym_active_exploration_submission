@@ -40,7 +40,7 @@ class GenericEnv:
         self._p.changeConstraint(mimic_constraint, gearRatio=-1, erp=0.1, maxForce=50)
 
     def init_agent_pose(self, t=None, sleep=False, traj=False):
-        angles = [-0.294, -1.650, 2.141, -2.062, -1.572, 1.277]
+        angles = [-0.294, -1.950, 2.141, -2.062, -1.572, 1.277]
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def _step(self, count=1):
@@ -107,7 +107,7 @@ class BlocksWorld(GenericEnv):
                                                    rotation=rotation, color="random", mass=0.1)
 
     def state(self):
-        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.15, 0.0, 1.35], target_position=[0.9, 0., 0.4],
+        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.2, 0.0, 1.7], target_position=[0.95, 0., 0.4],
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
@@ -141,41 +141,55 @@ class BlocksWorld(GenericEnv):
 
 class BlocksWorld_v2(BlocksWorld):
     def __init__(self, **kwargs):
+        self.traj_t = 1.5
+        self.x_locs = {0: 0.5, 1: 0.750, 2: 1.0}
+        self.y_locs = {0: -0.4, 1: -0.2, 2: 0.0, 3: 0.2, 4: 0.4}
+        self.sizes = [[0.02, 0.02, 0.05], [0.02, 0.22, 0.02]]
         super(BlocksWorld_v2, self).__init__(**kwargs)
-        self.traj_t = 1.0
-        self.locations = {
-            0: [0.8, -0.18, 0.41],
-            1: [0.8, 0.0, 0.41],
-            2: [0.8, 0.18, 0.41],
-            3: [0.5, -0.3, 0.41],
-            4: [0.5, 0.0, 0.41],
-            5: [0.5, 0.3, 0.41]
-        }
 
     def init_objects(self):
-        self.num_objects = 3
+        self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
+        obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
+        current_obj_locs = []
+        i = 0
+        while i < self.num_objects:
+            # size_idx = np.random.choice([0, 1], p=[0.6, 0.4])
+            size_idx = obj_types[i]
+            xidx = np.random.randint(0, len(self.x_locs))
+            yidx = np.random.randint(0, len(self.y_locs))
+            if (size_idx == 0) and ([xidx, yidx] in current_obj_locs):
+                continue
+            if (size_idx == 1) and (([xidx, yidx] in current_obj_locs) or ([xidx, yidx-1] in current_obj_locs) or ([xidx, yidx+1] in current_obj_locs)):
+                continue
+
+            position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
+            size = self.sizes[size_idx]
+            
+            current_obj_locs.append([xidx, yidx])
+            if size_idx == 1:
+                current_obj_locs.append([xidx, yidx-1])
+                current_obj_locs.append([xidx, yidx+1])
+
+            self.obj_dict[i] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX, size=size, position=position,
+                                                   rotation=[0, 0, 0], mass=0.1)
+            i += 1
+
         # self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-        #                                        size=[0.02, 0.02, 0.03], position=[0.5, -0.4, 0.6],
+        #                                        size=[0.02, 0.02, 0.05], position=[0.5, -0.3, 0.6],
         #                                        rotation=[0, 0, 0], color="random", mass=0.1)
-        self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=[0.02, 0.02, 0.05], position=[0.5, -0.3, 0.6],
-                                               rotation=[0, 0, 0], color="random", mass=0.1)
-        self.obj_dict[1] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=[0.02, 0.2, 0.02], position=[0.5, 0.0, 0.6],
-                                               rotation=[0, 0, 0], color="random", mass=0.1)
-        self.obj_dict[2] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=[0.02, 0.02, 0.05], position=[0.5, 0.3, 0.6],
-                                               rotation=[0, 0, 0], color="random", mass=0.1)
-        # self.obj_dict[4] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-        #                                        size=[0.02, 0.02, 0.03], position=[0.5, 0.4, 0.6],
+        # self.obj_dict[1] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+        #                                        size=[0.02, 0.2, 0.02], position=[0.5, 0.0, 0.6],
+        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
+        # self.obj_dict[2] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+        #                                        size=[0.02, 0.02, 0.05], position=[0.5, 0.3, 0.6],
         #                                        rotation=[0, 0, 0], color="random", mass=0.1)
 
     def step(self, from_loc, to_loc, sleep=False):
         # from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = self.locations[from_loc]
+        from_pos = [self.x_locs[from_loc[0]], self.y_locs[from_loc[1]], 0.41]
         from_top_pos = from_pos[:2] + [0.75]
-        to_pos = self.locations[to_loc]
+        to_pos = [self.x_locs[to_loc[0]], self.y_locs[to_loc[1]], 0.41]
         to_top_pos = to_pos[:2] + [0.75]
 
         before_pose = self.state_obj_poses()        
