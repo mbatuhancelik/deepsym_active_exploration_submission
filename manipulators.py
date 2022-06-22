@@ -36,6 +36,7 @@ class Manipulator:
         self.constraints = []
         for j in self.joints:
             self._p.enableJointForceTorqueSensor(self.id, j, 1)
+        self.force_stop_threshold = -7.5
 
     def attach(self, child_body, parent_link, position=(0, 0, 0), orientation=(0, 0, 0, 1), max_force=None):
         self.child = child_body
@@ -78,7 +79,7 @@ class Manipulator:
             self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
             force_feedback = np.array(self.get_joint_forces())
             running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
-            if running_force_feedback[5] < -20.0:
+            if running_force_feedback[5] < self.force_stop_threshold:
                 # print("="*100)
                 for j in range(N//10):
                     target_joints = self._p.calculateInverseKinematics(
@@ -109,7 +110,7 @@ class Manipulator:
                 # print("%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f" % tuple(self.get_joint_forces()))
                 force_feedback = np.array(self.get_joint_forces())
                 running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
-                if running_force_feedback[5] < -20.0:
+                if running_force_feedback[5] < self.force_stop_threshold:
                     # print("="*100)
                     for j in range(N//10):
                         self._p.setJointMotorControlArray(
