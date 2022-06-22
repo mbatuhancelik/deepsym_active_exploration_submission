@@ -69,7 +69,7 @@ def create_tabletop(p):
     objects = {}
     objects["base"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],
                                     position=[0., 0., 0.2], color=[0.5, 0.5, 0.5, 1.0], with_link=True)
-    objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.5, 0.2],
+    objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.65, 1, 0.2],
                                      position=[0.8, 0, 0.2], color=[0.9, 0.9, 0.9, 1.0])
     # walls
     # objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
