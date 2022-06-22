@@ -193,17 +193,7 @@ class DeepSymv2(DeepSymbolGenerator):
 class DeepSymv3(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(DeepSymv3, self).__init__(**kwargs)
-        # self.encoder_att = kwargs.get("encoder_att")
         self.decoder_att = kwargs.get("decoder_att")
-        # self.discretization = GumbelSigmoidLayer(hard=False, T=1.0)
-        # self.optimizer.param_groups.append(
-        #         {"params": self.encoder_att.parameters(),
-        #          "lr": self.lr,
-        #          "betas": (0.9, 0.999),
-        #          "eps": 1e-8,
-        #          "amsgrad": False,
-        #          "maximize": False,
-        #          "weight_decay": 0})
         self.optimizer.param_groups.append(
                 {"params": self.decoder_att.parameters(),
                  "lr": self.lr,
@@ -212,7 +202,6 @@ class DeepSymv3(DeepSymbolGenerator):
                  "amsgrad": False,
                  "maximize": False,
                  "weight_decay": 0})
-        # self.module_names.append("encoder_att")
         self.module_names.append("decoder_att")
 
     def encode(self, x, pad_mask, eval_mode=False):
@@ -220,24 +209,22 @@ class DeepSymv3(DeepSymbolGenerator):
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
         h = h.reshape(n_sample, n_seg, -1)
-        # h_att, _ = self.encoder_att(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device))
-        # h_att = self.discretization(h_att)
         if eval_mode:
-            # h_att = h_att.round()
             h = h.round()
         return h
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
+        ac = sample["action"]
         h = self.encode(x, sample["pad_mask"], eval_mode)
-        n_sample, n_seg = h.shape[0], h.shape[1]
-        a = torch.tensor([[0., 1., 0.]], dtype=torch.float, device=self.device)
-        a = a.repeat(n_sample, 1)
-        a = a.unsqueeze(1).repeat(1, n_seg, 1)
-        a[torch.arange(n_sample, device=self.device), sample["action"][:, 0].to(self.device)] = torch.tensor([1., 0., 0.], device=self.device)
-        a[torch.arange(n_sample, device=self.device), sample["action"][:, 1].to(self.device)] = torch.tensor([0., 0., 1.], device=self.device)
-        # a = sample["action"].to(self.device)
-        # a = a.unsqueeze(1).repeat(1, h.shape[1], 1)
+        _, n_seg = h.shape[0], h.shape[1]
+
+        eye_3, eye_5 = torch.eye(3), torch.eye(5)
+        a = torch.cat([eye_3[ac[:, 0]], eye_5[ac[:, 1]], eye_3[ac[:, 2]], eye_5[ac[:, 3]]], dim=-1)
+        a = a.unsqueeze(1)
+        a = a.repeat(1, n_seg, 1)
+        a = a.to(self.device)
+
         z = torch.cat([h, a], dim=-1)
         return z
 
