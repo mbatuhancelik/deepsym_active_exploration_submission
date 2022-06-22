@@ -50,8 +50,8 @@ if __name__ == "__main__":
         env_it += 1
         # (rgb_a, depth_a, seg_a), (rgb_b, depth_b, seg_b), (from_obj_id, to_obj_id), effect = collect_rollout(env)
         (rgb_a, depth_a, seg_a), (from_idx, to_idx), effect = collect_rollout(env)
-        # if seg_a.max() < 8:
-        #     continue
+        if seg_a.max() < 4:
+            continue
 
         depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
         # states[i, :3] = torch.tensor(np.transpose(rgb_a, (2, 0, 1)), dtype=torch.uint8)
