@@ -150,8 +150,9 @@ class BlocksWorld_v2(BlocksWorld):
     def init_objects(self):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
-        while sum(obj_types) <= 3:
+        while sum(obj_types) > 3:
             obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
+        obj_types = list(reversed(sorted(obj_types)))
         current_obj_locs = []
         i = 0
         while i < self.num_objects:
