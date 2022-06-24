@@ -26,7 +26,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld_v2(gui=0, min_objects=5, max_objects=10)
+    env = environment.BlocksWorld_v2(gui=0, min_objects=5, max_objects=9)
     np.random.seed()
 
     states = torch.zeros(args.N, 1, 256, 256, dtype=torch.uint8)
