@@ -63,7 +63,7 @@ model.print_model()
 for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
-valid_objects = {i: True for i in range(8, 13)}
-data = SegmentedSAEFolder(args.d, max_pad=5, valid_objects=valid_objects)
+valid_objects = {i: True for i in range(4, 13)}
+data = SegmentedSAEFolder(args.d, max_pad=9, valid_objects=valid_objects, normalize=True)
 loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=os.cpu_count())
 model.train(args.e, loader)
