@@ -36,13 +36,12 @@ for i, arg in enumerate(arg_dict):
 BN = True if args.bn == 1 else False
 
 encoder = torch.nn.Sequential(
-    blocks.ConvBlock(in_channels=1, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
+    blocks.ConvBlock(in_channels=3, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.ConvBlock(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvBlock(in_channels=512, out_channels=1024, kernel_size=4, stride=2, padding=1, batch_norm=BN),
     blocks.Avg([2, 3]),
-    blocks.MLP([1024, args.state_bits]),
+    blocks.MLP([512, args.state_bits]),
     blocks.GumbelSigmoidLayer(hard=False, T=1.0)
 )
 
