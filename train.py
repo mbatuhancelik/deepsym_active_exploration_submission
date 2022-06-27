@@ -32,6 +32,7 @@ for i, arg in enumerate(arg_dict):
     else:
         mode = "a"
     print(f"{arg}={arg_dict[arg]}", file=open(os.path.join(args.s, "args.txt"), mode))
+    print(f"{arg}={arg_dict[arg]}")
 
 BN = True if args.bn == 1 else False
 
@@ -64,5 +65,5 @@ for name in model.module_names:
 
 valid_objects = {i: True for i in range(4, 13)}
 data = SegmentedSAEFolder(args.d, max_pad=9, valid_objects=valid_objects, normalize=True)
-loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=os.cpu_count())
+loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=4)
 model.train(args.e, loader)
