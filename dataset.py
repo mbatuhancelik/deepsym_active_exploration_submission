@@ -117,17 +117,21 @@ class SegmentedSAEFolder(SAEFolder):
             self.effect = effect.reshape(effect_shape)
 
     def __getitem__(self, idx):
-        seg_a = segment_img_with_mask(self.state[idx], self.segmentation[idx], self.valid_objects)
-        n_seg, ch, h, w = seg_a.shape
-        n_seg = min(n_seg, self.max_pad)
-        padded = torch.zeros(self.max_pad, ch, h, w)
-        padded[:n_seg] = seg_a[:n_seg]
-        pad_mask = torch.zeros(self.max_pad)
-        pad_mask[:n_seg] = 1.0
-
+        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad)
         sample = {}
         sample["state"] = padded
         sample["action"] = self.action[idx].long()
         sample["effect"] = self.effect[idx][..., :3]
         sample["pad_mask"] = pad_mask
         return sample
+
+
+def preprocess(state, segmentation, valid_objects, max_pad):
+    seg_a = segment_img_with_mask(state, segmentation, valid_objects)
+    n_seg, ch, h, w = seg_a.shape
+    n_seg = min(n_seg, max_pad)
+    padded = torch.zeros(max_pad, ch, h, w)
+    padded[:n_seg] = seg_a[:n_seg]
+    pad_mask = torch.zeros(max_pad)
+    pad_mask[:n_seg] = 1.0
+    return padded, pad_mask
