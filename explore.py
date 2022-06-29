@@ -8,8 +8,14 @@ import numpy as np
 import environment
 
 
+def normalize_depth_img(img):
+    min_val = 0.0
+    max_val = 1.0
+    return (((img - min_val) / (max_val - min_val))*255).astype(np.uint8)
+
 def collect_rollout(env):
     rgb_a, depth_a, seg_a = env.state()
+    depth_a = normalize_depth_img(depth_a)
     action = env.sample_random_action()
     effect = env.step(*action)
     return (rgb_a, depth_a, seg_a), action, effect
@@ -45,7 +51,6 @@ if __name__ == "__main__":
             env.reset_objects()
             continue
 
-        depth_a = (((depth_a - depth_a.min()) / (depth_a.max() - depth_a.min()))*255).astype(np.uint8)
         states[i, 0] = torch.tensor(depth_a, dtype=torch.uint8)
         segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
         actions[i, 0], actions[i, 1] = from_idx, to_idx
