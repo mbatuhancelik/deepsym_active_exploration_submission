@@ -172,22 +172,77 @@ class DeepSymbolGenerator:
         self.decoder.train()
 
 
-class DeepSymv2(DeepSymbolGenerator):
+class DeepSymSegmentor(DeepSymbolGenerator):
     def __init__(self, **kwargs):
-        super(DeepSymv2, self).__init__(**kwargs)
+        super(DeepSymSegmentor, self).__init__(**kwargs)
+        self.projector = kwargs.get("projector")
+        self.decoder_att = kwargs.get("decoder_att")
+        self.optimizer.param_groups.append(
+                {"params": self.projector.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
+        self.optimizer.param_groups.append(
+                {"params": self.decoder_att.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
+        self.module_names.append("projector")
+        self.module_names.append("decoder_att")
+
+        self.max_parts = kwargs.get("max_parts")
+        self.part_dims = kwargs.get("part_dims")
+
+    def encode(self, x, eval_mode=False):
+        h_aug = self.encoder(x.to(self.device))
+        gating, h = h_aug[:, :self.max_parts], h_aug[:, self.max_parts:]
+        n_sample = h.shape[0]
+        h = h.reshape(n_sample, self.max_parts, self.part_dims)
+        gating = gating.unsqueeze(2)
+        h_filtered = gating * h
+        return h_filtered, gating
+
+    def concat(self, sample, eval_mode=False):
+        x = sample["state"]
+        a = sample["action"].to(self.device)
+        h, g = self.encode(x, eval_mode)
+        a = a.unsqueeze(1)
+        a = a.repeat(1, self.max_parts, 1)
+        z = torch.cat([h, a], dim=-1)
+        return z, g
+
+    def aggregate(self, z, g):
+        z = self.projector(z)
+        z_att = self.decoder_att(z, src_key_padding_mask=~(g[..., 0].round().bool()))
+        return z_att
+
+    def decode(self, z, g):
+        n_sample, n_part, z_dim = z.shape
+        z = z.reshape(-1, z_dim)
+        e = self.decoder(z)
+        _, ch, h, w = e.shape
+        e = e.reshape(n_sample, n_part, -1)
+        e_gated = (e * g).sum(dim=1)
+        e_gated = e_gated.reshape(n_sample, ch, h, w)
+        return e_gated
 
     def forward(self, sample, eval_mode=False):
-        x = sample["state"]
-        xn = sample["state_n"]
-        bs = x.shape[0]
-        x_all = torch.cat([x, xn], dim=0)
-        z_all = self.encode(x_all, eval_mode=eval_mode)
-        z_diff = z_all[bs:] - z_all[:bs]
-        e = self.decode(z_diff)
-        return z_diff, e
+        z, g = self.concat(sample, eval_mode)
+        z_att = self.aggregate(z, g)
+        e = self.decode(z_att, g)
+        return e, z, g
 
-    def concat(self, **kwargs):
-        raise NotImplementedError
+    def loss(self, sample):
+        e_truth = sample["effect"].to(self.device)
+        e_pred, _, _ = self.forward(sample)
+        L = self.criterion(e_pred, e_truth) * self.coeff
+        return L
 
 
 class DeepSymv3(DeepSymbolGenerator):
