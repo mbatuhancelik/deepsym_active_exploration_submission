@@ -193,7 +193,16 @@ class DeepSymv2(DeepSymbolGenerator):
 class DeepSymv3(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(DeepSymv3, self).__init__(**kwargs)
+        self.projector = kwargs.get("projector")
         self.decoder_att = kwargs.get("decoder_att")
+        self.optimizer.param_groups.append(
+                {"params": self.projector.parameters(),
+                 "lr": self.lr,
+                 "betas": (0.9, 0.999),
+                 "eps": 1e-8,
+                 "amsgrad": False,
+                 "maximize": False,
+                 "weight_decay": 0})
         self.optimizer.param_groups.append(
                 {"params": self.decoder_att.parameters(),
                  "lr": self.lr,
@@ -202,6 +211,7 @@ class DeepSymv3(DeepSymbolGenerator):
                  "amsgrad": False,
                  "maximize": False,
                  "weight_decay": 0})
+        self.module_names.append("projector")
         self.module_names.append("decoder_att")
 
     def encode(self, x, pad_mask, eval_mode=False):
@@ -221,6 +231,7 @@ class DeepSymv3(DeepSymbolGenerator):
         return z
 
     def aggregate(self, z, pad_mask):
+        z = self.projector(z)
         z_att = self.decoder_att(z, src_key_padding_mask=~pad_mask.bool().to(self.device))
         return z_att
 
