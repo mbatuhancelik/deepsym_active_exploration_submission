@@ -215,16 +215,8 @@ class DeepSymv3(DeepSymbolGenerator):
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
-        ac = sample["action"]
+        a = sample["action"].to(self.device)
         h = self.encode(x, sample["pad_mask"], eval_mode)
-        _, n_seg = h.shape[0], h.shape[1]
-
-        eye = torch.eye(6)
-        a = torch.cat([eye[ac[:, 0]], eye[ac[:, 1]]], dim=-1)
-        a = a.unsqueeze(1)
-        a = a.repeat(1, n_seg, 1)
-        a = a.to(self.device)
-
         z = torch.cat([h, a], dim=-1)
         return z
 

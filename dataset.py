@@ -118,9 +118,15 @@ class SegmentedSAEFolder(SAEFolder):
 
     def __getitem__(self, idx):
         padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad)
+        action_idx = self.action[idx]
+        eye = torch.eye(6)
+        action = torch.cat([eye[action_idx[0]], eye[action_idx[1]]], dim=-1)
+        action = action.unsqueeze(0)
+        action = action.repeat(padded.shape[0], 1)
+
         sample = {}
         sample["state"] = padded
-        sample["action"] = self.action[idx].long()
+        sample["action"] = action
         sample["effect"] = self.effect[idx][..., :3]
         sample["pad_mask"] = pad_mask
         return sample
