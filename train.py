@@ -46,24 +46,23 @@ encoder = torch.nn.Sequential(
     blocks.GumbelSigmoidLayer(hard=False, T=1.0)
 )
 
-# encoder_att = torch.nn.MultiheadAttention(embed_dim=args.state_bits, num_heads=4, batch_first=True)
-encoder_layer = torch.nn.TransformerEncoderLayer(d_model=args.state_bits+args.action_bits, nhead=1, batch_first=True)
+projector = torch.nn.Linear(args.state_bits+args.action_bits, 128)
+encoder_layer = torch.nn.TransformerEncoderLayer(d_model=128, nhead=8, batch_first=True)
 decoder_att = torch.nn.TransformerEncoder(encoder_layer, num_layers=4)
 
-decoder = blocks.MLP([args.state_bits+args.action_bits, 256, 256, 256, 3], batch_norm=BN)
+decoder = blocks.MLP([128, 256, 256, 256, 3], batch_norm=BN)
 
 encoder.to(args.dv)
 decoder.to(args.dv)
-# encoder_att.to(args.dv)
 decoder_att.to(args.dv)
 
-model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att,
+model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att, projector=projector,
                   device=args.dv, lr=args.lr, path=args.s, coeff=1)
 model.print_model()
 for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
 valid_objects = {i: True for i in range(4, 13)}
-data = SegmentedSAEFolder(args.d, max_pad=9, valid_objects=valid_objects, normalize=True)
-loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=4)
+data = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True)
+loader = torch.utils.data.DataLoader(data, batch_size=args.bs)
 model.train(args.e, loader)
