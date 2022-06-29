@@ -142,58 +142,43 @@ class BlocksWorld(GenericEnv):
 class BlocksWorld_v2(BlocksWorld):
     def __init__(self, **kwargs):
         self.traj_t = 1.5
-        self.x_locs = {0: 0.5, 1: 0.750, 2: 1.0}
-        self.y_locs = {0: -0.4, 1: -0.2, 2: 0.0, 3: 0.2, 4: 0.4}
-        self.sizes = [[0.02, 0.02, 0.05], [0.02, 0.22, 0.02]]
+        self.locs = {
+            0: [0.8, -0.18, 0.41],
+            1: [0.8, 0.0, 0.41],
+            2: [0.8, 0.18, 0.41],
+            3: [0.5, -0.3, 0.41],
+            4: [0.5, 0.0, 0.41],
+            5: [0.5, 0.3, 0.41]
+        }
+        self.sizes = [[0.02, 0.02, 0.05], [0.02, 0.2, 0.02]]
         super(BlocksWorld_v2, self).__init__(**kwargs)
 
     def init_objects(self):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
-        obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
-        while sum(obj_types) > 3:
-            obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
-        obj_types = list(reversed(sorted(obj_types)))
-        current_obj_locs = []
+        obj_types = [1, 0, 0]
+        R = np.random.permutation(3)
+        self.current_obj_locs = []
         i = 0
         while i < self.num_objects:
-            # size_idx = np.random.choice([0, 1], p=[0.6, 0.4])
-            size_idx = obj_types[i]
-            xidx = np.random.randint(0, len(self.x_locs))
-            yidx = np.random.randint(0, len(self.y_locs))
-            if (size_idx == 0) and ([xidx, yidx] in current_obj_locs):
-                continue
-            if (size_idx == 1) and (([xidx, yidx] in current_obj_locs) or ([xidx, yidx-1] in current_obj_locs) or ([xidx, yidx+1] in current_obj_locs)):
+            loc_idx = np.random.randint(3, 6)
+            size_idx = obj_types[R[i]]
+            if loc_idx in self.current_obj_locs:
                 continue
 
-            position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
+            position = self.locs[loc_idx][:2] + [0.6]
             size = self.sizes[size_idx]
-            
-            current_obj_locs.append([xidx, yidx])
-            if size_idx == 1:
-                current_obj_locs.append([xidx, yidx-1])
-                current_obj_locs.append([xidx, yidx+1])
-
-            self.obj_dict[i] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX, size=size, position=position,
-                                                   rotation=[0, 0, 0], mass=0.1)
+            self.current_obj_locs.append(loc_idx)
+            self.obj_dict[i] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                                   size=size, position=position, rotation=[0, 0, 0],
+                                                   mass=0.1)
             i += 1
 
-        # self.obj_dict[0] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-        #                                        size=[0.02, 0.02, 0.05], position=[0.5, -0.3, 0.6],
-        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
-        # self.obj_dict[1] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-        #                                        size=[0.02, 0.2, 0.02], position=[0.5, 0.0, 0.6],
-        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
-        # self.obj_dict[2] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-        #                                        size=[0.02, 0.02, 0.05], position=[0.5, 0.3, 0.6],
-        #                                        rotation=[0, 0, 0], color="random", mass=0.1)
-
     def step(self, from_loc, to_loc, sleep=False):
-        # from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = [self.x_locs[from_loc[0]], self.y_locs[from_loc[1]], 0.41]
-        from_top_pos = from_pos[:2] + [0.75]
-        to_pos = [self.x_locs[to_loc[0]], self.y_locs[to_loc[1]], 0.41]
-        to_top_pos = to_pos[:2] + [0.75]
+        from_pos = self.locs[from_loc]
+        from_top_pos = from_pos[:2] + [0.8]
+        to_pos = self.locs[to_loc]
+        to_top_pos = to_pos[:2] + [0.8]
 
         before_pose = self.state_obj_poses()        
         self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
@@ -208,6 +193,10 @@ class BlocksWorld_v2(BlocksWorld):
         self.init_agent_pose(t=1.0, sleep=sleep)
         after_pose = self.state_obj_poses()
         effect = after_pose - before_pose
+        if from_loc in self.current_obj_locs:
+            self.current_obj_locs.remove(from_loc)
+        if to_loc not in self.current_obj_locs:
+            self.current_obj_locs.append(to_loc)
         return effect
 
 

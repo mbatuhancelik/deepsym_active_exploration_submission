@@ -5,7 +5,6 @@ import torch
 from tqdm import tqdm
 
 import utils
-from blocks import GumbelSigmoidLayer
 
 
 class DeepSymbolGenerator:
@@ -220,8 +219,8 @@ class DeepSymv3(DeepSymbolGenerator):
         h = self.encode(x, sample["pad_mask"], eval_mode)
         _, n_seg = h.shape[0], h.shape[1]
 
-        eye_3, eye_5 = torch.eye(3), torch.eye(5)
-        a = torch.cat([eye_3[ac[:, 0]], eye_5[ac[:, 1]], eye_3[ac[:, 2]], eye_5[ac[:, 3]]], dim=-1)
+        eye = torch.eye(6)
+        a = torch.cat([eye[ac[:, 0]], eye[ac[:, 1]]], dim=-1)
         a = a.unsqueeze(1)
         a = a.repeat(1, n_seg, 1)
         a = a.to(self.device)
