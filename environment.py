@@ -199,6 +199,11 @@ class BlocksWorld_v2(BlocksWorld):
             self.current_obj_locs.append(to_loc)
         return effect
 
+    def sample_random_action(self):
+        from_idx = np.random.choice(self.current_obj_locs)
+        to_idx = np.random.randint(6)
+        return (from_idx, to_idx)
+
 
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):

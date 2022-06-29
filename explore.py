@@ -10,10 +10,9 @@ import environment
 
 def collect_rollout(env):
     rgb_a, depth_a, seg_a = env.state()
-    from_idx = np.random.choice(env.current_obj_locs)
-    to_idx = np.random.randint(6)
-    effect = env.step(from_idx, to_idx)
-    return (rgb_a, depth_a, seg_a), (from_idx, to_idx), effect
+    action = env.sample_random_action()
+    effect = env.step(*action)
+    return (rgb_a, depth_a, seg_a), action, effect
 
 
 if __name__ == "__main__":
