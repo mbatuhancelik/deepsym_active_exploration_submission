@@ -76,10 +76,14 @@ class SAEFolder(torch.utils.data.Dataset):
         return self.N
 
     def __getitem__(self, idx):
+        action_idx = self.action[idx]
+        eye = torch.eye(6)
+        action = torch.cat([eye[action_idx[0]], eye[action_idx[1]]], dim=-1)
+
         sample = {}
         sample["state"] = self.state[idx] / 255.0
-        sample["action"] = self.action[idx].long()
-        sample["effect"] = self.effect[idx]
+        sample["action"] = action
+        sample["effect"] = self.effect[idx] / 255.0 - sample["state"]
         return sample
 
 
