@@ -54,6 +54,7 @@ decoder = blocks.MLP([128, 256, 256, 256, 3], batch_norm=BN)
 
 encoder.to(args.dv)
 decoder.to(args.dv)
+projector.to(args.dv)
 decoder_att.to(args.dv)
 
 model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att, projector=projector,
@@ -62,7 +63,7 @@ model.print_model()
 for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
-valid_objects = {i: True for i in range(4, 13)}
+valid_objects = {i: True for i in range(4, 7)}
 data = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True)
-loader = torch.utils.data.DataLoader(data, batch_size=args.bs)
+loader = torch.utils.data.DataLoader(data, batch_size=args.bs, num_workers=4)
 model.train(args.e, loader)
