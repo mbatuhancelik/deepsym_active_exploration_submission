@@ -107,7 +107,7 @@ class BlocksWorld(GenericEnv):
                                                    rotation=rotation, color="random", mass=0.1)
 
     def state(self):
-        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.2, 0.0, 1.7], target_position=[0.95, 0., 0.4],
+        rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.2, 0.0, 1.6], target_position=[0.8, 0., 0.4],
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
