@@ -101,10 +101,11 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None, normalize=False):
+    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None, normalize=False, aug=False):
         super(SegmentedSAEFolder, self).__init__(folder_path, num_partition)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
+        self.aug = aug
 
         segmentation = []
         for i in range(self.num_partition):
@@ -121,7 +122,7 @@ class SegmentedSAEFolder(SAEFolder):
             self.effect = effect.reshape(effect_shape)
 
     def __getitem__(self, idx):
-        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad)
+        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug)
         action_idx = self.action[idx]
         eye = torch.eye(6)
         action = torch.cat([eye[action_idx[0]], eye[action_idx[1]]], dim=-1)
@@ -136,8 +137,8 @@ class SegmentedSAEFolder(SAEFolder):
         return sample
 
 
-def preprocess(state, segmentation, valid_objects, max_pad):
-    seg_a = segment_img_with_mask(state, segmentation, valid_objects)
+def preprocess(state, segmentation, valid_objects, max_pad, aug):
+    seg_a = segment_img_with_mask(state, segmentation, valid_objects, aug=aug)
     n_seg, ch, h, w = seg_a.shape
     n_seg = min(n_seg, max_pad)
     padded = torch.zeros(max_pad, ch, h, w)
