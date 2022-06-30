@@ -190,25 +190,25 @@ def in_array(element, array):
     return False, None
 
 
-def segment_img_with_mask(img, mask, valid_objects, resize=(64, 64), padding=10):
-    T = transforms.Resize(resize)
+def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10):
     N_obj = mask.max()
+    hw = window // 2
     segmented_imgs = []
     for i in range(N_obj+1):
         if i in valid_objects:
-            rows, cols = torch.where(mask == i)
+            mask_map = (mask == i)
+            rows, cols = torch.where(mask_map)
             if len(rows) > 0:
-                xmin, xmax, ymin, ymax = rows.min(), rows.max(), cols.min(), cols.max()
-                xmin = max(0, xmin-padding)
-                xmax = min(img.shape[1]-1, xmax+padding)
-                ymin = max(0, ymin-padding)
-                ymax = min(img.shape[2]-1, ymax+padding)
-                seg_img = img[:, xmin:xmax+1, ymin:ymax+1] / 255.0
+                x_c = min(img.shape[1]-hw, max(hw, int(rows.float().mean())))
+                y_c = min(img.shape[2]-hw, max(hw, int(cols.float().mean())))
+                xmin, xmax = x_c-hw, x_c+hw
+                ymin, ymax = y_c-hw, y_c+hw
+                masked_img = (mask_map.float() * img)
+                seg_img = masked_img[:, xmin:xmax, ymin:ymax] / 255.0
                 img_h, img_w = seg_img.shape[1], seg_img.shape[2]
-                x_ch = torch.arange(xmin, xmax+1).repeat_interleave(img_w, 0).reshape(1, img_h, img_w) / img.shape[1]
-                y_ch = torch.arange(ymin, ymax+1).repeat(img_h, 1).unsqueeze(0) / img.shape[2]
+                x_ch = torch.arange(xmin, xmax).repeat_interleave(img_w, 0).reshape(1, img_h, img_w) / img.shape[1]
+                y_ch = torch.arange(ymin, ymax).repeat(img_h, 1).unsqueeze(0) / img.shape[2]
                 seg_img = torch.cat([seg_img, x_ch, y_ch], dim=0)
-                seg_img = T(seg_img)
                 segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs
