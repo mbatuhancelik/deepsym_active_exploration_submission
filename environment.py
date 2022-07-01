@@ -43,6 +43,15 @@ class GenericEnv:
         angles = [-0.294, -1.950, 2.141, -2.062, -1.572, 1.277]
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
+    def state_obj_poses(self):
+        N_obj = len(self.obj_dict)
+        pose = np.zeros((N_obj, 7), dtype=np.float32)
+        for i in range(N_obj):
+            position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            pose[i][:3] = position
+            pose[i][3:] = quaternion
+        return pose
+
     def _step(self, count=1):
         for _ in range(count):
             self._p.stepSimulation()
@@ -111,15 +120,6 @@ class BlocksWorld(GenericEnv):
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
 
-    def state_obj_poses(self):
-        N_obj = len(self.obj_dict)
-        pose = np.zeros((N_obj, 7), dtype=np.float32)
-        for i in range(N_obj):
-            position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
-            pose[i][:3] = position
-            pose[i][3:] = quaternion
-        return pose
-
     def step(self, from_obj_id, to_obj_id, sleep=False):
         from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
@@ -150,7 +150,7 @@ class BlocksWorld_v2(BlocksWorld):
             4: [0.5, 0.0, 0.41],
             5: [0.5, 0.3, 0.41]
         }
-        self.sizes = [[0.02, 0.02, 0.05], [0.02, 0.2, 0.02]]
+        self.sizes = [[0.025, 0.025, 0.05], [0.025, 0.2, 0.025]]
         super(BlocksWorld_v2, self).__init__(**kwargs)
 
     def init_objects(self):
@@ -186,6 +186,7 @@ class BlocksWorld_v2(BlocksWorld):
         self.agent.close_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent._waitsleep(0.3, sleep=sleep)
         self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
         self.agent.open_gripper(self.traj_t, sleep=sleep)
