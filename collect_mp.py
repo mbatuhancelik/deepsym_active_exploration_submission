@@ -6,7 +6,7 @@ from multiprocessing import Process
 
 
 def collect(num, folder, idx):
-    subprocess.run(["python", "explore_rgb.py", "-N", num, "-o", folder, "-i", idx])
+    subprocess.run(["python", "explore.py", "-N", num, "-o", folder, "-i", idx])
 
 
 if __name__ == "__main__":
