@@ -157,17 +157,17 @@ class BlocksWorld_v2(BlocksWorld):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         obj_types = [1, 0, 0]
         R = np.random.permutation(3)
-        self.current_obj_locs = []
+        self.current_obj_locs = [[] for _ in self.locs]
         i = 0
         while i < self.num_objects:
             loc_idx = np.random.randint(3, 6)
             size_idx = obj_types[R[i]]
-            if loc_idx in self.current_obj_locs:
+            if len(self.current_obj_locs[loc_idx]) > 0:
                 continue
 
             position = self.locs[loc_idx][:2] + [0.6]
             size = self.sizes[size_idx]
-            self.current_obj_locs.append(loc_idx)
+            self.current_obj_locs[loc_idx].append(0)
             self.obj_dict[i] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                                    size=size, position=position, rotation=[0, 0, 0],
                                                    mass=0.1)
@@ -194,14 +194,13 @@ class BlocksWorld_v2(BlocksWorld):
         self.init_agent_pose(t=1.0, sleep=sleep)
         after_pose = self.state_obj_poses()
         effect = after_pose - before_pose
-        if from_loc in self.current_obj_locs:
-            self.current_obj_locs.remove(from_loc)
-        if to_loc not in self.current_obj_locs:
-            self.current_obj_locs.append(to_loc)
+        if len(self.current_obj_locs[from_loc]) > 0:
+            self.current_obj_locs[from_loc].pop()
+        self.current_obj_locs[to_loc].append(0)
         return effect
 
     def sample_random_action(self):
-        from_idx = np.random.choice(self.current_obj_locs)
+        from_idx = np.random.choice([i for i in range(len(self.current_obj_locs)) if len(self.current_obj_locs[i]) > 0])
         to_idx = np.random.randint(6)
         return (from_idx, to_idx)
 
