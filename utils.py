@@ -190,7 +190,9 @@ def in_array(element, array):
     return False, None
 
 
-def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10):
+def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10, aug=False):
+    if aug:
+        T = transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), fillcolor=0)
     N_obj = mask.max()
     hw = window // 2
     segmented_imgs = []
@@ -209,6 +211,8 @@ def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10):
                 x_ch = torch.arange(xmin, xmax).repeat_interleave(img_w, 0).reshape(1, img_h, img_w) / img.shape[1]
                 y_ch = torch.arange(ymin, ymax).repeat(img_h, 1).unsqueeze(0) / img.shape[2]
                 seg_img = torch.cat([seg_img, x_ch, y_ch], dim=0)
+                if aug:
+                    seg_img = T(seg_img)
                 segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs
