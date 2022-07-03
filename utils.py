@@ -226,7 +226,7 @@ def segment_img_with_mask_old(img, mask, valid_objects):
             obj_mask = (mask == i)
             if obj_mask.any():
                 obj_mask = obj_mask.float()
-                seg_img = img * obj_mask
+                seg_img = (img * obj_mask) / 255.0
                 segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs

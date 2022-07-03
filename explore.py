@@ -8,14 +8,9 @@ import numpy as np
 import environment
 
 
-def normalize_depth_img(img):
-    min_val = 0.0
-    max_val = 1.0
-    return (((img - min_val) / (max_val - min_val))*255).astype(np.uint8)
-
 def collect_rollout(env):
     rgb_a, depth_a, seg_a = env.state()
-    depth_a = normalize_depth_img(depth_a)
+    depth_a = (depth_a*255).astype(np.uint8)
     action = env.sample_random_action()
     effect = env.step(*action)
     return (rgb_a, depth_a, seg_a), action, effect
