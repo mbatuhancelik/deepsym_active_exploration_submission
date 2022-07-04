@@ -59,7 +59,13 @@ if __name__ == "__main__":
         segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
         actions[i, 0], actions[i, 1] = from_idx, to_idx
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
-        if (env_it) == env.num_objects*5:
+        if env.num_objects == 1 and env_it == 4:
+            env_it = 0
+            env.reset_objects()
+        elif env.num_objects == 2 and env_it == 8:
+            env_it = 0
+            env.reset_objects()
+        elif (env_it) == 20:
             env_it = 0
             env.reset_objects()
 

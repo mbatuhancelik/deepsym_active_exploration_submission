@@ -154,7 +154,7 @@ class BlocksWorld_v2(BlocksWorld):
         super(BlocksWorld_v2, self).__init__(**kwargs)
 
     def init_objects(self):
-        self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
+        self.num_objects = np.random.choice([1, 2, 3], p=[0.1, 0.2, 0.7])
         obj_types = [1, 0, 0]
         R = np.random.permutation(3)
         self.current_obj_locs = [[] for _ in self.locs]
@@ -200,7 +200,11 @@ class BlocksWorld_v2(BlocksWorld):
         return effect
 
     def sample_random_action(self):
-        from_idx = np.random.choice([i for i in range(len(self.current_obj_locs)) if len(self.current_obj_locs[i]) > 0])
+        if np.random.rand() < 0.2:
+            # there might be actions that does not pick any objects
+            from_idx = np.random.randint(6)
+        else:
+            from_idx = np.random.choice([i for i in range(len(self.current_obj_locs)) if len(self.current_obj_locs[i]) > 0])
         to_idx = np.random.randint(6)
         return (from_idx, to_idx)
 
