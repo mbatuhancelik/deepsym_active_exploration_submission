@@ -8,9 +8,18 @@ import numpy as np
 import environment
 
 
+def normalize(img):
+    vmin = 0.5
+    vmax = 1
+    if img.min() < 0.5:
+        print("chaos is here.")
+    img_n = (((img - vmin) / (vmax - vmin))*255).astype(np.uint8)
+    return img_n
+
+
 def collect_rollout(env):
     rgb_a, depth_a, seg_a = env.state()
-    depth_a = (depth_a*255).astype(np.uint8)
+    depth_a = normalize(depth_a)
     action = env.sample_random_action()
     effect = env.step(*action)
     return (rgb_a, depth_a, seg_a), action, effect
