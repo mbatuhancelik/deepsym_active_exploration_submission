@@ -52,6 +52,12 @@ def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color
         elif color is not None:
             visualId = p.createVisualShape(shapeType=obj_type, halfExtents=size, rgbaColor=color)
 
+    elif obj_type == "random":
+        obj = "%03d" % np.random.randint(1000)
+        obj_id = p.loadURDF(f"random_urdfs/{obj}/{obj}.urdf", basePosition=position,
+                            baseOrientation=p.getQuaternionFromEuler(rotation))
+        return obj_id
+
     if with_link:
         obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=-1,
                                    basePosition=position, baseOrientation=p.getQuaternionFromEuler(rotation),
