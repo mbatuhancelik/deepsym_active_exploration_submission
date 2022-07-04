@@ -118,8 +118,8 @@ class SegmentedSAEFolder(SAEFolder):
             effect_shape = self.effect.shape
             effect = self.effect.flatten(0, -2)
             self.eff_mu = effect.mean(dim=0)
-            self.eff_std = effect.std(dim=0)
-            effect = (effect - self.eff_mu) / (self.eff_std + 1e-6)
+            self.eff_std = effect.std(dim=0) + 1e-6
+            effect = (effect - self.eff_mu) / (self.eff_std)
             self.effect = effect.reshape(effect_shape)
 
     def __getitem__(self, idx):
