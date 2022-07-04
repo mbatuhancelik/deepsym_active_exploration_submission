@@ -154,7 +154,10 @@ class BlocksWorld_v2(BlocksWorld):
         super(BlocksWorld_v2, self).__init__(**kwargs)
 
     def init_objects(self):
-        self.num_objects = np.random.choice([1, 2, 3], p=[0.1, 0.2, 0.7])
+        if self.min_objects == 1:
+            self.num_objects = np.random.choice([1, 2, 3], p=[0.1, 0.2, 0.7])
+        else:
+            self.num_objects = 3
         obj_types = [1, 0, 0]
         R = np.random.permutation(3)
         self.current_obj_locs = [[] for _ in self.locs]
