@@ -97,7 +97,7 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False):
+    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False, eff_mu=None, eff_std=None):
         super(SegmentedSAEFolder, self).__init__(folder_path, partitions)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
@@ -117,6 +117,9 @@ class SegmentedSAEFolder(SAEFolder):
             self.eff_std = effect.std(dim=0) + 1e-6
             effect = (effect - self.eff_mu) / (self.eff_std)
             self.effect = effect.reshape(effect_shape)
+        if (eff_mu is not None) and (eff_std is not None):
+            self.eff_mu = eff_mu
+            self.eff_std = eff_std
 
     def __getitem__(self, idx):
         padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
