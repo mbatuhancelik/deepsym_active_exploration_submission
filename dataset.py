@@ -43,34 +43,30 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
 
 
 class SAEFolder(torch.utils.data.Dataset):
-    def __init__(self, folder_path, num_partition=None):
+    def __init__(self, folder_path, partitions=None):
         self.folder_path = folder_path
         info = list(map(lambda x: int(x.rstrip()), open(os.path.join(folder_path, "info.txt"), "r").readlines()))
         self.sample_per_partition = info[0]
-        if num_partition is not None:
-            self.num_partition = num_partition
+        if partitions is not None:
+            self.partitions = partitions
         else:
-            self.num_partition = info[1]
-        self.N = self.sample_per_partition * self.num_partition
+            self.partitions = list(range(info[1]))
+        self.N = self.sample_per_partition * len(self.partitions)
 
         state = []
         action = []
         effect = []
-        # segmentation = []
-        for i in range(self.num_partition):
+        for i in self.partitions:
             state.append(torch.load(os.path.join(folder_path, f"state_{i}.pt")))
             action.append(torch.load(os.path.join(folder_path, f"action_{i}.pt")))
             effect.append(torch.load(os.path.join(folder_path, f"effect_{i}.pt")))
-            # segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
 
         self.state = torch.cat(state)
         self.action = torch.cat(action)
         self.effect = torch.cat(effect)
-        # self.segmentation = torch.cat(segmentation)
         assert self.state.shape[0] == self.N
         assert self.action.shape[0] == self.N
         assert self.effect.shape[0] == self.N
-        # assert self.segmentation.shape[0] == self.N
 
     def __len__(self):
         return self.N
@@ -88,8 +84,8 @@ class SAEFolder(torch.utils.data.Dataset):
 
 
 class CrafterDataset(SAEFolder):
-    def __init__(self, folder_path, num_partition=None):
-        super(CrafterDataset, self).__init__(folder_path, num_partition)
+    def __init__(self, folder_path, partitions=None):
+        super(CrafterDataset, self).__init__(folder_path, partitions)
 
     def __getitem__(self, idx):
         sample = {}
@@ -101,15 +97,15 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, num_partition=None, normalize=False, aug=False, old=False):
-        super(SegmentedSAEFolder, self).__init__(folder_path, num_partition)
+    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False):
+        super(SegmentedSAEFolder, self).__init__(folder_path, partitions)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
         self.aug = aug
         self.old = old
 
         segmentation = []
-        for i in range(self.num_partition):
+        for i in self.partitions:
             segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
         self.segmentation = torch.cat(segmentation)
         assert self.segmentation.shape[0] == self.N
