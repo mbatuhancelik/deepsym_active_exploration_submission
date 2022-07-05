@@ -2,7 +2,6 @@ import os
 import time
 
 import torch
-from tqdm import tqdm
 
 import utils
 
@@ -120,7 +119,7 @@ class DeepSymbolGenerator:
     def one_pass_optimize(self, loader):
         avg_loss = 0.0
         start = time.time()
-        for i, sample in enumerate(tqdm(loader)):
+        for i, sample in enumerate(loader):
             self.optimizer.zero_grad()
             L = self.loss(sample)
             L.backward()
@@ -132,14 +131,29 @@ class DeepSymbolGenerator:
         time_elapsed = end-start
         return avg_loss, time_elapsed
 
-    def train(self, epoch, loader):
+    def train(self, epoch, loader, val_loader=None):
         for e in range(epoch):
+            # one epoch training over the train set
             epoch_loss, time_elapsed = self.one_pass_optimize(loader)
             self.epoch += 1
-            if epoch_loss < self.best_loss:
-                self.best_loss = epoch_loss
-                self.save("_best")
-            print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}, elapsed={time_elapsed:.2f}")
+
+            # calculate validation loss
+            if val_loader is not None:
+                val_loss = 0.0
+                for i, sample in enumerate(val_loader):
+                    with torch.no_grad():
+                        L = self.loss(sample)
+                    val_loss += L.item()
+                val_loss /= (i+1)
+                if val_loss < self.best_loss:
+                    self.best_loss = val_loss
+                    self.save("_best")
+                print(f"epoch={self.epoch}, iter={self.iteration}, train loss={epoch_loss:.5f}, val loss={val_loss:.5f}, elapsed={time_elapsed:.2f}")
+            else:
+                if epoch_loss < self.best_loss:
+                    self.best_loss = epoch_loss
+                    self.save("_best")
+                print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}, elapsed={time_elapsed:.2f}")
             self.save("_last")
 
     def load(self, ext):
