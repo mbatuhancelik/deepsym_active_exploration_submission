@@ -68,4 +68,4 @@ train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, n
 val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, eff_mu=train_set.eff_mu, eff_std=train_set.eff_std, old=True, partitions=[10])
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.bs, num_workers=4, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.bs, num_workers=4, shuffle=True)
-model.train(args.e, loader, val_loader)
+model.train(args.e, train_loader, val_loader)
