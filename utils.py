@@ -236,3 +236,12 @@ def segment_img_with_mask_old(img, mask, valid_objects):
                 segmented_imgs.append(seg_img)
     segmented_imgs = torch.stack(segmented_imgs)
     return segmented_imgs
+
+
+def normalize_depth_img(img):
+    vmin = 0.5
+    vmax = 1
+    if img.min() < 0.5:
+        print("chaos is here.")
+    img_n = (((img - vmin) / (vmax - vmin))*255).astype(np.uint8)
+    return img_n
