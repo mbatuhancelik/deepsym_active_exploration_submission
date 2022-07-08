@@ -162,6 +162,7 @@ class BlocksWorld_v2(BlocksWorld):
         R = np.random.permutation(3)
         self.current_obj_locs = [[] for _ in self.locs]
         i = 0
+        obj_ids = []
         while i < self.num_objects:
             loc_idx = np.random.randint(3, 6)
             size_idx = obj_types[R[i]]
@@ -171,10 +172,12 @@ class BlocksWorld_v2(BlocksWorld):
             position = self.locs[loc_idx][:2] + [0.6]
             size = self.sizes[size_idx]
             self.current_obj_locs[loc_idx].append(0)
-            self.obj_dict[i] = utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                   size=size, position=position, rotation=[0, 0, 0],
-                                                   mass=0.1)
+            obj_ids.append(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                               size=size, position=position, rotation=[0, 0, 0],
+                                               mass=0.1))
             i += 1
+        for i, o_id in enumerate(sorted(obj_ids)):
+            self.obj_dict[i] = o_id
 
     def step(self, from_loc, to_loc, sleep=False):
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
@@ -183,7 +186,7 @@ class BlocksWorld_v2(BlocksWorld):
         to_pos = self.locs[to_loc]
         to_top_pos = to_pos[:2] + [0.8]
 
-        before_pose = self.state_obj_poses()        
+        before_pose = self.state_obj_poses()
         self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
         self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(self.traj_t, sleep=sleep)
