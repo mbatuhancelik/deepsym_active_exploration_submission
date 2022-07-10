@@ -113,13 +113,14 @@ class SegmentedSAEFolder(SAEFolder):
         if normalize:
             effect_shape = self.effect.shape
             effect = self.effect.flatten(0, -2)
-            self.eff_mu = effect.mean(dim=0)
-            self.eff_std = effect.std(dim=0) + 1e-6
+            if (eff_mu is not None) and (eff_std is not None):
+                self.eff_mu = eff_mu
+                self.eff_std = eff_std
+            else:
+                self.eff_mu = effect.mean(dim=0)
+                self.eff_std = effect.std(dim=0) + 1e-6
             effect = (effect - self.eff_mu) / (self.eff_std)
             self.effect = effect.reshape(effect_shape)
-        if (eff_mu is not None) and (eff_std is not None):
-            self.eff_mu = eff_mu
-            self.eff_std = eff_std
 
     def __getitem__(self, idx):
         padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
