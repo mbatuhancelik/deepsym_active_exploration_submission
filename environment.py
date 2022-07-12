@@ -191,7 +191,7 @@ class BlocksWorld_v2(BlocksWorld):
         self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
         self.agent._waitsleep(0.3, sleep=sleep)
         self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
@@ -212,6 +212,91 @@ class BlocksWorld_v2(BlocksWorld):
         else:
             from_idx = np.random.choice([i for i in range(len(self.current_obj_locs)) if len(self.current_obj_locs[i]) > 0])
         to_idx = np.random.randint(6)
+        return (from_idx, to_idx)
+
+
+class BlocksWorld_v3(BlocksWorld):
+    def __init__(self, **kwargs):
+        self.traj_t = 1.5
+        self.x_locs = {0: 0.5, 1: 0.750, 2: 1.0}
+        self.y_locs = {0: -0.4, 1: -0.2, 2: 0.0, 3: 0.2, 4: 0.4}
+        self.sizes = [[0.025, 0.025, 0.05], [0.025, 0.225, 0.025]]
+        super(BlocksWorld_v3, self).__init__(**kwargs)
+
+    def init_objects(self):
+        self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
+        obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
+        while sum(obj_types) > 3:
+            obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
+        obj_types = list(reversed(sorted(obj_types)))
+        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
+        i = 0
+        obj_ids = []
+        while i < self.num_objects:
+            size_idx = obj_types[i]
+            xidx = np.random.randint(0, len(self.x_locs))
+            yidx = np.random.randint(0, len(self.y_locs))
+            if (size_idx == 0) and (len(self.current_obj_locs[xidx][yidx]) > 0):
+                continue
+            if ((size_idx == 1) and
+                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or 
+                     (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
+                     (len(self.current_obj_locs[xidx][min(4, yidx+1)]) > 0))):
+                continue
+
+            position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
+            size = self.sizes[size_idx]
+            self.current_obj_locs[xidx][yidx].append(0)
+            if size_idx == 1:
+                self.current_obj_locs[xidx][max(0, yidx-1)].append(0)
+                self.current_obj_locs[xidx][min(4, yidx+1)].append(0)
+            obj_ids.append(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                               size=size, position=position, rotation=[0, 0, 0],
+                                               mass=0.1))
+            i += 1
+        for i, o_id in enumerate(sorted(obj_ids)):
+            self.obj_dict[i] = o_id
+
+    def step(self, from_loc, to_loc, sleep=False):
+        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
+        from_pos = [self.x_locs[from_loc[0]], self.y_locs[from_loc[1]], 0.41]
+        from_top_pos = from_pos[:2] + [1.0]
+        to_pos = [self.x_locs[to_loc[0]], self.y_locs[to_loc[1]], 0.41]
+        to_top_pos = to_pos[:2] + [1.0]
+
+        before_pose = self.state_obj_poses()
+        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=False, sleep=sleep)
+        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.close_gripper(self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
+        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.open_gripper(self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.init_agent_pose(t=1.0, sleep=sleep)
+        after_pose = self.state_obj_poses()
+        effect = after_pose - before_pose
+        if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
+            self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
+            self.current_obj_locs[to_loc[0]][to_loc[1]].append(0)
+        return effect
+
+    def sample_random_action(self):
+        if np.random.rand() < 0.0:
+            # there might be actions that does not pick any objects
+            xidx = np.random.randint(0, len(self.x_locs))
+            yidx = np.random.randint(0, len(self.y_locs))
+            from_idx = [xidx, yidx]
+        else:
+            possible_actions = []
+            for i in range(len(self.x_locs)):
+                for j in range(len(self.y_locs)):
+                    if len(self.current_obj_locs[i][j]) > 0:
+                        possible_actions.append([i, j])
+            r = np.random.randint(0, len(possible_actions))
+            from_idx = possible_actions[r]
+
+        to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         return (from_idx, to_idx)
 
 

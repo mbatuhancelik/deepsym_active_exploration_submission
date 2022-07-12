@@ -239,9 +239,9 @@ def segment_img_with_mask_old(img, mask, valid_objects):
 
 
 def normalize_depth_img(img):
-    vmin = 0.5
+    vmin = 0.2
     vmax = 1
-    if img.min() < 0.5:
-        print("chaos is here.")
+    if img.min() < 0.2:
+        print("chaos is here.", img.min())
     img_n = (((img - vmin) / (vmax - vmin))*255).astype(np.uint8)
     return img_n

@@ -62,7 +62,7 @@ class Manipulator:
             targetOrientation=orientation)
         self.set_joint_position(target_joints[:-2], t=t, sleep=sleep, traj=traj)
 
-    def move_in_cartesian(self, position, orientation=None, t=1.0, sleep=False):
+    def move_in_cartesian(self, position, orientation=None, t=1.0, sleep=False, ignore_force=False):
         N = int(t * 240)
 
         current_position, current_orientation = self.get_tip_pose()
@@ -79,17 +79,18 @@ class Manipulator:
             self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
             force_feedback = np.array(self.get_joint_forces())
             running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
-            if running_force_feedback[5] < self.force_stop_threshold:
-                # print("="*100)
-                for j in range(N//10):
-                    target_joints = self._p.calculateInverseKinematics(
-                        bodyUniqueId=self.id,
-                        endEffectorLinkIndex=self.ik_idx,
-                        targetPosition=position_traj[i-j],
-                        targetOrientation=orientation)
-                    self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
-                    force_feedback = np.array(self.get_joint_forces())
-                break
+            if not ignore_force:
+                if running_force_feedback[5] < self.force_stop_threshold:
+                    # print("="*100)
+                    for j in range(N//20):
+                        target_joints = self._p.calculateInverseKinematics(
+                            bodyUniqueId=self.id,
+                            endEffectorLinkIndex=self.ik_idx,
+                            targetPosition=position_traj[i-j],
+                            targetOrientation=orientation)
+                        self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
+                        force_feedback = np.array(self.get_joint_forces())
+                    break
 
     def set_joint_position(self, position, velocity=None, t=None, sleep=False, traj=False):
         assert len(self.joints) > 0
@@ -112,7 +113,7 @@ class Manipulator:
                 running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
                 if running_force_feedback[5] < self.force_stop_threshold:
                     # print("="*100)
-                    for j in range(N//10):
+                    for j in range(N//20):
                         self._p.setJointMotorControlArray(
                             bodyUniqueId=self.id,
                             jointIndices=self.joints[:-2],
@@ -179,7 +180,7 @@ class Manipulator:
             jointIndices=self.joints[-2:],
             controlMode=self._p.POSITION_CONTROL,
             targetPositions=target_position,
-            forces=[10, 10])
+            forces=[15, 15])
         self._waitsleep(t, sleep)
 
     # TODO: make this only joint position, joint velocity etc.
