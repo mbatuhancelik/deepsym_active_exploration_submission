@@ -27,12 +27,14 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
 
-    env = environment.BlocksWorld_v2(gui=0, min_objects=1, max_objects=3)
+    # env = environment.BlocksWorld_v2(gui=0, min_objects=1, max_objects=3)
+    env = environment.BlocksWorld_v3(gui=0, min_objects=5, max_objects=9)
     np.random.seed()
 
     states = torch.zeros(args.N, 1, 256, 256, dtype=torch.uint8)
     segmentations = torch.zeros(args.N, 256, 256, dtype=torch.uint8)
-    actions = torch.zeros(args.N, 2, dtype=torch.int32)
+    # actions = torch.zeros(args.N, 2, dtype=torch.int32)
+    actions = torch.zeros(args.N, 4, dtype=torch.int32)
     effects = torch.zeros(args.N, env.max_objects, 7, dtype=torch.float)
 
     prog_it = args.N // 20
@@ -49,15 +51,19 @@ if __name__ == "__main__":
 
         states[i, 0] = torch.tensor(depth_a, dtype=torch.uint8)
         segmentations[i] = torch.tensor(seg_a, dtype=torch.uint8)
-        actions[i, 0], actions[i, 1] = from_idx, to_idx
+        # actions[i, 0], actions[i, 1] = from_idx, to_idx
+        actions[i, 0], actions[i, 1], actions[i, 2], actions[i, 3] = from_idx[0], from_idx[1], to_idx[0], to_idx[1]
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
-        if env.num_objects == 1 and env_it == 4:
-            env_it = 0
-            env.reset_objects()
-        elif env.num_objects == 2 and env_it == 8:
-            env_it = 0
-            env.reset_objects()
-        elif (env_it) == 20:
+        # if env.num_objects == 1 and env_it == 4:
+        #     env_it = 0
+        #     env.reset_objects()
+        # elif env.num_objects == 2 and env_it == 8:
+        #     env_it = 0
+        #     env.reset_objects()
+        # elif (env_it) == 20:
+        #     env_it = 0
+        #     env.reset_objects()
+        if (env_it) == 20:
             env_it = 0
             env.reset_objects()
 
