@@ -75,8 +75,8 @@ for name in model.module_names:
 
 valid_objects = {i: True for i in range(4, 7)}
 train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=list(range(10)), with_post=True)
-val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=[10], with_post=True)
+val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, eff_mu=train_set.eff_mu, eff_std=train_set.eff_std, old=False, partitions=[10], with_post=True)
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=128, shuffle=True)
 record_from_loader(model, train_loader, "train_")
-record_from_loader(model, train_loader, "val_")
+record_from_loader(model, val_loader, "val_")
