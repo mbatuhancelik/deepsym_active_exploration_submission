@@ -1,17 +1,25 @@
+import os
+import argparse
+
 import torch
 
 from models import DeepSymv3
+from dataset import SegmentedSAEFolder
 import blocks
 import utils
-import environment
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("record symbols.")
+    parser.add_argument("-d", help="data path", type=str, required=True)
+    parser.add_argument("-s", help="model path", type=str, required=True)
+    args = parser.parse_args()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 STATE_BITS = 8
 ACTION_BITS = 12
 BN = True
-NUM_INTERACTION = 10000
 
 encoder = torch.nn.Sequential(
     blocks.ConvBlock(in_channels=3, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
@@ -34,7 +42,7 @@ projector.to(device)
 decoder_att.to(device)
 
 model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att, projector=projector,
-                  device=device, lr=0.0001, path="save/v4_varying_new/", coeff=1.0)
+                  device=device, lr=0.0001, path=args.s, coeff=1.0)
 model.load("_best")
 model.eval_mode()
 
@@ -45,41 +53,24 @@ for name in model.module_names:
         param.requires_grad = False
 
 valid_objects = {i: True for i in range(4, 7)}
-env = environment.BlocksWorld_v2(gui=0, min_objects=1, max_objects=3)
+train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=list(range(10)), with_post=True)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=16, shuffle=True)
 
-eye = torch.eye(6)
-i = 0
-env_it = 0
-symbol_forward_map = {}
-while i < NUM_INTERACTION:
-    state_tuple = env.state()
-    padded, pad_mask = utils.state_to_tensor(state_tuple, valid_objects=valid_objects, num_objects=env.num_objects, is_old=False)
-    z_before = model.encode(padded.unsqueeze(0), pad_mask.unsqueeze(0))[0]
-    from_idx, to_idx = env.sample_random_action()
-    action_vector = torch.cat([eye[from_idx], eye[to_idx]], dim=-1).unsqueeze(0)
-    env.step(from_idx, to_idx)
+z_precond = []
+z_effect = []
+mask = []
 
-    state_tuple = env.state()
-    padded, pad_mask = utils.state_to_tensor(state_tuple, valid_objects=valid_objects, num_objects=env.num_objects, is_old=False)
-    z_after = model.encode(padded.unsqueeze(0), pad_mask.unsqueeze(0))[0]
-    z_i = sorted(utils.binary_tensor_to_str(z_before))
-    a = utils.binary_tensor_to_str(action_vector)
-    z_f = sorted(utils.binary_tensor_to_str(z_after))
-    precond = (tuple(z_i), tuple(a))
-    effect = tuple(z_f)
-    if precond in symbol_forward_map:
-        if effect in symbol_forward_map[precond]:
-            symbol_forward_map[precond][effect] += 1
-        else:
-            symbol_forward_map[precond][effect] = 1
-    else:
-        symbol_forward_map[precond] = {effect: 1}
+for i, sample in enumerate(train_loader):
+    z_i = model.concat(sample, eval_mode=True)
+    z_f = model.encode(sample["post_state"], sample["post_pad_mask"], eval_mode=True)
+    z_precond.append(z_i)
+    z_effect.append(z_f)
+    mask.append(sample["pad_mask"])
+    break
 
-    env_it += 1
-    if env_it == 20:
-        env_it = 0
-        env.reset_objects()
-        for precond in symbol_forward_map:
-            for effect in symbol_forward_map[precond]:
-                print(f"{precond}->{effect}: {symbol_forward_map[precond][effect]}")
-        continue
+z_precond = torch.cat(z_precond, dim=0)
+z_effect = torch.cat(z_effect, dim=0)
+mask = torch.cat(mask, dim=0)
+torch.save(z_precond, os.path.join(args.s, "z_precond.pt"))
+torch.save(z_effect, os.path.join(args.s, "z_effect.pt"))
+torch.save(mask, os.path.join(args.s, "mask.pt"))
