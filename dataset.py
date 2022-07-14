@@ -3,7 +3,7 @@ import os
 import torch
 from torchvision import transforms
 
-from utils import segment_img_with_mask, segment_img_with_mask_old
+from utils import preprocess
 
 to_tensor = transforms.ToTensor()
 
@@ -156,17 +156,3 @@ class SegmentedSAEFolder3x5(SegmentedSAEFolder):
         sample["effect"] = self.effect[idx][..., :3]
         sample["pad_mask"] = pad_mask
         return sample
-
-
-def preprocess(state, segmentation, valid_objects, max_pad, aug, old):
-    if old:
-        seg_a = segment_img_with_mask_old(state, segmentation, valid_objects)
-    else:
-        seg_a = segment_img_with_mask(state, segmentation, valid_objects, aug=aug)
-    n_seg, ch, h, w = seg_a.shape
-    n_seg = min(n_seg, max_pad)
-    padded = torch.zeros(max_pad, ch, h, w)
-    padded[:n_seg] = seg_a[:n_seg]
-    pad_mask = torch.zeros(max_pad)
-    pad_mask[:n_seg] = 1.0
-    return padded, pad_mask

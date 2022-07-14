@@ -238,10 +238,33 @@ def segment_img_with_mask_old(img, mask, valid_objects):
     return segmented_imgs
 
 
+def preprocess(state, segmentation, valid_objects, max_pad, aug, old):
+    if old:
+        seg_a = segment_img_with_mask_old(state, segmentation, valid_objects)
+    else:
+        seg_a = segment_img_with_mask(state, segmentation, valid_objects, aug=aug)
+    n_seg, ch, h, w = seg_a.shape
+    n_seg = min(n_seg, max_pad)
+    padded = torch.zeros(max_pad, ch, h, w)
+    padded[:n_seg] = seg_a[:n_seg]
+    pad_mask = torch.zeros(max_pad)
+    pad_mask[:n_seg] = 1.0
+    return padded, pad_mask
+
+
 def normalize_depth_img(img):
-    vmin = 0.2
+    vmin = 0.5
     vmax = 1
-    if img.min() < 0.2:
+    if img.min() < 0.5:
         print("chaos is here.", img.min())
     img_n = (((img - vmin) / (vmax - vmin))*255).astype(np.uint8)
     return img_n
+
+
+def state_to_tensor(state_tuple, valid_objects, num_objects, is_old, is_aug=False):
+    _, depth_img, seg = state_tuple
+    depth_img = normalize_depth_img(depth_img)
+    depth_img = torch.tensor(depth_img).unsqueeze(0)
+    seg = torch.tensor(seg)
+    padded, pad_mask = preprocess(depth_img, seg, valid_objects, num_objects, old=is_old, aug=is_aug)
+    return padded, pad_mask
