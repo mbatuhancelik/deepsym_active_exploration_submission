@@ -66,7 +66,6 @@ for i, sample in enumerate(train_loader):
     z_precond.append(z_i)
     z_effect.append(z_f)
     mask.append(sample["pad_mask"])
-    break
 
 z_precond = torch.cat(z_precond, dim=0)
 z_effect = torch.cat(z_effect, dim=0)
