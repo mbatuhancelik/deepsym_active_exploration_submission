@@ -97,18 +97,28 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False, eff_mu=None, eff_std=None):
+    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False, eff_mu=None, eff_std=None, with_post=False):
         super(SegmentedSAEFolder, self).__init__(folder_path, partitions)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
         self.aug = aug
         self.old = old
+        self.with_post = with_post
 
         segmentation = []
         for i in self.partitions:
             segmentation.append(torch.load(os.path.join(folder_path, f"segmentation_{i}.pt")))
         self.segmentation = torch.cat(segmentation)
         assert self.segmentation.shape[0] == self.N
+
+        if self.with_post:
+            post_state = []
+            post_segmentation = []
+            for i in self.partitions:
+                post_state.append(torch.load(os.path.join(folder_path, f"post_state_{i}.pt")))
+                post_segmentation.append(torch.load(os.path.join(folder_path, f"post_segmentation_{i}.pt")))
+            self.post_state = torch.cat(post_state)
+            self.post_segmentation = torch.cat(post_segmentation)
 
         if normalize:
             effect_shape = self.effect.shape
@@ -124,6 +134,8 @@ class SegmentedSAEFolder(SAEFolder):
 
     def __getitem__(self, idx):
         padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
+        if self.with_post:
+            post_padded, post_pad_mask = preprocess(self.post_state[idx], self.post_segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
         action_idx = self.action[idx]
         eye = torch.eye(6)
         action = torch.cat([eye[action_idx[0]], eye[action_idx[1]]], dim=-1)
@@ -135,6 +147,9 @@ class SegmentedSAEFolder(SAEFolder):
         sample["action"] = action
         sample["effect"] = self.effect[idx][..., :3]
         sample["pad_mask"] = pad_mask
+        if self.with_post:
+            sample["post_state"] = post_padded
+            sample["post_pad_mask"] = post_pad_mask
         return sample
 
 
