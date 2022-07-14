@@ -1,6 +1,7 @@
 import argparse
 
 import torch
+import blocks
 from tqdm import tqdm
 
 from dataset import SymbolForwardDataset
@@ -12,6 +13,8 @@ if __name__ == "__main__":
     parser.add_argument("-s", help="path", type=str, required=True)
     parser.add_argument("-e", help="epoch", type=int, default=1000)
     parser.add_argument("-bs", help="batch size", type=int, default=128)
+    parser.add_argument("-lr", help="learning rate", type=float, default=0.001)
+    parser.add_argument("-hs", help="hidden size", type=int, default=128)
     args = parser.parse_args()
 
     device = get_device()
@@ -21,15 +24,15 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(train_set, args.bs, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_set, args.bs, shuffle=True)
 
-    proj_in = torch.nn.Linear(20, 128)
-    attention = torch.nn.MultiheadAttention(embed_dim=128, num_heads=8, batch_first=True)
-    proj_out = torch.nn.Linear(128, 8)
+    proj_in = blocks.MLP([20, args.hs, args.hs])
+    attention = torch.nn.MultiheadAttention(embed_dim=args.hs, num_heads=8, batch_first=True)
+    proj_out = blocks.MLP([args.hs, args.hs, 8])
 
     proj_in.to(device)
     attention.to(device)
     proj_out.to(device)
 
-    optimizer = torch.optim.Adam(lr=0.001, params=[
+    optimizer = torch.optim.Adam(lr=args.lr, params=[
             {"params": proj_in.parameters()},
             {"params": attention.parameters()},
             {"params": proj_out.parameters()}])
@@ -67,3 +70,4 @@ if __name__ == "__main__":
             val_loss += criterion(e_bar, eff_i)
         val_loss /= (i+1)
         print(f"Epoch={e+1}, train loss={epoch_loss}, val loss={val_loss}")
+
