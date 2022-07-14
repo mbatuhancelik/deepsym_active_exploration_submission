@@ -268,3 +268,7 @@ def state_to_tensor(state_tuple, valid_objects, num_objects, is_old, is_aug=Fals
     seg = torch.tensor(seg)
     padded, pad_mask = preprocess(depth_img, seg, valid_objects, num_objects, old=is_old, aug=is_aug)
     return padded, pad_mask
+
+
+def get_device():
+    return "cuda" if torch.cuda.is_available() else "cpu"
