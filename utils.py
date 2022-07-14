@@ -272,3 +272,26 @@ def state_to_tensor(state_tuple, valid_objects, num_objects, is_old, is_aug=Fals
 
 def get_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def sample_prediction(prob, mask, sample_size=100):
+    valid_tokens = torch.stack([p_i for p_i, m_i in zip(prob, mask) if m_i > 0.5])
+    possible_symbols = []
+    for _ in range(sample_size):
+        sample = valid_tokens.bernoulli()
+        possible_symbols.append(sample)
+    possible_symbols = torch.stack(possible_symbols).unique(dim=0)
+    sampled_symbols = []
+    for p_i in possible_symbols:
+        current_sample = []
+        it = 0
+        for i, m_i in enumerate(mask):
+            if m_i > 0.5:
+                current_sample.append(p_i[it])
+                it += 1
+            else:
+                current_sample.append(prob[i].round())
+        current_sample = torch.stack(current_sample)
+        sampled_symbols.append(current_sample)
+    sampled_symbols = torch.stack(sampled_symbols)
+    return sampled_symbols

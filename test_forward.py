@@ -6,7 +6,7 @@ import blocks
 from tqdm import tqdm
 
 from dataset import SymbolForwardDataset
-from utils import get_device
+from utils import get_device, sample_prediction
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("train a symbol forward model")
@@ -48,8 +48,10 @@ if __name__ == "__main__":
         test_loss += criterion(e_bar, eff_i)
         for e_bar_i, eff_ij, m_ij in zip(e_bar, eff_i, m_i):
             tuple_acc = 0
-            print(torch.sigmoid(e_bar_i))
-            exit()
+            samples = sample_prediction(torch.sigmoid(e_bar_i), m_ij, sample_size=1000)
+            if eff_ij in samples:
+                full_accuracy += 1
+
             for e_bar_ij, eff_ijk, m_ijk in zip(e_bar_i, eff_ij, m_ij):
                 if m_ijk < 0.5:
                     continue
@@ -62,9 +64,8 @@ if __name__ == "__main__":
                         best_acc = acc.sum()
                 accuracy += best_acc
                 tuple_acc += best_acc
-            if tuple_acc == m_ij.sum():
-                full_accuracy += 1
+            # if tuple_acc == m_ij.sum():
+            #     full_accuracy += 1
 
     test_loss /= (i+1)
     print(f"Test loss={test_loss} accuracy={accuracy/obj_count} full acc={full_accuracy/len(test_set)}")
-
