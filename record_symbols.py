@@ -9,6 +9,26 @@ import blocks
 import utils
 
 
+def record_from_loader(model, loader, prefix):
+    z_precond = []
+    z_effect = []
+    mask = []
+
+    for i, sample in enumerate(loader):
+        z_i = model.concat(sample, eval_mode=True)
+        z_f = model.encode(sample["post_state"], sample["post_pad_mask"], eval_mode=True)
+        z_precond.append(z_i)
+        z_effect.append(z_f)
+        mask.append(sample["pad_mask"])
+
+    z_precond = torch.cat(z_precond, dim=0)
+    z_effect = torch.cat(z_effect, dim=0)
+    mask = torch.cat(mask, dim=0)
+    torch.save(z_precond, os.path.join(args.s, prefix+"z_precond.pt"))
+    torch.save(z_effect, os.path.join(args.s, prefix+"z_effect.pt"))
+    torch.save(mask, os.path.join(args.s, prefix+"mask.pt"))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("record symbols.")
     parser.add_argument("-d", help="data path", type=str, required=True)
@@ -54,22 +74,8 @@ for name in model.module_names:
 
 valid_objects = {i: True for i in range(4, 7)}
 train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=list(range(10)), with_post=True)
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=16, shuffle=True)
-
-z_precond = []
-z_effect = []
-mask = []
-
-for i, sample in enumerate(train_loader):
-    z_i = model.concat(sample, eval_mode=True)
-    z_f = model.encode(sample["post_state"], sample["post_pad_mask"], eval_mode=True)
-    z_precond.append(z_i)
-    z_effect.append(z_f)
-    mask.append(sample["pad_mask"])
-
-z_precond = torch.cat(z_precond, dim=0)
-z_effect = torch.cat(z_effect, dim=0)
-mask = torch.cat(mask, dim=0)
-torch.save(z_precond, os.path.join(args.s, "z_precond.pt"))
-torch.save(z_effect, os.path.join(args.s, "z_effect.pt"))
-torch.save(mask, os.path.join(args.s, "mask.pt"))
+val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=[10], with_post=True)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=True)
+val_loader = torch.utils.data.DataLoader(val_set, batch_size=128, shuffle=True)
+record_from_loader(model, train_loader, "train")
+record_from_loader(model, train_loader, "val")
