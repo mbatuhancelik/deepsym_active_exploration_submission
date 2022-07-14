@@ -2,6 +2,7 @@ import os
 import argparse
 
 import torch
+from tqdm import tqdm
 
 from models import DeepSymv3
 from dataset import SegmentedSAEFolder
@@ -14,7 +15,7 @@ def record_from_loader(model, loader, prefix):
     z_effect = []
     mask = []
 
-    for i, sample in enumerate(loader):
+    for i, sample in enumerate(tqdm(loader)):
         z_i = model.concat(sample, eval_mode=True)
         z_f = model.encode(sample["post_state"], sample["post_pad_mask"], eval_mode=True)
         z_precond.append(z_i)
@@ -77,5 +78,5 @@ train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, n
 val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=False, partitions=[10], with_post=True)
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=128, shuffle=True)
-record_from_loader(model, train_loader, "train")
-record_from_loader(model, train_loader, "val")
+record_from_loader(model, train_loader, "train_")
+record_from_loader(model, train_loader, "val_")
