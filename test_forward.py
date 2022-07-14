@@ -49,23 +49,11 @@ if __name__ == "__main__":
         for e_bar_i, eff_ij, m_ij in zip(e_bar, eff_i, m_i):
             tuple_acc = 0
             samples = sample_prediction(torch.sigmoid(e_bar_i), m_ij, sample_size=1000)
-            if eff_ij in samples:
+            errors = (samples - eff_ij.unsqueeze(0)).abs()
+            errors = m_ij.reshape(1, 3, 1).repeat(errors.shape[0], 1, 1) * errors
+            tuple_errors = errors.sum(dim=[1, 2])
+            if tuple_errors.min() < 0.5:
                 full_accuracy += 1
 
-            for e_bar_ij, eff_ijk, m_ijk in zip(e_bar_i, eff_ij, m_ij):
-                if m_ijk < 0.5:
-                    continue
-                obj_count += 1
-                best_acc = 0
-                for _ in range(100):
-                    eb_sample = torch.sigmoid(e_bar_ij).bernoulli()
-                    acc = (eff_ijk-eb_sample).abs().sum() < 0.1
-                    if acc.sum() > best_acc:
-                        best_acc = acc.sum()
-                accuracy += best_acc
-                tuple_acc += best_acc
-            # if tuple_acc == m_ij.sum():
-            #     full_accuracy += 1
-
     test_loss /= (i+1)
-    print(f"Test loss={test_loss} accuracy={accuracy/obj_count} full acc={full_accuracy/len(test_set)}")
+    print(f"Test loss={test_loss} full acc={full_accuracy/len(test_set)}")
