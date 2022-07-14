@@ -8,6 +8,19 @@ from utils import preprocess
 to_tensor = transforms.ToTensor()
 
 
+class SymbolForwardDataset(torch.utils.data.Dataset):
+    def __init__(self, path, prefix):
+        self.precond = torch.load(os.path.join(path, prefix+"z_precond.pt"))
+        self.effect = torch.load(os.path.join(path, prefix+"z_effect.pt"))
+        self.mask = torch.load(os.path.join(path, prefix+"mask.pt"))
+
+    def __len__(self):
+        return len(self.precond)
+
+    def __getitem__(self, idx):
+        return self.precond[idx], self.effect[idx], self.mask[idx]
+
+
 class StateActionDataset(torch.utils.data.Dataset):
     def __init__(self, path):
         self.state = torch.load(os.path.join(path, "state.pt"))
