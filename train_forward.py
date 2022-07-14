@@ -1,3 +1,4 @@
+import os
 import argparse
 
 import torch
@@ -6,6 +7,12 @@ from tqdm import tqdm
 
 from dataset import SymbolForwardDataset
 from utils import get_device
+
+
+def save_model(path, prefix):
+    torch.save(proj_in.cpu().state_dict(), os.path.join(path, prefix+"proj_in.ckpt"))
+    torch.save(attention.cpu().state_dict(), os.path.join(path, prefix+"attention.ckpt"))
+    torch.save(proj_out.cpu().state_dict(), os.path.join(path, prefix+"proj_out.ckpt"))
 
 
 if __name__ == "__main__":
@@ -37,6 +44,7 @@ if __name__ == "__main__":
             {"params": attention.parameters()},
             {"params": proj_out.parameters()}])
     criterion = torch.nn.BCEWithLogitsLoss()
+    best_loss = 1e100
 
     for e in range(args.e):
         epoch_loss = 0.0
@@ -69,5 +77,11 @@ if __name__ == "__main__":
                 e_bar = proj_out(h_i)
             val_loss += criterion(e_bar, eff_i)
         val_loss /= (i+1)
-        print(f"Epoch={e+1}, train loss={epoch_loss}, val loss={val_loss}")
+        if val_loss < best_loss:
+            save_model(args.s, "best_")
+        save_model(args.s, "last_")
+        proj_in.to(device)
+        attention.to(device)
+        proj_out.to(device)
 
+        print(f"Epoch={e+1}, train loss={epoch_loss}, val loss={val_loss}")
