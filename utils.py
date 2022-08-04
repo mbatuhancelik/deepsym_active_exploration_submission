@@ -72,6 +72,25 @@ def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color
     return obj_id
 
 
+def create_arrow(p, from_loc, to_loc):
+    delta = (np.array(to_loc) - np.array(from_loc))
+    length = np.linalg.norm(delta)
+    r_x = -np.arctan2(np.linalg.norm([delta[0], delta[1]]), delta[2])
+    r_y = 0
+    r_z = -np.arctan2(delta[0], delta[1])
+
+    baseVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[0.0, 0.0, 1.0, 0.75])
+    childVisualId = p.createVisualShape(shapeType=p.GEOM_CAPSULE, radius=0.01, length=length, rgbaColor=[0.0, 1.0, 1.0, 0.75])
+    tipVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[1.0, 0.0, 0.0, 0.75])
+    obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=baseVisualId,
+                               basePosition=from_loc, baseOrientation=[0., 0., 0., 1], linkMasses=[-1, -1],
+                               linkCollisionShapeIndices=[-1, -1], linkVisualShapeIndices=[childVisualId, tipVisualId],
+                               linkPositions=[delta/2, delta], linkOrientations=[p.getQuaternionFromEuler([r_x, r_y, r_z]), [0, 0, 0, 1]],
+                               linkInertialFramePositions=[[0, 0, 0], [0, 0, 0]], linkInertialFrameOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
+                               linkParentIndices=[0, 0], linkJointTypes=[p.JOINT_FIXED, p.JOINT_FIXED], linkJointAxis=[[0, 0, 0], [0, 0, 0]])
+    return obj_id
+
+
 def create_tabletop(p):
     objects = {}
     objects["base"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],

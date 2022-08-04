@@ -174,7 +174,7 @@ class BlocksWorld_v2(BlocksWorld):
             self.current_obj_locs[loc_idx].append(0)
             obj_ids.append(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                                size=size, position=position, rotation=[0, 0, 0],
-                                               mass=0.1))
+                                               mass=0.1, color="random"))
             i += 1
         for i, o_id in enumerate(sorted(obj_ids)):
             self.obj_dict[i] = o_id
@@ -252,7 +252,7 @@ class BlocksWorld_v3(BlocksWorld):
                 self.current_obj_locs[xidx][min(4, yidx+1)].append(0)
             obj_ids.append(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                                size=size, position=position, rotation=[0, 0, 0],
-                                               mass=0.1))
+                                               mass=0.1, color="random"))
             i += 1
         for i, o_id in enumerate(sorted(obj_ids)):
             self.obj_dict[i] = o_id
