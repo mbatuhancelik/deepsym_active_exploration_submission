@@ -110,7 +110,8 @@ class CrafterDataset(SAEFolder):
 
 
 class SegmentedSAEFolder(SAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False, eff_mu=None, eff_std=None, with_post=False):
+    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False,
+                 old=False, eff_mu=None, eff_std=None, with_post=False):
         super(SegmentedSAEFolder, self).__init__(folder_path, partitions)
         self.max_pad = max_pad
         self.valid_objects = valid_objects
@@ -146,9 +147,11 @@ class SegmentedSAEFolder(SAEFolder):
             self.effect = effect.reshape(effect_shape)
 
     def __getitem__(self, idx):
-        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
+        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects,
+                                      self.max_pad, self.aug, self.old)
         if self.with_post:
-            post_padded, post_pad_mask = preprocess(self.post_state[idx], self.post_segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
+            post_padded, post_pad_mask = preprocess(self.post_state[idx], self.post_segmentation[idx],
+                                                    self.valid_objects, self.max_pad, self.aug, self.old)
         action_idx = self.action[idx]
         eye = torch.eye(6)
         action = torch.cat([eye[action_idx[0]], eye[action_idx[1]]], dim=-1)
@@ -167,14 +170,18 @@ class SegmentedSAEFolder(SAEFolder):
 
 
 class SegmentedSAEFolder3x5(SegmentedSAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False, old=False, eff_mu=None, eff_std=None):
-        super(SegmentedSAEFolder3x5, self).__init__(folder_path, max_pad, valid_objects, partitions, normalize, aug, old, eff_mu, eff_std)
+    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False,
+                 old=False, eff_mu=None, eff_std=None):
+        super(SegmentedSAEFolder3x5, self).__init__(folder_path, max_pad, valid_objects, partitions,
+                                                    normalize, aug, old, eff_mu, eff_std)
 
     def __getitem__(self, idx):
-        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects, self.max_pad, self.aug, self.old)
+        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects,
+                                      self.max_pad, self.aug, self.old)
         action_idx = self.action[idx]
         eye_3, eye_5 = torch.eye(3), torch.eye(5)
-        action = torch.cat([eye_3[action_idx[0]], eye_5[action_idx[1]], eye_3[action_idx[2]], eye_5[action_idx[3]]], dim=-1)
+        action = torch.cat([eye_3[action_idx[0]], eye_5[action_idx[1]], eye_3[action_idx[2]], eye_5[action_idx[3]]],
+                           dim=-1)
         action = action.unsqueeze(0)
         action = action.repeat(padded.shape[0], 1)
 
