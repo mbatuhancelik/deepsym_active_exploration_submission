@@ -77,7 +77,8 @@ while True:
         eye = torch.eye(6)
         sample = {
             "state": padded.unsqueeze(0),
-            "action": torch.cat([eye[action[0]], eye[action[1]]], dim=-1).reshape(1, 1, 12).repeat(1, padded.shape[0], 1),
+            "action": torch.cat([eye[action[0]], eye[action[1]]], dim=-1)
+            .reshape(1, 1, 12).repeat(1, padded.shape[0], 1),
             "pad_mask": pad_mask.unsqueeze(0)
         }
         pred_z, pred_e = model.forward(sample, eval_mode=True)
@@ -89,4 +90,5 @@ while True:
         print("Predicted // Actual")
         print("------------------")
         for p_e, a_e, z in zip(pred_e[0], effect, pred_z[0]):
-            print(f"{p_e[0]:.3f}, {p_e[1]:.3f}, {p_e[2]:.3f} // {a_e[0]:.3f}, {a_e[1]:.3f}, {a_e[2]:.3f} -- {z[0]}, {z[1]}, {z[2]}, {z[3]}, {z[4]}, {z[5]}, {z[6]}, {z[7]}")
+            print(f"{p_e[0]:.3f}, {p_e[1]:.3f}, {p_e[2]:.3f} // {a_e[0]:.3f}, {a_e[1]:.3f}, {a_e[2]:.3f}"
+                  f"-- {z[0]}, {z[1]}, {z[2]}, {z[3]}, {z[4]}, {z[5]}, {z[6]}, {z[7]}")

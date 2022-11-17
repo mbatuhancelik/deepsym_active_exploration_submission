@@ -148,7 +148,8 @@ class DeepSymbolGenerator:
                 if val_loss < self.best_loss:
                     self.best_loss = val_loss
                     self.save("_best")
-                print(f"epoch={self.epoch}, iter={self.iteration}, train loss={epoch_loss:.5f}, val loss={val_loss:.5f}, elapsed={time_elapsed:.2f}")
+                print(f"epoch={self.epoch}, iter={self.iteration}, train loss={epoch_loss:.5f}, val loss={val_loss:.5f}"
+                      f", elapsed={time_elapsed:.2f}")
             else:
                 if epoch_loss < self.best_loss:
                     self.best_loss = epoch_loss
@@ -407,7 +408,7 @@ class RBM(torch.nn.Module):
         return prob, sample
 
     def energy(self, v, h):
-        return -(v @ self.a + h @ self.b + ((v @ self.w)*h).sum(dim=-1)) 
+        return -(v @ self.a + h @ self.b + ((v @ self.w)*h).sum(dim=-1))
 
     def gibbs_k(self, h, k, prob=False):
         for _ in range(k):

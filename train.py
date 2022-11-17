@@ -64,8 +64,10 @@ for name in model.module_names:
     print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
 
 valid_objects = {i: True for i in range(4, 7)}
-train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, old=True, partitions=list(range(10)))
-val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True, eff_mu=train_set.eff_mu, eff_std=train_set.eff_std, old=True, partitions=[10])
+train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True,
+                               old=True, partitions=list(range(10)))
+val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True,
+                             eff_mu=train_set.eff_mu, eff_std=train_set.eff_std, old=True, partitions=[10])
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.bs, num_workers=4, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.bs, num_workers=4, shuffle=True)
 model.train(args.e, train_loader, val_loader)

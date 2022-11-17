@@ -61,10 +61,11 @@ def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color
     if with_link:
         obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=-1,
                                    basePosition=position, baseOrientation=p.getQuaternionFromEuler(rotation),
-                                   linkMasses=[mass], linkCollisionShapeIndices=[collisionId], linkVisualShapeIndices=[visualId],
-                                   linkPositions=[[0, 0, 0]], linkOrientations=[[0, 0, 0, 1]],
-                                   linkInertialFramePositions=[[0, 0, 0]], linkInertialFrameOrientations=[[0, 0, 0, 1]],
-                                   linkParentIndices=[0], linkJointTypes=[p.JOINT_FIXED], linkJointAxis=[[0, 0, 0]])
+                                   linkMasses=[mass], linkCollisionShapeIndices=[collisionId],
+                                   linkVisualShapeIndices=[visualId], linkPositions=[[0, 0, 0]],
+                                   linkOrientations=[[0, 0, 0, 1]], linkInertialFramePositions=[[0, 0, 0]],
+                                   linkInertialFrameOrientations=[[0, 0, 0, 1]], linkParentIndices=[0],
+                                   linkJointTypes=[p.JOINT_FIXED], linkJointAxis=[[0, 0, 0]])
     else:
         obj_id = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collisionId, baseVisualShapeIndex=visualId,
                                    basePosition=position, baseOrientation=p.getQuaternionFromEuler(rotation))
@@ -79,15 +80,21 @@ def create_arrow(p, from_loc, to_loc):
     r_y = 0
     r_z = -np.arctan2(delta[0], delta[1])
 
-    baseVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[0.0, 0.0, 1.0, 0.75])
-    childVisualId = p.createVisualShape(shapeType=p.GEOM_CAPSULE, radius=0.01, length=length, rgbaColor=[0.0, 1.0, 1.0, 0.75])
-    tipVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[1.0, 0.0, 0.0, 0.75])
+    baseVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
+                                       rgbaColor=[0.0, 0.0, 1.0, 0.75])
+    childVisualId = p.createVisualShape(shapeType=p.GEOM_CAPSULE, radius=0.01, length=length,
+                                        rgbaColor=[0.0, 1.0, 1.0, 0.75])
+    tipVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
+                                      rgbaColor=[1.0, 0.0, 0.0, 0.75])
     obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=baseVisualId,
                                basePosition=from_loc, baseOrientation=[0., 0., 0., 1], linkMasses=[-1, -1],
                                linkCollisionShapeIndices=[-1, -1], linkVisualShapeIndices=[childVisualId, tipVisualId],
-                               linkPositions=[delta/2, delta], linkOrientations=[p.getQuaternionFromEuler([r_x, r_y, r_z]), [0, 0, 0, 1]],
-                               linkInertialFramePositions=[[0, 0, 0], [0, 0, 0]], linkInertialFrameOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
-                               linkParentIndices=[0, 0], linkJointTypes=[p.JOINT_FIXED, p.JOINT_FIXED], linkJointAxis=[[0, 0, 0], [0, 0, 0]])
+                               linkPositions=[delta/2, delta],
+                               linkOrientations=[p.getQuaternionFromEuler([r_x, r_y, r_z]), [0, 0, 0, 1]],
+                               linkInertialFramePositions=[[0, 0, 0], [0, 0, 0]],
+                               linkInertialFrameOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
+                               linkParentIndices=[0, 0], linkJointTypes=[p.JOINT_FIXED, p.JOINT_FIXED],
+                               linkJointAxis=[[0, 0, 0], [0, 0, 0]])
     return obj_id
 
 
@@ -114,7 +121,8 @@ def get_image(p, eye_position, target_position, up_vector, height, width):
                                      cameraTargetPosition=target_position,
                                      cameraUpVector=up_vector)
     projectionMatrix = p.computeProjectionMatrixFOV(fov=45, aspect=1.0, nearVal=0.75, farVal=1.5)
-    _, _, rgb, depth, seg = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
+    _, _, rgb, depth, seg = p.getCameraImage(height=height, width=width, viewMatrix=viewMatrix,
+                                             projectionMatrix=projectionMatrix)
     return rgb, depth, seg
 
 
@@ -122,7 +130,8 @@ def create_camera(p, position, rotation, static=True):
     baseCollision = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
     targetCollision = p.createCollisionShape(shapeType=p.GEOM_CYLINDER, radius=0.005, height=0.01)
     baseVisual = p.createVisualShape(shapeType=p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02], rgbaColor=[0, 0, 0, 1])
-    targetVisual = p.createVisualShape(shapeType=p.GEOM_CYLINDER, radius=0.005, length=0.01, rgbaColor=[0.8, 0.8, 0.8, 1.0])
+    targetVisual = p.createVisualShape(shapeType=p.GEOM_CYLINDER, radius=0.005, length=0.01,
+                                       rgbaColor=[0.8, 0.8, 0.8, 1.0])
 
     # base = create_object(obj_type=p.GEOM_SPHERE, size=0.1, position=position, rotation=rotation)
     # target = create_object(obj_T)
@@ -186,7 +195,7 @@ def binary_to_decimal(x):
     ----------
     x : torch.Tensor
         N by D where N is the number of binary vectors
-    
+
     Returns
     -------
     dec_tensor : torch.Tensor
