@@ -52,7 +52,7 @@ class GumbelSoftmaxLayer(torch.nn.Module):
         super(GumbelSoftmaxLayer, self).__init__()
         self.hard = hard
         self.T = T
-    
+
     def forward(self, x):
         return torch.nn.functional.gumbel_softmax(x, tau=self.T, hard=self.hard)
 
