@@ -205,7 +205,8 @@ class Manipulator:
         for i in range(self.num_joints):
             joint_info = self._p.getJointInfo(self.id, self.joints[i])
             low, high = joint_info[8:10]
-            self.debug_params.append(self._p.addUserDebugParameter(self.names[i].decode("utf-8"), low, high, current_angle[i]))
+            self.debug_params.append(self._p.addUserDebugParameter(self.names[i].decode("utf-8"),
+                                     low, high, current_angle[i]))
 
     def update_debug(self):
         target_angles = []

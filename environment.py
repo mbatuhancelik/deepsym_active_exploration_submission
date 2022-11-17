@@ -125,11 +125,27 @@ class BlocksWorld(GenericEnv):
         to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
         to_pos = to_pos[:2] + (0.75,)
         traj_time = 0.5
-        self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(from_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos[:2]+(0.75,),
+                                          orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]),
+                                          t=traj_time,
+                                          traj=True,
+                                          sleep=sleep)
+        self.agent.set_cartesian_position(from_pos,
+                                          orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]),
+                                          t=traj_time,
+                                          traj=True,
+                                          sleep=sleep)
         self.agent.close_gripper(traj_time, sleep=sleep)
-        self.agent.set_cartesian_position(from_pos[:2]+(0.75,), orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
-        self.agent.set_cartesian_position(to_pos, orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, traj=True, sleep=sleep)
+        self.agent.set_cartesian_position(from_pos[:2]+(0.75,),
+                                          orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]),
+                                          t=traj_time,
+                                          traj=True,
+                                          sleep=sleep)
+        self.agent.set_cartesian_position(to_pos,
+                                          orientation=self._p.getQuaternionFromEuler([np.pi, 0, 0]),
+                                          t=traj_time,
+                                          traj=True,
+                                          sleep=sleep)
         # self.agent._waitsleep(0.5, sleep=sleep)
         before_pose = self.state_obj_poses()
         self.agent.open_gripper(traj_time, sleep=sleep)
@@ -210,7 +226,8 @@ class BlocksWorld_v2(BlocksWorld):
             # there might be actions that does not pick any objects
             from_idx = np.random.randint(6)
         else:
-            from_idx = np.random.choice([i for i in range(len(self.current_obj_locs)) if len(self.current_obj_locs[i]) > 0])
+            from_idx = np.random.choice([i for i in range(len(self.current_obj_locs))
+                                         if len(self.current_obj_locs[i]) > 0])
         to_idx = np.random.randint(6)
         return (from_idx, to_idx)
 
@@ -239,7 +256,7 @@ class BlocksWorld_v3(BlocksWorld):
             if (size_idx == 0) and (len(self.current_obj_locs[xidx][yidx]) > 0):
                 continue
             if ((size_idx == 1) and
-                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or 
+                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or
                      (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
                      (len(self.current_obj_locs[xidx][min(4, yidx+1)]) > 0))):
                 continue
@@ -346,24 +363,36 @@ class PushEnv(GenericEnv):
         traj_time = 1
 
         if action == 0:
-            self.agent.set_cartesian_position([0.8, -0.15, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.set_cartesian_position([0.8, -0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.move_in_cartesian([0.8, 0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, -0.15, 0.75],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, -0.15, 0.42],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.8, 0.15, 0.42],
+                                         self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
             self.init_agent_pose(t=0.25, sleep=sleep)
         elif action == 1:
-            self.agent.set_cartesian_position([0.95, 0.0, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.set_cartesian_position([0.95, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.move_in_cartesian([0.65, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.agent.set_cartesian_position([0.95, 0.0, 0.75],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.95, 0.0, 0.42],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.65, 0.0, 0.42],
+                                         self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
             self.init_agent_pose(t=0.25, sleep=sleep)
         elif action == 2:
-            self.agent.set_cartesian_position([0.8, 0.15, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.set_cartesian_position([0.8, 0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.move_in_cartesian([0.8, -0.15, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, 0.15, 0.75],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.8, 0.15, 0.42],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.8, -0.15, 0.42],
+                                         self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
             self.init_agent_pose(t=0.25, sleep=sleep)
         elif action == 3:
-            self.agent.set_cartesian_position([0.65, 0.0, 0.75], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.set_cartesian_position([0.65, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
-            self.agent.move_in_cartesian([0.95, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
+            self.agent.set_cartesian_position([0.65, 0.0, 0.75],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.set_cartesian_position([0.65, 0.0, 0.42],
+                                              self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=0.5, sleep=sleep)
+            self.agent.move_in_cartesian([0.95, 0.0, 0.42],
+                                         self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
             self.init_agent_pose(t=0.25, sleep=sleep)
 
 

@@ -144,8 +144,8 @@ class ConvTransposeBlock(torch.nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, std=None, bias=True,
                  batch_norm=False):
         super(ConvTransposeBlock, self).__init__()
-        self.block = [torch.nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
-                                               stride=stride, padding=padding, bias=bias)]
+        self.block = [torch.nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels,
+                                               kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)]
         if batch_norm:
             self.block.append(torch.nn.BatchNorm2d(out_channels))
         self.block.append(torch.nn.ReLU())
@@ -176,7 +176,8 @@ class HME(torch.nn.Module):
                 torch.empty(self.gate_count, gating_features), nonlinearity='sigmoid').t())
         self.gb = torch.nn.Parameter(torch.zeros(self.gate_count))
         if self.proj == 'linear':
-            self.pw = torch.nn.init.kaiming_normal_(torch.empty(out_features*self.n_leaf, in_features), nonlinearity='linear')
+            self.pw = torch.nn.init.kaiming_normal_(torch.empty(out_features*self.n_leaf, in_features),
+                                                    nonlinearity='linear')
             self.pw = torch.nn.Parameter(self.pw.reshape(out_features, self.n_leaf, in_features).permute(0, 2, 1))
             self.pb = torch.nn.Parameter(torch.zeros(out_features, self.n_leaf))
         elif self.proj == 'constant':
