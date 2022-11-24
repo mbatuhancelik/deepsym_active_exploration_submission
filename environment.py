@@ -199,7 +199,7 @@ class BlocksWorld_v2(BlocksWorld):
     def step(self, from_loc, to_loc, sleep=False):
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         from_pos = self.locs[from_loc]
-        from_top_pos = from_pos[:2] + [0.8] 
+        from_top_pos = from_pos[:2] + [0.8]
         to_pos = self.locs[to_loc]
         to_top_pos = to_pos[:2] + [0.8]
 
@@ -257,7 +257,7 @@ class BlocksWorld_v3(BlocksWorld):
             if (size_idx == 0) and (len(self.current_obj_locs[xidx][yidx]) > 0):
                 continue
             if ((size_idx == 1) and
-                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or 
+                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or
                      (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
                      (len(self.current_obj_locs[xidx][min(4, yidx+1)]) > 0))):
                 continue
@@ -317,8 +317,9 @@ class BlocksWorld_v3(BlocksWorld):
         to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         return (from_idx, to_idx)
 
+
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self,segments = 8,x_area= 0.9 , y_area = 0.9 , **kwargs):
+    def __init__(self, segments=8, x_area=0.9, y_area=0.9, **kwargs):
         self.traj_t = 1.5
 
         print(kwargs)
@@ -329,23 +330,18 @@ class BlocksWorld_v4(BlocksWorld):
         self.y_area = y_area
         self.segments = segments
 
-
         self.x_locs = {}
         self.y_locs = {}
 
-        self.del_x = x_area / segments 
-        self.del_y = y_area / segments 
-
+        self.del_x = x_area / segments
+        self.del_y = y_area / segments
 
         for i in range(segments):
             self.x_locs[i] = self.x_init + self.del_x * i
             self.y_locs[i] = self.y_init + self.del_y * i
 
-
         single_size = 0.025
-        #TODO: ADD GRAPH
-
-
+        # TODO: ADD GRAPH
         self.obj_types = {}
         if 'min_objects' not in kwargs:
             kwargs["min_objects"] = 8
@@ -354,80 +350,81 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
 
-        self.sizes = [[single_size, single_size, 0.05], [single_size, 5*single_size, 0.025], [5*single_size,0.025, single_size] ]
+        self.sizes = [[single_size, single_size, 0.05],
+                      [single_size, 5*single_size, 0.025],
+                      [5*single_size, 0.025, single_size]]
         super(BlocksWorld_v4, self).__init__(**kwargs)
-        
-    def create_object(self, obj_type , xidx, yidx):
-            '''
-            Add an object ot the world, without collusions
-            return -1 if it is not possible
-            return object id if possible
-            '''
 
-            if (obj_type < 4) and (len(self.current_obj_locs[xidx][yidx]) > 0):
-                    return -1 
-            if ((obj_type == 4) and
-                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or 
-                        (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
-                        (len(self.current_obj_locs[xidx][min(3, yidx+1)]) > 0))):
-                return -1
-            if ((obj_type == 5) and
-                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or 
-                        (len(self.current_obj_locs[max(0, xidx-1)][yidx]) > 0) or
-                        (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
-                return -1
+    def create_object(self, obj_type, xidx, yidx):
+        """
+        Add an object ot the world, without collusions
+        return -1 if it is not possible
+        return object id if possible
+        """
+        if (obj_type < 4) and (len(self.current_obj_locs[xidx][yidx]) > 0):
+            return -1
+        if ((obj_type == 4) and
+                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
+                 (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
+                 (len(self.current_obj_locs[xidx][min(3, yidx+1)]) > 0))):
+            return -1
+        if ((obj_type == 5) and
+                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
+                 (len(self.current_obj_locs[max(0, xidx-1)][yidx]) > 0) or
+                 (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
+            return -1
 
-            position = [self.x_locs[xidx], self.y_locs[yidx] , 0.6]
-            
-            size = self.sizes[0]
-            if obj_type == 4:
-                size = self.sizes[1]
-            elif obj_type == 5:
-                size = self.sizes[2]
-            elif obj_type == 3:
-                size[2] = self.sizes[2][2]
-            
-            self.current_obj_locs[xidx][yidx].append(obj_type)
-            if obj_type == 4:
-                if yidx > 0:
-                    self.current_obj_locs[xidx][yidx-1].append(obj_type)
-                if yidx < len(self.y_locs) - 1:
-                    self.current_obj_locs[xidx][yidx+1].append(obj_type)
-            if obj_type == 5:
-                if xidx > 0:
-                    self.current_obj_locs[xidx - 1][yidx].append(obj_type)
-                if xidx < len(self.x_locs) -1:
-                    self.current_obj_locs[xidx +1][ yidx].append(obj_type)
-            o_id = -1
-            #obj type is never 0
-            if obj_type == 0:
-                o_id =  utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random")
-            elif obj_type == 1:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 2:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 3:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 4:
-                o_id =(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 5:
-                o_id =(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, np.pi],
-                                                mass=0.1, color="random"))
-            self.obj_dict[len(self.obj_dict)] = o_id
-            self.obj_types[o_id] = obj_type
-            return o_id
-    
+        position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
+
+        size = self.sizes[0]
+        if obj_type == 4:
+            size = self.sizes[1]
+        elif obj_type == 5:
+            size = self.sizes[2]
+        elif obj_type == 3:
+            size[2] = self.sizes[2][2]
+
+        self.current_obj_locs[xidx][yidx].append(obj_type)
+        if obj_type == 4:
+            if yidx > 0:
+                self.current_obj_locs[xidx][yidx-1].append(obj_type)
+            if yidx < len(self.y_locs) - 1:
+                self.current_obj_locs[xidx][yidx+1].append(obj_type)
+        if obj_type == 5:
+            if xidx > 0:
+                self.current_obj_locs[xidx - 1][yidx].append(obj_type)
+            if xidx < len(self.x_locs) - 1:
+                self.current_obj_locs[xidx + 1][yidx].append(obj_type)
+        o_id = -1
+        # obj type is never 0
+        if obj_type == 0:
+            o_id = utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
+                                       size=size, position=position, rotation=[0, 0, 0],
+                                       mass=0.1, color="random")
+        elif obj_type == 1:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=[0, 0, 0],
+                                        mass=0.1, color="random"))
+        elif obj_type == 2:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
+                                        size=size, position=position, rotation=[0, 0, 0],
+                                        mass=0.1, color="random"))
+        elif obj_type == 3:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=[0, 0, 0],
+                                        mass=0.1, color="random"))
+        elif obj_type == 4:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=[0, 0, 0],
+                                        mass=0.1, color="random"))
+        elif obj_type == 5:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=[0, 0, np.pi],
+                                        mass=0.1, color="random"))
+        self.obj_dict[len(self.obj_dict)] = o_id
+        self.obj_types[o_id] = obj_type
+        return o_id
+
     def init_objects(self):
         '''
         obj_tpes index:
@@ -445,7 +442,7 @@ class BlocksWorld_v4(BlocksWorld):
         # obj_types = [4 for i in range(self.num_objects)]
         obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
-        #TODO: REMOVE CAPSULE AND SHPERE, add cube
+        # TODO: REMOVE CAPSULE AND SHPERE, add cube
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
@@ -460,7 +457,7 @@ class BlocksWorld_v4(BlocksWorld):
 
             i += 1
         self.create_contact_graph()
-            
+
     def create_contact_graph(self):
         positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
@@ -468,15 +465,15 @@ class BlocksWorld_v4(BlocksWorld):
         clusters = []
         for i in range(num_objects):
             clusters.append(i)
-            
+
         self.contact_graph = [[0 for i in range(num_objects)] for k in range(num_objects)]
         for i in range(num_objects):
             for k in range(i+1, num_objects):
                 if self.contact_graph[i][k] == 1:
                     continue
 
-                contact_points = self._p.getContactPoints(bodyA = self.obj_dict[i], bodyB = self.obj_dict[k])
-                if  not len(contact_points) == 0:
+                contact_points = self._p.getContactPoints(bodyA=self.obj_dict[i], bodyB=self.obj_dict[k])
+                if not len(contact_points) == 0:
                     self.contact_graph[i][k] = 1
                     self.contact_graph[k][i] = 1
                     clusters[k] = clusters[i]
@@ -484,15 +481,12 @@ class BlocksWorld_v4(BlocksWorld):
 
         return self.contact_graph, self.clusters
 
-
-
-
-    def step(self, from_loc, to_loc, before_grip_rotation = 0, after_grip_rotation = 0, sleep=True):
-        if self.gui ==0:
+    def step(self, from_loc, to_loc, before_grip_rotation=0, after_grip_rotation=0, sleep=False):
+        if self.gui == 0:
             sleep = False
         correction_constant = 0.005
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = [self.x_locs[from_loc[0] ]+ correction_constant, self.y_locs[from_loc[1]], 0.41]
+        from_pos = [self.x_locs[from_loc[0]] + correction_constant, self.y_locs[from_loc[1]], 0.41]
         from_top_pos = from_pos[:2] + [1.0]
         to_pos = [self.x_locs[to_loc[0]] + correction_constant, self.y_locs[to_loc[1]], 0.41]
         to_top_pos = to_pos[:2] + [1.0]
@@ -505,13 +499,13 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.close_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        if after_grip_rotation != 0: 
+        if after_grip_rotation != 0:
             target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
         self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.init_agent_pose(t=1.5, sleep=sleep)
-        after_pose , types= self.state_obj_poses_and_types()
+        after_pose, types = self.state_obj_poses_and_types()
         effect = after_pose - before_pose
 
         object_id = -1
@@ -524,17 +518,17 @@ class BlocksWorld_v4(BlocksWorld):
     def state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
         pose = np.zeros((N_obj, 6), dtype=np.float32)
-        obj_types = np.zeros((N_obj), dtype=np.int8) 
+        obj_types = np.zeros((N_obj), dtype=np.int8)
         for i in range(N_obj):
             position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
             pose[i][:3] = position
             pose[i][3:] = self._p.getEulerFromQuaternion(quaternion)
             obj_types[i] = self.obj_types[self.obj_dict[i]]
 
-        return pose , obj_types
-    
+        return pose, obj_types
+
     def get_obj_location(self, obj_id):
-        
+
         position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_id])
         rel_x = position[0] - self.x_init
         x_index = rel_x / self.del_x
@@ -543,8 +537,8 @@ class BlocksWorld_v4(BlocksWorld):
         rel_y = position[1] - self.y_init
         y_index = round(rel_y / self.del_y)
 
-        x_index = min(x_index, self.segments -1)
-        y_index = min(y_index, self.segments -1)
+        x_index = min(x_index, self.segments - 1)
+        y_index = min(y_index, self.segments - 1)
         x_index = max(0, x_index)
         y_index = max(0, y_index)
 
@@ -553,41 +547,38 @@ class BlocksWorld_v4(BlocksWorld):
     def state(self):
         return self.state_obj_poses_and_types()
 
-
-        
-
-
     def sample_random_action(self):
         action_type = np.random.rand()
         to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        
+
         if action_type < 0.1:
             # there might be actions that does not pick any objects
             # or actions that does not pick long objects from the middle position
             from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
-            #TODO: perform object location change operations instead of this
+            # TODO: perform object location change operations instead of this
         else:
             possible_actions = []
             for i in range((self.num_objects)):
-                for k in range(i,(self.num_objects)):
-                        if self.clusters[k] != self.clusters[i]:
-                            possible_actions.append([i, k])
-            
+                for k in range(i, (self.num_objects)):
+                    if self.clusters[k] != self.clusters[i]:
+                        possible_actions.append([i, k])
+
             if len(possible_actions) != 0:
-                action = possible_actions[np.random.randint(0 , len(possible_actions))]
+                action = possible_actions[np.random.randint(0, len(possible_actions))]
 
                 obj_1 = action[0]
                 obj_2 = action[1]
 
                 from_idx = self.get_obj_location(obj_1)
                 to_idx = self.get_obj_location(obj_2)
-            
-            #TODO: find object locations and sample actions accordingly
+
+            # TODO: find object locations and sample actions accordingly
 
         before_rotation = np.random.randint(0, 2)
         after_rotation = np.random.randint(0, 2)
         return (from_idx, to_idx, before_rotation, after_rotation)
+
 
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
