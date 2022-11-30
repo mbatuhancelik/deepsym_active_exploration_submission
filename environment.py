@@ -13,16 +13,21 @@ class GenericEnv:
         self.reset(seed=seed)
 
     def reset(self, seed=None):
+        #if there is seed it resets the seed by assigning a new random seed variable
         if seed is not None:
             np.random.seed(seed)
 
         self._p.resetSimulation()
         self._p.configureDebugVisualizer(self._p.COV_ENABLE_GUI, 0)
+        #?
         self._p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        #sets the gravity
         self._p.setGravity(0, 0, -9.807)
         self._p.loadURDF("plane.urdf")
 
+        #creates a tabletop with defined properties in utils.py file
         self.env_dict = utils.create_tabletop(self._p)
+        #what does manipulator do?
         self.agent = manipulators.Manipulator(p=self._p, path="ur10e/ur10e.urdf", position=[0., 0., 0.4], ik_idx=10)
         base_constraint = self._p.createConstraint(parentBodyUniqueId=self.env_dict["base"], parentLinkIndex=0,
                                                    childBodyUniqueId=self.agent.id, childLinkIndex=-1,
@@ -38,24 +43,31 @@ class GenericEnv:
                                                     parentFramePosition=[0, 0, 0],
                                                     childFramePosition=[0, 0, 0])
         self._p.changeConstraint(mimic_constraint, gearRatio=-1, erp=0.1, maxForce=50)
-
+    #initializes the agent's position
     def init_agent_pose(self, t=None, sleep=False, traj=False):
         angles = [-0.294, -1.950, 2.141, -2.062, -1.572, 1.277]
         self.agent.set_joint_position(angles, t=t, sleep=sleep, traj=traj)
 
     def state_obj_poses(self):
+        #number of objects
         N_obj = len(self.obj_dict)
+        #initializes a pose list for every object with zeros
         pose = np.zeros((N_obj, 7), dtype=np.float32)
+        #gets the position and quaternion for every object
         for i in range(N_obj):
             position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
+            #the first three element of the list assigned with the position of the object
             pose[i][:3] = position
+            #the last four element of the list assigned with the quaternion of the object
             pose[i][3:] = quaternion
         return pose
-
+    
+    #moves the simulation forward by given number of steps. 
+    #If there is no count specified, moves the simulation forward by one step
     def _step(self, count=1):
         for _ in range(count):
             self._p.stepSimulation()
-
+    #disconnects the simulation environment
     def __del__(self):
         self._p.disconnect()
 
@@ -69,21 +81,28 @@ class BlocksWorld(GenericEnv):
 
     def reset(self, seed=None):
         super(BlocksWorld, self).reset(seed=seed)
-
+        #deletes the objects
         self.obj_dict = {}
+        #resets the agents position
         self.init_agent_pose(t=1)
+        #creates new objects
         self.init_objects()
+        #?
         self._step(40)
+        #what is the t parameter in open_gripper
         self.agent.open_gripper(1, sleep=True)
-
+    
+    #deletes the current objects and creates new onjects
     def reset_objects(self):
         for key in self.obj_dict:
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
         self.obj_dict = {}
         self.init_objects()
+        #?
         self._step(240)
 
+    #resets the positions of the current objects
     def reset_object_poses(self):
         for key in self.obj_dict:
             x = np.random.uniform(0.5, 1.0)
@@ -93,7 +112,8 @@ class BlocksWorld(GenericEnv):
 
             self._p.resetBasePositionAndOrientation(self.obj_dict[key], [x, y, z], quat)
         self._step(240)
-
+    
+    #creates new objects between min number and max number of objects
     def init_objects(self):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         for i in range(self.num_objects):
@@ -119,7 +139,7 @@ class BlocksWorld(GenericEnv):
         rgb, depth, seg = utils.get_image(p=self._p, eye_position=[1.2, 0.0, 1.6], target_position=[0.8, 0., 0.4],
                                           up_vector=[0, 0, 1], height=256, width=256)
         return rgb[:, :, :3], depth, seg
-
+    #moves the simulation forward but how?
     def step(self, from_obj_id, to_obj_id, sleep=False):
         from_pos, from_quat = self._p.getBasePositionAndOrientation(from_obj_id)
         to_pos, to_quat = self._p.getBasePositionAndOrientation(to_obj_id)
@@ -179,31 +199,115 @@ class BlocksWorld_v2(BlocksWorld):
         for i, o_id in enumerate(sorted(obj_ids)):
             self.obj_dict[i] = o_id
 
-    def step(self, from_loc, to_loc, sleep=False):
-        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
+    def push(self, from_loc, to_loc,target_quat,sleep=False):
         from_pos = self.locs[from_loc]
-        from_top_pos = from_pos[:2] + [0.8]
         to_pos = self.locs[to_loc]
         to_top_pos = to_pos[:2] + [0.8]
+        print(self.obj_dict)
+#x ve y pozisyonlarına göre yapılacak hareketi belirle
+        if(from_pos[0] > to_pos[0]):
+            if(from_pos[1]>to_pos[1]):
+                print("this1")
+                from_back_pos = [from_pos[0]+0.2] + [from_pos[1]] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]+0.1] + [from_pos[1]] +[from_pos[2]]
+                go_back_pos = [to_pos[0]+0.1] + [to_pos[1]] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]+0.1] + [to_pos[1]] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]+0.05] +[to_pos[2]]
+                go_left_pos = [to_pos[0]] + [to_pos[1]+0.2] +[to_pos[2]]
+                to_top_pos3 = [to_pos[0]] + [to_pos[1]+0.2] +[0.8]
+
+            else:
+                print("this2")
+                from_back_pos = [from_pos[0]+0.2] + [from_pos[1]] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]+0.1] + [from_pos[1]] +[from_pos[2]]
+                go_back_pos = [to_pos[0]+0.1] + [to_pos[1]] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]+0.1] + [to_pos[1]] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]-0.05] +[to_pos[2]]
+                go_left_pos = [to_pos[0]] + [to_pos[1]-0.2] +[to_pos[2]]
+                to_top_pos3 = [to_pos[0]] + [to_pos[1]-0.2] +[0.8]
+        else:
+            if(from_pos[1]>to_pos[1]):
+                print("this3")
+                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]] +[from_pos[2]]
+                go_back_pos = [to_pos[0]-0.1] + [from_pos[1]] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]-0.1] + [to_pos[1]] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]+0.05] +[to_pos[2]]
+                go_left_pos = [to_pos[0]] + [from_pos[1]+0.2] +[to_pos[2]]
+                to_top_pos3 = [to_pos[0]] + [to_pos[1]+0.2] +[0.8]
+            else:
+                print("this4")
+                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]] +[from_pos[2]]
+                go_back_pos = [to_pos[0]-0.2] + [from_pos[1]] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]-0.2] + [to_pos[1]] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]-0.05] +[to_pos[2]]
+                go_left_pos = [to_pos[0]] + [from_pos[1]-0.3] +[to_pos[2]]
+                to_top_pos3 = [to_pos[0]] + [to_pos[1]-0.3] +[0.8]
+
 
         before_pose = self.state_obj_poses()
-        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
-        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        #gripper goes behind of the object
+        self.agent.set_cartesian_position(from_back_pos, orientation=target_quat, t=3, traj=True, sleep=sleep)
         self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        self.agent._waitsleep(0.3, sleep=sleep)
-        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
-        self.agent.open_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        #object is moved in x axis
+        self.agent.move_in_cartesian(move_x_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        #move gripper backwards in order to avoid to take down the object
+        self.agent.move_in_cartesian(go_back_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos2, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        #move gripper to right or left side of the object in order to move it in y axis
+        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        #object is moved in y axis
+        self.agent.move_in_cartesian(move_y_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        #move gripper side of the object in order to avoid to take down the object
+        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos3, orientation=target_quat, t=3, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
         self.init_agent_pose(t=1.0, sleep=sleep)
         after_pose = self.state_obj_poses()
         effect = after_pose - before_pose
+        return effect
+
+    def step(self, from_loc, to_loc, is_pushing=False, sleep=False):
+        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
+        from_pos = self.locs[from_loc]
+        from_top_pos = from_pos[:2] + [0.8]
+        
+        to_pos = self.locs[to_loc]
+        to_top_pos = to_pos[:2] + [0.8]
+        
+
+        if(is_pushing):
+            effect = self.push(from_loc,to_loc,target_quat,sleep)
+            
+        else:
+            before_pose = self.state_obj_poses()
+            self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=True, sleep=sleep)
+            self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+            self.agent.close_gripper(self.traj_t, sleep=sleep)
+            self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+            self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
+            self.agent._waitsleep(0.3, sleep=sleep)
+            self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+            self.agent._waitsleep(0.5, sleep=sleep)
+            self.agent.open_gripper(self.traj_t, sleep=sleep)
+            self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+            self.init_agent_pose(t=1.0, sleep=sleep)
+            after_pose = self.state_obj_poses()
+            effect = after_pose - before_pose
         if len(self.current_obj_locs[from_loc]) > 0:
             self.current_obj_locs[from_loc].pop()
         self.current_obj_locs[to_loc].append(0)
         return effect
+
 
     def sample_random_action(self):
         if np.random.rand() < 0.2:
@@ -366,7 +470,7 @@ class PushEnv(GenericEnv):
             self.agent.move_in_cartesian([0.95, 0.0, 0.42], self._p.getQuaternionFromEuler([np.pi, 0, 0]), t=traj_time, sleep=sleep)
             self.init_agent_pose(t=0.25, sleep=sleep)
 
-
+"""
 class TilePuzzleMNIST:
     DATA = torch.load("data/mnist_data.pt")
     LABELS = torch.load("data/mnist_label.pt")
@@ -428,3 +532,4 @@ class TilePuzzleMNIST:
 
     def _even(self):
         return True if self.digit % 2 == 0 else False
+"""

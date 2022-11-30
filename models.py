@@ -110,12 +110,14 @@ class DeepSymbolGenerator:
         e = self.decode(z)
         return z, e
 
+    #calculates loss of sample
     def loss(self, sample):
         e_truth = sample["effect"].to(self.device)
         _, e_pred = self.forward(sample)
         L = self.criterion(e_pred, e_truth)*self.coeff
         return L
 
+    #calculates cost function value
     def one_pass_optimize(self, loader):
         avg_loss = 0.0
         start = time.time()
@@ -159,7 +161,7 @@ class DeepSymbolGenerator:
     def load(self, ext):
         for name in self.module_names:
             module_path = os.path.join(self.path, name+ext+".ckpt")
-            module_dict = torch.load(module_path)
+            module_dict = torch.load(module_path)   
             getattr(self, name).load_state_dict(module_dict)
 
     def save(self, ext):
