@@ -1,73 +1,26 @@
 """Train DeepSym"""
 import argparse
-import os
 
 import torch
 
-import blocks
-from models import DeepSymv3
-from dataset import SegmentedSAEFolder
-from utils import get_parameter_count
+import utils
+from dataset import StateActionEffectDataset
 
 parser = argparse.ArgumentParser("Train DeepSym.")
-parser.add_argument("-s", help="save folder", type=str, required=True)
-parser.add_argument("-d", help="data folder", type=str, required=True)
-parser.add_argument("-state_bits", help="state bits", type=int, required=True)
-parser.add_argument("-action_bits", help="action bits", type=int, required=True)
-parser.add_argument("-lr", help="learning rate", type=float, required=True)
-parser.add_argument("-e", help="num epochs", type=int, required=True)
-parser.add_argument("-bs", help="batch size", type=int, required=True)
-parser.add_argument("-bn", help="batch norm. True (1) or False (0)", type=int, required=True)
-parser.add_argument("-dv", help="device", default="cpu")
+parser.add_argument("-c", "--config", help="config file", type=str, required=True)
 args = parser.parse_args()
 
-
-if not os.path.exists(args.s):
-    os.makedirs(args.s)
-
-arg_dict = vars(args)
-for i, arg in enumerate(arg_dict):
-    if i == 0:
-        mode = "w"
-    else:
-        mode = "a"
-    print(f"{arg}={arg_dict[arg]}", file=open(os.path.join(args.s, "args.txt"), mode))
-    print(f"{arg}={arg_dict[arg]}")
-
-BN = True if args.bn == 1 else False
-
-encoder = torch.nn.Sequential(
-    blocks.ConvBlock(in_channels=1, out_channels=64, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvBlock(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvBlock(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.ConvBlock(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, batch_norm=BN),
-    blocks.Avg([2, 3]),
-    blocks.MLP([512, args.state_bits]),
-    blocks.GumbelSigmoidLayer(hard=False, T=1.0)
-)
-
-projector = torch.nn.Linear(args.state_bits+args.action_bits, 128)
-encoder_layer = torch.nn.TransformerEncoderLayer(d_model=128, nhead=8, batch_first=True)
-decoder_att = torch.nn.TransformerEncoder(encoder_layer, num_layers=4)
-
-decoder = blocks.MLP([128, 256, 256, 256, 3], batch_norm=BN)
-
-encoder.to(args.dv)
-decoder.to(args.dv)
-projector.to(args.dv)
-decoder_att.to(args.dv)
-
-model = DeepSymv3(encoder=encoder, decoder=decoder, decoder_att=decoder_att, projector=projector,
-                  device=args.dv, lr=args.lr, path=args.s, coeff=1)
+config = utils.parse_and_init(args)
+model = utils.create_model_from_config(config)
 model.print_model()
 for name in model.module_names:
-    print(f"{name} params={get_parameter_count(getattr(model, name)):,}")
+    print(f"{name} params={utils.get_parameter_count(getattr(model, name)):,}")
 
-valid_objects = {i: True for i in range(4, 7)}
-train_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True,
-                               old=True, partitions=list(range(10)))
-val_set = SegmentedSAEFolder(args.d, max_pad=3, valid_objects=valid_objects, normalize=True,
-                             eff_mu=train_set.eff_mu, eff_std=train_set.eff_std, old=True, partitions=[10])
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.bs, num_workers=4, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.bs, num_workers=4, shuffle=True)
+
+train_set = StateActionEffectDataset(config["data"], split="train")
+val_set = StateActionEffectDataset(config["data"], split="val")
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.bs, num_workers=4, shuffle=True,
+                                           collate_fn=utils.collate_fn)
+val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.bs, num_workers=4, shuffle=True,
+                                         collate_fn=utils.collate_fn)
 model.train(args.e, train_loader, val_loader)
