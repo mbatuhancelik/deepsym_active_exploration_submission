@@ -2,8 +2,10 @@ import os
 
 import torch
 import wandb
+import numpy as np
 
 import utils
+from environment import GenericEnv
 
 
 class DeepSymbolGenerator:
@@ -155,6 +157,7 @@ class DeepSymbolGenerator:
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}")
             self.save("_last")
+        self.save_symbols(val_loader)
 
     def load(self, ext, from_wandb=False):
         for name in self.module_names:
@@ -184,12 +187,17 @@ class DeepSymbolGenerator:
             utils.print_module(getattr(self, name), name, space)
 
     def eval_mode(self):
-        self.encoder.eval()
-        self.decoder.eval()
+        for name in self.module_names:
+            module = getattr(self, name)
+            module.eval()
 
     def train_mode(self):
-        self.encoder.train()
-        self.decoder.train()
+        for name in self.module_names:
+            module = getattr(self, name)
+            module.train()
+
+    def save_symbols(self, loader):
+        pass
 
 
 class MultiDeepSym(DeepSymbolGenerator):
@@ -204,7 +212,11 @@ class MultiDeepSym(DeepSymbolGenerator):
                  "eps": 1e-8,
                  "amsgrad": False,
                  "maximize": False,
-                 "weight_decay": 0})
+                 "weight_decay": 0,
+                 "fused": False,
+                 "foreach": None,
+                 "capturable": False,
+                 "differentiable": False})
         self.optimizer.param_groups.append(
                 {"params": self.decoder_att.parameters(),
                  "lr": self.lr,
@@ -212,7 +224,11 @@ class MultiDeepSym(DeepSymbolGenerator):
                  "eps": 1e-8,
                  "amsgrad": False,
                  "maximize": False,
-                 "weight_decay": 0})
+                 "weight_decay": 0,
+                 "fused": False,
+                 "foreach": None,
+                 "capturable": False,
+                 "differentiable": False})
         self.module_names.append("projector")
         self.module_names.append("decoder_att")
 
@@ -273,3 +289,52 @@ class MultiDeepSymMLP(MultiDeepSym):
         if eval_mode:
             h = h.round()
         return h
+
+    def save_symbols(self, loader):
+        self.eval_mode()
+        groundings = {}
+        for i, sample in enumerate(loader):
+            x = sample["state"]
+            z = self.encode(x, eval_mode=True)
+            z = z.reshape(-1, z.shape[-1])
+            x = x.reshape(z.shape[0], -1)
+            paddings = sample["pad_mask"].reshape(z.shape[0], -1)
+            z_str = utils.binary_tensor_to_str(z)
+            for zs_i, x_i, p_i in zip(z_str, x, paddings):
+                if p_i > 0.5:
+                    if zs_i in groundings:
+                        groundings[zs_i].append(x_i)
+                    else:
+                        groundings[zs_i] = [x_i]
+
+        env = GenericEnv(gui=1)
+        env.init_agent_pose()
+        env._step(100)
+        obj_mapping = {
+            # (type, size, rotation, color)
+            1: (env._p.GEOM_BOX, (0.025, 0.025, 0.05), (0, 0, 0), (1.0, 0.0, 0.0, 1.0)),
+            2: (env._p.GEOM_CYLINDER, (0.025, 0.025, 0.025), (0, 0, 0), (0.0, 1.0, 0.0, 1.0)),
+            3: (env._p.GEOM_BOX, (0.025, 0.025, 0.025), (0, 0, 0), (0.0, 0.0, 1.0, 1.0)),
+            4: (env._p.GEOM_BOX, (0.025, 0.125, 0.025), (0, 0, 0), (1.0, 1.0, 0.0, 1.0)),
+            5: (env._p.GEOM_BOX, (0.125, 0.025, 0.025), (0, 0, np.pi), (1.0, 0.0, 1.0, 1.0)),
+        }
+        images = {}
+        for symbol in groundings:
+            for o_i in groundings[symbol]:
+                x, y, z, rx, ry, rz, obj_type = o_i
+                obj_type = int(obj_type)
+                obj_id = utils.create_object(p=env._p, obj_type=obj_type, size=obj_mapping[obj_type][1],
+                                             position=(x, y, z), rotation=(rx, ry, rz), mass=0.1,
+                                             color=obj_mapping[obj_type][3])
+                rgb, _, _, = utils.get_image(p=env._p, eye_position=[1.2, 0.0, 1.6], target_position=[0.8, 0., 0.4],
+                                             up_vector=[0, 0, 1], height=256, width=256)
+                env._p.removeBody(obj_id)
+                if symbol in images:
+                    images[symbol].append(rgb)
+                else:
+                    images[symbol] = [rgb]
+        for symbol in images:
+            image = wandb.Image(np.mean(images[symbol]), caption=symbol)
+            wandb.log({f"{symbol}": image})
+
+        self.train_mode()

@@ -17,10 +17,8 @@ for name in model.module_names:
     print(f"{name} params={utils.get_parameter_count(getattr(model, name)):,}")
 
 
-train_set = StateActionEffectDataset(config["data"], split="train")
-val_set = StateActionEffectDataset(config["data"], split="val")
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.bs, num_workers=4, shuffle=True,
-                                           collate_fn=utils.collate_fn)
-val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.bs, num_workers=4, shuffle=True,
-                                         collate_fn=utils.collate_fn)
-model.train(args.e, train_loader, val_loader)
+train_set = StateActionEffectDataset(config["dataset_name"], split="train")
+val_set = StateActionEffectDataset(config["dataset_name"], split="val")
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=config["batch_size"], shuffle=True)
+val_loader = torch.utils.data.DataLoader(val_set, batch_size=config["batch_size"])
+model.train(config["epoch"], train_loader, val_loader)
