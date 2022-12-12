@@ -383,3 +383,31 @@ def sample_prediction(prob, mask, sample_size=100):
         sampled_symbols.append(current_sample)
     sampled_symbols = torch.stack(sampled_symbols)
     return sampled_symbols
+
+
+def collate_fn(batch):
+    dec_to_bin = {
+        0: torch.tensor([0, 0, 0], dtype=torch.float),
+        1: torch.tensor([0, 0, 1], dtype=torch.float),
+        2: torch.tensor([0, 1, 0], dtype=torch.float),
+        3: torch.tensor([0, 1, 1], dtype=torch.float),
+        4: torch.tensor([1, 0, 0], dtype=torch.float),
+        5: torch.tensor([1, 0, 1], dtype=torch.float),
+        6: torch.tensor([1, 1, 0], dtype=torch.float),
+        7: torch.tensor([1, 1, 1], dtype=torch.float)
+    }
+    state, action, effect, pad_mask = [], [], [], []
+    for sample in batch:
+        state.append(sample["state"])
+        a = torch.cat([dec_to_bin[a_i.item()] for a_i in sample["action"][:4]] + [sample["action"][4:]], dim=0)
+        action.append(a)
+        effect.append(sample["effect"])
+        pad_mask.append(torch.ones(sample["pad_mask"]))
+
+    new_batch = {
+        "state": torch.stack(state, dim=0),
+        "action": torch.stack(action, dim=0),
+        "effect": torch.stack(effect, dim=0),
+        "pad_mask": pad_sequence(pad_mask, batch_first=True)
+    }
+    return new_batch

@@ -19,19 +19,39 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
 
 
 class StateActionEffectDataset(torch.utils.data.Dataset):
-    def __init__(self, path):
+    def __init__(self, name, split="train"):
+        path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
         self.action = torch.load(os.path.join(path, "action.pt"))
         self.effect = torch.load(os.path.join(path, "effect.pt"))
+        self.mask = torch.load(os.path.join(path, "mask.pt"))
+        n_train = int(len(self.state) * 0.8)
+        n_val = int(len(self.state) * 0.1)
+        if split == "train":
+            self.state = self.state[:n_train]
+            self.action = self.action[:n_train]
+            self.effect = self.effect[:n_train]
+            self.mask = self.mask[:n_train]
+        elif split == "val":
+            self.state = self.state[n_train:n_train+n_val]
+            self.action = self.action[n_train:n_train+n_val]
+            self.effect = self.effect[n_train:n_train+n_val]
+            self.mask = self.mask[n_train:n_train+n_val]
+        elif split == "test":
+            self.state = self.state[n_train+n_val:]
+            self.action = self.action[n_train+n_val:]
+            self.effect = self.effect[n_train+n_val:]
+            self.mask = self.mask[n_train+n_val:]
 
     def __len__(self):
         return len(self.state)
 
     def __getitem__(self, idx):
         sample = {}
-        sample["state"] = self.state[idx] / 255.0
-        sample["action"] = self.action[idx].float()
-        sample["effect"] = self.effect[idx] / 255.0
+        sample["state"] = self.state[idx]
+        sample["action"] = self.action[idx]
+        sample["effect"] = self.effect[idx]
+        sample["pad_mask"] = self.mask[idx]
         return sample
 
 
