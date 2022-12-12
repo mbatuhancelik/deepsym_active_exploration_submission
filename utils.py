@@ -44,7 +44,7 @@ def parse_and_init(args):
 def create_model_from_config(config):
     # create the encoder
     enc_layers = [config["state_dim"]] + [config["hidden_dim"]]*config["n_hidden_layers"] + [config["latent_dim"]]
-    enc_mlp = blocks.MLP(enc_layers, activation=torch.nn.ReLU, batch_norm=config["batch_norm"])
+    enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"])
     encoder = torch.nn.Sequential(
         enc_mlp,
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"], T=config["gumbel_t"])
@@ -52,11 +52,11 @@ def create_model_from_config(config):
     # create the projector
     projector = torch.nn.Linear(config["latent_dim"]+config["action_dim"], config["hidden_dim"])
     # create the transformer
-    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"])
+    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"], batch_first=True)
     transformer = torch.nn.TransformerEncoder(layer, num_layers=config["n_attention_layers"])
     # create the decoder
     dec_layers = [config["hidden_dim"]]*(config["n_hidden_layers"]+1) + [config["effect_dim"]]
-    decoder = blocks.MLP(dec_layers, activation=torch.nn.ReLU, batch_norm=config["batch_norm"])
+    decoder = blocks.MLP(dec_layers, batch_norm=config["batch_norm"])
     # send everything to the device
     encoder = encoder.to(config["device"])
     projector = projector.to(config["device"])
