@@ -43,15 +43,32 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
             self.effect = self.effect[n_train+n_val:]
             self.mask = self.mask[n_train+n_val:]
 
+        self._dec_to_bin = {
+            0: torch.tensor([0, 0, 0], dtype=torch.float),
+            1: torch.tensor([0, 0, 1], dtype=torch.float),
+            2: torch.tensor([0, 1, 0], dtype=torch.float),
+            3: torch.tensor([0, 1, 1], dtype=torch.float),
+            4: torch.tensor([1, 0, 0], dtype=torch.float),
+            5: torch.tensor([1, 0, 1], dtype=torch.float),
+            6: torch.tensor([1, 1, 0], dtype=torch.float),
+            7: torch.tensor([1, 1, 1], dtype=torch.float)
+        }
+
     def __len__(self):
         return len(self.state)
 
     def __getitem__(self, idx):
         sample = {}
         sample["state"] = self.state[idx]
-        sample["action"] = self.action[idx]
+        # just transforming the action into a binary vector
+        # don't think too much about this
+        a = torch.cat([self._dec_to_bin[a_i.item()] for a_i in self.action[idx][:4]] +
+                      [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
+        sample["action"] = a
         sample["effect"] = self.effect[idx]
-        sample["pad_mask"] = self.mask[idx]
+        mask = torch.zeros(sample["state"].shape[0])
+        mask[:self.mask[idx]] = 1.0
+        sample["pad_mask"] = mask
         return sample
 
 
