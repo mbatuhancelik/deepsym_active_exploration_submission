@@ -62,9 +62,15 @@ def create_model_from_config(config):
     projector = projector.to(config["device"])
     transformer = transformer.to(config["device"])
     decoder = decoder.to(config["device"])
+
+    wandb.watch(encoder, log="all")
+    wandb.watch(projector, log="all")
+    wandb.watch(transformer, log="all")
+    wandb.watch(decoder, log="all")
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
                                    device=config["device"], lr=config["lr"], path=config["save_folder"], coeff=1.0)
+
     return model
 
 
