@@ -2,10 +2,9 @@ import os
 
 import torch
 import wandb
-import numpy as np
+import matplotlib.pyplot as plt
 
 import utils
-from environment import GenericEnv
 
 
 class DeepSymbolGenerator:
@@ -293,7 +292,7 @@ class MultiDeepSymMLP(MultiDeepSym):
     def save_symbols(self, loader):
         self.eval_mode()
         groundings = {}
-        for i, sample in enumerate(loader):
+        for sample in loader:
             x = sample["state"]
             z = self.encode(x, eval_mode=True)
             z = z.reshape(-1, z.shape[-1])
@@ -307,34 +306,31 @@ class MultiDeepSymMLP(MultiDeepSym):
                     else:
                         groundings[zs_i] = [x_i]
 
-        env = GenericEnv(gui=1)
-        env.init_agent_pose()
-        env._step(100)
-        obj_mapping = {
-            # (type, size, rotation, color)
-            1: (env._p.GEOM_BOX, (0.025, 0.025, 0.05), (0, 0, 0), (1.0, 0.0, 0.0, 1.0)),
-            2: (env._p.GEOM_CYLINDER, (0.025, 0.025, 0.025), (0, 0, 0), (0.0, 1.0, 0.0, 1.0)),
-            3: (env._p.GEOM_BOX, (0.025, 0.025, 0.025), (0, 0, 0), (0.0, 0.0, 1.0, 1.0)),
-            4: (env._p.GEOM_BOX, (0.025, 0.125, 0.025), (0, 0, 0), (1.0, 1.0, 0.0, 1.0)),
-            5: (env._p.GEOM_BOX, (0.125, 0.025, 0.025), (0, 0, np.pi), (1.0, 0.0, 1.0, 1.0)),
-        }
-        images = {}
-        for symbol in groundings:
-            for o_i in groundings[symbol]:
-                x, y, z, rx, ry, rz, obj_type = o_i
-                obj_type = int(obj_type)
-                obj_id = utils.create_object(p=env._p, obj_type=obj_type, size=obj_mapping[obj_type][1],
-                                             position=(x, y, z), rotation=(rx, ry, rz), mass=0.1,
-                                             color=obj_mapping[obj_type][3])
-                rgb, _, _, = utils.get_image(p=env._p, eye_position=[1.2, 0.0, 1.6], target_position=[0.8, 0., 0.4],
-                                             up_vector=[0, 0, 1], height=256, width=256)
-                env._p.removeBody(obj_id)
-                if symbol in images:
-                    images[symbol].append(rgb)
-                else:
-                    images[symbol] = [rgb]
-        for symbol in images:
-            image = wandb.Image(np.mean(images[symbol]), caption=symbol)
-            wandb.log({f"{symbol}": image})
+        markers = ["s", "o", "P", "p", "v"]
+        labels = ["box", "cylinder", "short box", "long box", "long box r."]
+        for zs, xs in groundings.items():
+            xs = torch.stack(xs)
+            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            ax[0].set_title("Positions")
+            ax[0].set_xlabel("x")
+            ax[0].set_ylabel("y")
+            for i in range(1, 6):
+                axis = ax[0].scatter(xs[xs[:, 6] == i, 0], xs[xs[:, 6] == i, 1], c=xs[xs[:, 6] == i, 2], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
+            # add the colorbar
+            cbar = fig.colorbar(axis, ax=ax[0])
+            cbar.ax.set_ylabel("z")
+            ax[0].legend()
+            for i in range(1, 6):
+                axis2 = ax[1].scatter(xs[xs[:, 6] == i, 3], xs[xs[:, 6] == i, 4], c=xs[xs[:, 6] == i, 5], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
+            ax[1].set_title("Rotations")
+            ax[1].set_xlabel("rx")
+            ax[1].set_ylabel("ry")
+            # add the colorbar
+            cbar = fig.colorbar(axis2, ax=ax[1])
+            cbar.ax.set_ylabel("rz")
+            ax[1].legend()
+            # log the plot to wandb as an image and close the figure
+            wandb.log({zs: wandb.Image(fig)})
+            plt.close(fig)
 
         self.train_mode()
