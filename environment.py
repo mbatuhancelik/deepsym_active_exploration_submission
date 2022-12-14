@@ -1,3 +1,4 @@
+import copy
 import torch
 import pybullet
 import pybullet_data
@@ -319,7 +320,7 @@ class BlocksWorld_v3(BlocksWorld):
 
 class BlocksWorld_v4(BlocksWorld):
     def __init__(self,segments = 8,x_area= 0.9 , y_area = 0.9 , **kwargs):
-        self.traj_t = 1.5
+        self.traj_t = 2
 
         print(kwargs)
         self.x_init = 0.5
@@ -354,7 +355,7 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
 
-        self.sizes = [[single_size, single_size, 0.05], [single_size, 5*single_size, 0.025], [5*single_size,0.025, single_size] ]
+        self.sizes = [[single_size, single_size, 0.025], [single_size, 5*single_size, 0.025], [5*single_size,0.025, single_size] ]
         super(BlocksWorld_v4, self).__init__(**kwargs)
         
     def create_object(self, obj_type , xidx, yidx):
@@ -377,15 +378,13 @@ class BlocksWorld_v4(BlocksWorld):
                         (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
                 return -1
 
-            position = [self.x_locs[xidx], self.y_locs[yidx] , 0.6]
+            position = [self.x_locs[xidx], self.y_locs[yidx] , 0.4]
             
-            size = self.sizes[0]
+            size = copy.deepcopy(self.sizes[0])
             if obj_type == 4:
                 size = self.sizes[1]
             elif obj_type == 5:
                 size = self.sizes[2]
-            elif obj_type == 3:
-                size[2] = self.sizes[2][2]
             
             self.current_obj_locs[xidx][yidx].append(obj_type)
             if obj_type == 4:
@@ -443,8 +442,10 @@ class BlocksWorld_v4(BlocksWorld):
 
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
-        obj_types = list(reversed(sorted(obj_types)))
+        obj_types = np.random.randint(1, 6, (self.num_objects,))
+        while(np.sum(obj_types) < 29):
+            obj_types = np.random.randint(1, 6, (self.num_objects,))
+        obj_types = list(reversed(sorted(obj_types.tolist())))
         #TODO: REMOVE CAPSULE AND SHPERE, add cube
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
@@ -490,7 +491,7 @@ class BlocksWorld_v4(BlocksWorld):
     def step(self, from_loc, to_loc, before_grip_rotation = 0, after_grip_rotation = 0, sleep=True):
         if self.gui ==0:
             sleep = False
-        correction_constant = 0.005
+        correction_constant = 0.003
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         from_pos = [self.x_locs[from_loc[0] ]+ correction_constant, self.y_locs[from_loc[1]], 0.41]
         from_top_pos = from_pos[:2] + [1.0]
@@ -506,7 +507,10 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
         if after_grip_rotation != 0: 
-            target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
+            if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
+                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
+            else:
+                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
@@ -561,8 +565,10 @@ class BlocksWorld_v4(BlocksWorld):
         action_type = np.random.rand()
         to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
+        before_rotation = np.random.randint(0, 2)
+        after_rotation = np.random.randint(0, 2)
         
-        if action_type < 0.1:
+        if action_type < 0.05:
             # there might be actions that does not pick any objects
             # or actions that does not pick long objects from the middle position
             from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
@@ -583,10 +589,37 @@ class BlocksWorld_v4(BlocksWorld):
                 from_idx = self.get_obj_location(obj_1)
                 to_idx = self.get_obj_location(obj_2)
             
-            #TODO: find object locations and sample actions accordingly
+            action_type = np.random.rand()
+            
+            if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
+                action_type = np.random.rand()
+                if action_type < 0.5:
+                    print("hold edge", self.obj_types[self.obj_dict[obj_1]])
+                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
+                    delta = np.random.choice([1,-1])
+                    axis = 1
+                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
+                        axis = 0
+                    from_idx[axis] += delta
+                    to_idx[axis] += delta
 
-        before_rotation = np.random.randint(0, 2)
-        after_rotation = np.random.randint(0, 2)
+                    from_idx = np.clip(from_idx, 0, self.segments-1)
+                    to_idx = np.clip(to_idx, 0, self.segments-1)
+                    #not having this adds too much uncertainty
+                    # after_rotation = 0
+            if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
+                action_type = np.random.rand()
+                if action_type < 0.5:
+                    print("put edge")
+                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
+                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
+                        to_idx[1] += np.random.choice([1 ,-1])
+                    else:
+                        to_idx[0] += np.random.choice([1,-1])
+                    to_idx = np.clip(to_idx, 0, self.segments-1)
+
+
+        print((from_idx, to_idx, before_rotation, after_rotation))
         return (from_idx, to_idx, before_rotation, after_rotation)
 
 class PushEnv(GenericEnv):
