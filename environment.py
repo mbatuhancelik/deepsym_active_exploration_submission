@@ -425,55 +425,6 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-
-            position = [self.x_locs[xidx], self.y_locs[yidx] , 0.4]
-            
-            size = copy.deepcopy(self.sizes[0])
-            if obj_type == 4:
-                size = self.sizes[1]
-            elif obj_type == 5:
-                size = self.sizes[2]
-            
-            self.current_obj_locs[xidx][yidx].append(obj_type)
-            if obj_type == 4:
-                if yidx > 0:
-                    self.current_obj_locs[xidx][yidx-1].append(obj_type)
-                if yidx < len(self.y_locs) - 1:
-                    self.current_obj_locs[xidx][yidx+1].append(obj_type)
-            if obj_type == 5:
-                if xidx > 0:
-                    self.current_obj_locs[xidx - 1][yidx].append(obj_type)
-                if xidx < len(self.x_locs) -1:
-                    self.current_obj_locs[xidx +1][ yidx].append(obj_type)
-            o_id = -1
-            #obj type is never 0
-            if obj_type == 0:
-                o_id =  utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random")
-            elif obj_type == 1:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 2:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 3:
-                o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 4:
-                o_id =(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, 0],
-                                                mass=0.1, color="random"))
-            elif obj_type == 5:
-                o_id =(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                                size=size, position=position, rotation=[0, 0, np.pi],
-                                                mass=0.1, color="random"))
-            self.obj_dict[len(self.obj_dict)] = o_id
-            self.obj_types[o_id] = obj_type
-            return o_id
     
     def init_objects(self):
         '''
