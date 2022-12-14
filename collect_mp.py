@@ -5,20 +5,21 @@ import subprocess
 from multiprocessing import Process
 
 
-def collect(num, folder, idx):
-    subprocess.run(["python", "explore.py", "-N", num, "-o", folder, "-i", idx])
+def collect(num, t, folder, idx):
+    subprocess.run(["python", "explore_blockworld4.py", "-N", num, "-T", t, "-o", folder, "-i", idx])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Collect interaction data in parallel.")
     parser.add_argument("-d", help="data folder", type=str, required=True)
     parser.add_argument("-N", help="number of data per proc", type=int, required=True)
+    parser.add_argument("-T", help="interaction per episode", type=int, required=True)
     parser.add_argument("-p", help="number of procs", type=int, required=True)
     args = parser.parse_args()
     procs = []
     start = time.time()
     for i in range(args.p):
-        p = Process(target=collect, args=[str(args.N), args.d, str(i)])
+        p = Process(target=collect, args=[str(args.N), str(args.T), args.d, str(i)])
         p.start()
         procs.append(p)
 
