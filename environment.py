@@ -19,7 +19,6 @@ class GenericEnv:
 
         self._p.resetSimulation()
         self._p.configureDebugVisualizer(self._p.COV_ENABLE_GUI, 0)
-        #?
         self._p.setAdditionalSearchPath(pybullet_data.getDataPath())
         #sets the gravity
         self._p.setGravity(0, 0, -9.807)
@@ -203,50 +202,57 @@ class BlocksWorld_v2(BlocksWorld):
         from_pos = self.locs[from_loc]
         to_pos = self.locs[to_loc]
         to_top_pos = to_pos[:2] + [0.8]
+        target_quat2 = self._p.getQuaternionFromEuler([np.pi, 0, 0])
         print(self.obj_dict)
 #x ve y pozisyonlarına göre yapılacak hareketi belirle
         if(from_pos[0] > to_pos[0]):
             if(from_pos[1]>to_pos[1]):
                 print("this1")
                 from_back_pos = [from_pos[0]+0.2] + [from_pos[1]] +[from_pos[2]] 
-                move_x_pos = [to_pos[0]+0.1] + [from_pos[1]] +[from_pos[2]]
-                go_back_pos = [to_pos[0]+0.1] + [to_pos[1]] +[to_pos[2]]
+                move_x_pos = [to_pos[0]+0.2] + [from_pos[1]] +[from_pos[2]]
+                go_back_pos = [to_pos[0]+0.1] + [from_pos[1]] +[to_pos[2]]
                 to_top_pos2 = [to_pos[0]+0.1] + [to_pos[1]] +[0.8]
                 move_y_pos = [to_pos[0]] + [to_pos[1]+0.05] +[to_pos[2]]
-                go_left_pos = [to_pos[0]] + [to_pos[1]+0.2] +[to_pos[2]]
+                go_left_pos = [to_pos[0]] + [from_pos[1]+0.1] +[to_pos[2]]
                 to_top_pos3 = [to_pos[0]] + [to_pos[1]+0.2] +[0.8]
 
             else:
                 print("this2")
-                from_back_pos = [from_pos[0]+0.2] + [from_pos[1]] +[from_pos[2]] 
-                move_x_pos = [to_pos[0]+0.1] + [from_pos[1]] +[from_pos[2]]
-                go_back_pos = [to_pos[0]+0.1] + [to_pos[1]] +[to_pos[2]]
-                to_top_pos2 = [to_pos[0]+0.1] + [to_pos[1]] +[0.8]
-                move_y_pos = [to_pos[0]] + [to_pos[1]-0.05] +[to_pos[2]]
-                go_left_pos = [to_pos[0]] + [to_pos[1]-0.2] +[to_pos[2]]
+                from_back_pos2 = [from_pos[0]+0.2] + [from_pos[1]+0.1] +[from_pos[2]] 
+                from_back_pos = [from_pos[0]+0.2] + [from_pos[1]-0.025] +[from_pos[2]] 
+                move_x_pos = [from_pos[0]+0.125] + [to_pos[1]-0.025] +[from_pos[2]]
+                go_back_pos = [from_pos[0]+0.2] + [to_pos[1]-0.025] +[to_pos[2]]
+                go_left_pos = [from_pos[0]] + [to_pos[1]-0.2] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]+0.2] + [to_pos[1]-0.025] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]-0.125] +[to_pos[2]]
                 to_top_pos3 = [to_pos[0]] + [to_pos[1]-0.2] +[0.8]
         else:
             if(from_pos[1]>to_pos[1]):
                 print("this3")
-                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]] +[from_pos[2]] 
-                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]] +[from_pos[2]]
-                go_back_pos = [to_pos[0]-0.1] + [from_pos[1]] +[to_pos[2]]
-                to_top_pos2 = [to_pos[0]-0.1] + [to_pos[1]] +[0.8]
-                move_y_pos = [to_pos[0]] + [to_pos[1]+0.05] +[to_pos[2]]
+                from_back_pos2 = [from_pos[0]-0.2] + [from_pos[1]-0.1] +[from_pos[2]] 
+                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]+0.025] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]+0.025] +[from_pos[2]]
+                go_back_pos = [to_pos[0]-0.2] + [from_pos[1]+0.025] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]-0.2] + [from_pos[1]+0.025] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]+0.125] +[to_pos[2]]
                 go_left_pos = [to_pos[0]] + [from_pos[1]+0.2] +[to_pos[2]]
                 to_top_pos3 = [to_pos[0]] + [to_pos[1]+0.2] +[0.8]
             else:
                 print("this4")
-                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]] +[from_pos[2]] 
-                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]] +[from_pos[2]]
-                go_back_pos = [to_pos[0]-0.2] + [from_pos[1]] +[to_pos[2]]
-                to_top_pos2 = [to_pos[0]-0.2] + [to_pos[1]] +[0.8]
-                move_y_pos = [to_pos[0]] + [to_pos[1]-0.05] +[to_pos[2]]
+                from_back_pos2 = [from_pos[0]-0.2] + [from_pos[1]+0.1] +[from_pos[2]] 
+                from_back_pos = [from_pos[0]-0.2] + [from_pos[1]-0.025] +[from_pos[2]] 
+                move_x_pos = [to_pos[0]-0.125] + [from_pos[1]-0.025] +[from_pos[2]]
+                go_back_pos = [to_pos[0]-0.2] + [from_pos[1]-0.025] +[to_pos[2]]
+                to_top_pos2 = [to_pos[0]-0.2] + [from_pos[1]-0.025] +[0.8]
+                move_y_pos = [to_pos[0]] + [to_pos[1]-0.125] +[to_pos[2]]
                 go_left_pos = [to_pos[0]] + [from_pos[1]-0.3] +[to_pos[2]]
                 to_top_pos3 = [to_pos[0]] + [to_pos[1]-0.3] +[0.8]
 
 
         before_pose = self.state_obj_poses()
+        
+        #go back before in order not to take down the objects
+        self.agent.set_cartesian_position(from_back_pos2, orientation=target_quat, t=3, traj=True, sleep=sleep)
         #gripper goes behind of the object
         self.agent.set_cartesian_position(from_back_pos, orientation=target_quat, t=3, traj=True, sleep=sleep)
         self.agent.close_gripper(self.traj_t, sleep=sleep)
@@ -261,16 +267,20 @@ class BlocksWorld_v2(BlocksWorld):
         self.agent.move_in_cartesian(to_top_pos2, orientation=target_quat, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
         #move gripper to right or left side of the object in order to move it in y axis
-        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat2, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
         #object is moved in y axis
-        self.agent.move_in_cartesian(move_y_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent.move_in_cartesian(move_y_pos, orientation=target_quat2, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
         #move gripper side of the object in order to avoid to take down the object
-        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat, t=3, sleep=sleep)
+        self.agent.move_in_cartesian(go_left_pos, orientation=target_quat2, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos3, orientation=target_quat, t=3, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos3, orientation=target_quat2, t=3, sleep=sleep)
         self.agent._waitsleep(0.5, sleep=sleep)
+
+
+
+
         self.init_agent_pose(t=1.0, sleep=sleep)
         after_pose = self.state_obj_poses()
         effect = after_pose - before_pose
