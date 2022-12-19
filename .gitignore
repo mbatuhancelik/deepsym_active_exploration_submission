@@ -1,11 +1,16 @@
 *.sublime-workspace
 __pycache__
+
 data
 save
 out
+wandb
+artifacts
+
 .ipynb_checkpoints
 *.ipynb
 .DS_Store
+
 *.out
 *.png
-wandb
+*.yaml

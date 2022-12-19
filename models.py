@@ -1,7 +1,8 @@
 import os
-import time
 
 import torch
+import wandb
+import matplotlib.pyplot as plt
 
 import utils
 
@@ -118,7 +119,6 @@ class DeepSymbolGenerator:
 
     def one_pass_optimize(self, loader):
         avg_loss = 0.0
-        start = time.time()
         for i, sample in enumerate(loader):
             self.optimizer.zero_grad()
             L = self.loss(sample)
@@ -126,16 +126,15 @@ class DeepSymbolGenerator:
             self.optimizer.step()
             avg_loss += L.item()
             self.iteration += 1
-        end = time.time()
         avg_loss /= (i+1)
-        time_elapsed = end-start
-        return avg_loss, time_elapsed
+        return avg_loss
 
     def train(self, epoch, loader, val_loader=None):
         for e in range(epoch):
             # one epoch training over the train set
-            epoch_loss, time_elapsed = self.one_pass_optimize(loader)
+            epoch_loss = self.one_pass_optimize(loader)
             self.epoch += 1
+            wandb.log({"train_loss": epoch_loss, "epoch": self.epoch})
 
             # calculate validation loss
             if val_loader is not None:
@@ -145,22 +144,29 @@ class DeepSymbolGenerator:
                         L = self.loss(sample)
                     val_loss += L.item()
                 val_loss /= (i+1)
+                wandb.log({"val_loss": val_loss, "epoch": self.epoch})
+
                 if val_loss < self.best_loss:
                     self.best_loss = val_loss
                     self.save("_best")
-                print(f"epoch={self.epoch}, iter={self.iteration}, train loss={epoch_loss:.5f}, val loss={val_loss:.5f}"
-                      f", elapsed={time_elapsed:.2f}")
+                print(f"epoch={self.epoch}, iter={self.iteration}, train loss={epoch_loss:.5f}, val loss={val_loss:.5f}")
             else:
                 if epoch_loss < self.best_loss:
                     self.best_loss = epoch_loss
                     self.save("_best")
-                print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}, elapsed={time_elapsed:.2f}")
+                print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}")
             self.save("_last")
+        self.save_symbols(val_loader)
 
-    def load(self, ext):
+    def load(self, ext, from_wandb=False):
         for name in self.module_names:
-            module_path = os.path.join(self.path, name+ext+".ckpt")
-            module_dict = torch.load(module_path)
+            if from_wandb:
+                module_path = os.path.join(self.path, name+ext+".pt")
+                module_dict = wandb.restore(module_path, run_path=f"colorslab/multideepsym/{wandb.run.id}").name
+                module_dict = torch.load(module_dict)
+            else:
+                module_path = os.path.join(self.path, name+ext+".pt")
+                module_dict = torch.load(module_path)
             getattr(self, name).load_state_dict(module_dict)
 
     def save(self, ext):
@@ -170,26 +176,33 @@ class DeepSymbolGenerator:
         for name in self.module_names:
             module = getattr(self, name)
             module_dict = module.eval().cpu().state_dict()
-            module_path = os.path.join(self.path, name+ext+".ckpt")
+            module_path = os.path.join(self.path, name+ext+".pt")
             torch.save(module_dict, module_path)
             getattr(self, name).train().to(self.device)
+
+        wandb.save(os.path.join(self.path, "*"+ext+".pt"))
 
     def print_model(self, space=0, encoder_only=False):
         for name in self.module_names:
             utils.print_module(getattr(self, name), name, space)
 
     def eval_mode(self):
-        self.encoder.eval()
-        self.decoder.eval()
+        for name in self.module_names:
+            module = getattr(self, name)
+            module.eval()
 
     def train_mode(self):
-        self.encoder.train()
-        self.decoder.train()
+        for name in self.module_names:
+            module = getattr(self, name)
+            module.train()
+
+    def save_symbols(self, loader):
+        pass
 
 
-class DeepSymv3(DeepSymbolGenerator):
+class MultiDeepSym(DeepSymbolGenerator):
     def __init__(self, **kwargs):
-        super(DeepSymv3, self).__init__(**kwargs)
+        super(MultiDeepSym, self).__init__(**kwargs)
         self.projector = kwargs.get("projector")
         self.decoder_att = kwargs.get("decoder_att")
         self.optimizer.param_groups.append(
@@ -199,7 +212,11 @@ class DeepSymv3(DeepSymbolGenerator):
                  "eps": 1e-8,
                  "amsgrad": False,
                  "maximize": False,
-                 "weight_decay": 0})
+                 "weight_decay": 0,
+                 "fused": False,
+                 "foreach": None,
+                 "capturable": False,
+                 "differentiable": False})
         self.optimizer.param_groups.append(
                 {"params": self.decoder_att.parameters(),
                  "lr": self.lr,
@@ -207,11 +224,15 @@ class DeepSymv3(DeepSymbolGenerator):
                  "eps": 1e-8,
                  "amsgrad": False,
                  "maximize": False,
-                 "weight_decay": 0})
+                 "weight_decay": 0,
+                 "fused": False,
+                 "foreach": None,
+                 "capturable": False,
+                 "differentiable": False})
         self.module_names.append("projector")
         self.module_names.append("decoder_att")
 
-    def encode(self, x, pad_mask, eval_mode=False):
+    def encode(self, x, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
         x = x.reshape(-1, ch, h, w)
         h = self.encoder(x.to(self.device))
@@ -223,7 +244,7 @@ class DeepSymv3(DeepSymbolGenerator):
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
         a = sample["action"].to(self.device)
-        h = self.encode(x, sample["pad_mask"], eval_mode)
+        h = self.encode(x, eval_mode)
         z = torch.cat([h, a], dim=-1)
         return z
 
@@ -254,3 +275,63 @@ class DeepSymv3(DeepSymbolGenerator):
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L
+
+
+class MultiDeepSymMLP(MultiDeepSym):
+    def __init__(self, **kwargs):
+        super(MultiDeepSymMLP, self).__init__(**kwargs)
+
+    def encode(self, x, eval_mode=False):
+        n_sample, n_seg, n_feat = x.shape
+        x = x.reshape(-1, n_feat)
+        h = self.encoder(x.to(self.device))
+        h = h.reshape(n_sample, n_seg, -1)
+        if eval_mode:
+            h = h.round()
+        return h
+
+    def save_symbols(self, loader):
+        self.eval_mode()
+        groundings = {}
+        for sample in loader:
+            x = sample["state"]
+            z = self.encode(x, eval_mode=True)
+            z = z.reshape(-1, z.shape[-1])
+            x = x.reshape(z.shape[0], -1)
+            paddings = sample["pad_mask"].reshape(z.shape[0], -1)
+            z_str = utils.binary_tensor_to_str(z)
+            for zs_i, x_i, p_i in zip(z_str, x, paddings):
+                if p_i > 0.5:
+                    if zs_i in groundings:
+                        groundings[zs_i].append(x_i)
+                    else:
+                        groundings[zs_i] = [x_i]
+
+        markers = ["s", "o", "P", "p", "v"]
+        labels = ["box", "cylinder", "short box", "long box", "long box r."]
+        for zs, xs in groundings.items():
+            xs = torch.stack(xs)
+            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            ax[0].set_title("Positions")
+            ax[0].set_xlabel("x")
+            ax[0].set_ylabel("y")
+            for i in range(1, 6):
+                axis = ax[0].scatter(xs[xs[:, 6] == i, 0], xs[xs[:, 6] == i, 1], c=xs[xs[:, 6] == i, 2], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
+            # add the colorbar
+            cbar = fig.colorbar(axis, ax=ax[0])
+            cbar.ax.set_ylabel("z")
+            ax[0].legend()
+            for i in range(1, 6):
+                axis2 = ax[1].scatter(xs[xs[:, 6] == i, 3], xs[xs[:, 6] == i, 4], c=xs[xs[:, 6] == i, 5], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
+            ax[1].set_title("Rotations")
+            ax[1].set_xlabel("rx")
+            ax[1].set_ylabel("ry")
+            # add the colorbar
+            cbar = fig.colorbar(axis2, ax=ax[1])
+            cbar.ax.set_ylabel("rz")
+            ax[1].legend()
+            # log the plot to wandb as an image and close the figure
+            wandb.log({zs: wandb.Image(fig)})
+            plt.close(fig)
+
+        self.train_mode()

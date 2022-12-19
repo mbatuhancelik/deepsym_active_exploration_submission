@@ -19,19 +19,56 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
 
 
 class StateActionEffectDataset(torch.utils.data.Dataset):
-    def __init__(self, path):
+    def __init__(self, name, split="train"):
+        path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
         self.action = torch.load(os.path.join(path, "action.pt"))
         self.effect = torch.load(os.path.join(path, "effect.pt"))
+        self.mask = torch.load(os.path.join(path, "mask.pt"))
+        n_train = int(len(self.state) * 0.8)
+        n_val = int(len(self.state) * 0.1)
+        if split == "train":
+            self.state = self.state[:n_train]
+            self.action = self.action[:n_train]
+            self.effect = self.effect[:n_train]
+            self.mask = self.mask[:n_train]
+        elif split == "val":
+            self.state = self.state[n_train:n_train+n_val]
+            self.action = self.action[n_train:n_train+n_val]
+            self.effect = self.effect[n_train:n_train+n_val]
+            self.mask = self.mask[n_train:n_train+n_val]
+        elif split == "test":
+            self.state = self.state[n_train+n_val:]
+            self.action = self.action[n_train+n_val:]
+            self.effect = self.effect[n_train+n_val:]
+            self.mask = self.mask[n_train+n_val:]
+
+        self._dec_to_bin = {
+            0: torch.tensor([0, 0, 0], dtype=torch.float),
+            1: torch.tensor([0, 0, 1], dtype=torch.float),
+            2: torch.tensor([0, 1, 0], dtype=torch.float),
+            3: torch.tensor([0, 1, 1], dtype=torch.float),
+            4: torch.tensor([1, 0, 0], dtype=torch.float),
+            5: torch.tensor([1, 0, 1], dtype=torch.float),
+            6: torch.tensor([1, 1, 0], dtype=torch.float),
+            7: torch.tensor([1, 1, 1], dtype=torch.float)
+        }
 
     def __len__(self):
         return len(self.state)
 
     def __getitem__(self, idx):
         sample = {}
-        sample["state"] = self.state[idx] / 255.0
-        sample["action"] = self.action[idx].float()
-        sample["effect"] = self.effect[idx] / 255.0
+        sample["state"] = self.state[idx]
+        # just transforming the action into a binary vector
+        # don't think too much about this
+        a = torch.cat([self._dec_to_bin[a_i.item()] for a_i in self.action[idx][:4]] +
+                      [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
+        sample["action"] = a
+        sample["effect"] = self.effect[idx]
+        mask = torch.zeros(sample["state"].shape[0])
+        mask[:self.mask[idx]] = 1.0
+        sample["pad_mask"] = mask
         return sample
 
 

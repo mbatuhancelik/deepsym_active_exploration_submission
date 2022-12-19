@@ -1,11 +1,77 @@
 import pkgutil
+import os
+import zipfile
 
+import wandb
+import yaml
 import pybullet
 from pybullet_utils import bullet_client
 import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
 from torchvision import transforms
+from torch.nn.utils.rnn import pad_sequence
+
+import blocks
+import models
+
+
+def parse_and_init(args):
+    with open(args.config, "r") as f:
+        config = yaml.safe_load(f)
+
+    # create a save folder if not exists
+    save_folder = config["save_folder"]
+    os.makedirs(save_folder, exist_ok=True)
+
+    # download and extract dataset if not exists
+    data_path = os.path.join("data", config["dataset_name"])
+    if not os.path.exists(data_path):
+        artifact = wandb.use_artifact(f"colorslab/multideepsym/{config['dataset_name']}:latest", type="dataset")
+        artifact_dir = artifact.download()
+        archive = zipfile.ZipFile(os.path.join(artifact_dir, config["dataset_name"]+".zip"), "r")
+        archive.extractall("data")
+
+    # also save the config file in the save folder
+    with open(os.path.join(save_folder, "config.yaml"), "w") as f:
+        yaml.dump(config, f)
+
+    # initialize wandb run
+    wandb.init(project="multideepsym", entity="colorslab", config=config, dir=save_folder)
+    return wandb.config
+
+
+def create_model_from_config(config):
+    # create the encoder
+    enc_layers = [config["state_dim"]] + [config["hidden_dim"]]*config["n_hidden_layers"] + [config["latent_dim"]]
+    enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"])
+    encoder = torch.nn.Sequential(
+        enc_mlp,
+        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"], T=config["gumbel_t"])
+    )
+    # create the projector
+    projector = torch.nn.Linear(config["latent_dim"]+config["action_dim"], config["hidden_dim"])
+    # create the transformer
+    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"], batch_first=True)
+    transformer = torch.nn.TransformerEncoder(layer, num_layers=config["n_attention_layers"])
+    # create the decoder
+    dec_layers = [config["hidden_dim"]]*(config["n_hidden_layers"]+1) + [config["effect_dim"]]
+    decoder = blocks.MLP(dec_layers, batch_norm=config["batch_norm"])
+    # send everything to the device
+    encoder = encoder.to(config["device"])
+    projector = projector.to(config["device"])
+    transformer = transformer.to(config["device"])
+    decoder = decoder.to(config["device"])
+
+    wandb.watch(encoder, log="all")
+    wandb.watch(projector, log="all")
+    wandb.watch(transformer, log="all")
+    wandb.watch(decoder, log="all")
+    # create the model
+    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
+                                   device=config["device"], lr=config["lr"], path=config["save_folder"], coeff=1.0)
+
+    return model
 
 
 def connect(gui=1):
