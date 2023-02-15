@@ -1,3 +1,5 @@
+import torch
+import copy
 import pybullet
 import pybullet_data
 import numpy as np
@@ -375,7 +377,7 @@ class BlocksWorld_v4(BlocksWorld):
 
         position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
 
-        size = self.sizes[0]
+        size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
             size = self.sizes[1]
         elif obj_type == 5:
@@ -423,7 +425,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-
+    
     def init_objects(self):
         '''
         obj_tpes index:
@@ -441,7 +443,7 @@ class BlocksWorld_v4(BlocksWorld):
         # obj_types = [4 for i in range(self.num_objects)]
         obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
-        # TODO: REMOVE CAPSULE AND SHPERE, add cube
+        
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
@@ -483,7 +485,7 @@ class BlocksWorld_v4(BlocksWorld):
     def step(self, from_loc, to_loc, before_grip_rotation=0, after_grip_rotation=0, sleep=False):
         if self.gui == 0:
             sleep = False
-        correction_constant = 0.005
+        correction_constant = 0.003
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         from_pos = [self.x_locs[from_loc[0]] + correction_constant, self.y_locs[from_loc[1]], 0.41]
         from_top_pos = from_pos[:2] + [1.0]
@@ -498,8 +500,11 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.close_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        if after_grip_rotation != 0:
-            target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
+        if after_grip_rotation != 0: 
+            if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
+                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
+            else:
+                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
@@ -550,8 +555,10 @@ class BlocksWorld_v4(BlocksWorld):
         action_type = np.random.rand()
         to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-
-        if action_type < 0.1:
+        before_rotation = np.random.randint(0, 2)
+        after_rotation = np.random.randint(0, 2)
+        
+        if action_type < 0.05:
             # there might be actions that does not pick any objects
             # or actions that does not pick long objects from the middle position
             from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
@@ -571,11 +578,38 @@ class BlocksWorld_v4(BlocksWorld):
 
                 from_idx = self.get_obj_location(obj_1)
                 to_idx = self.get_obj_location(obj_2)
+            
+            action_type = np.random.rand()
+            
+            if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
+                action_type = np.random.rand()
+                if action_type < 0.5:
+                    print("hold edge", self.obj_types[self.obj_dict[obj_1]])
+                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
+                    delta = np.random.choice([1,-1])
+                    axis = 1
+                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
+                        axis = 0
+                    from_idx[axis] += delta
+                    to_idx[axis] += delta
 
-            # TODO: find object locations and sample actions accordingly
+                    from_idx = np.clip(from_idx, 0, self.segments-1)
+                    to_idx = np.clip(to_idx, 0, self.segments-1)
+                    #not having this adds too much uncertainty
+                    # after_rotation = 0
+            if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
+                action_type = np.random.rand()
+                if action_type < 0.5:
+                    print("put edge")
+                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
+                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
+                        to_idx[1] += np.random.choice([1 ,-1])
+                    else:
+                        to_idx[0] += np.random.choice([1,-1])
+                    to_idx = np.clip(to_idx, 0, self.segments-1)
 
-        before_rotation = np.random.randint(0, 2)
-        after_rotation = np.random.randint(0, 2)
+
+        print((from_idx, to_idx, before_rotation, after_rotation))
         return (from_idx, to_idx, before_rotation, after_rotation)
 
 
