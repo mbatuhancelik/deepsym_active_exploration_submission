@@ -73,9 +73,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
                       [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
         sample["action"] = a
         sample["effect"] = self.effect[idx]
-        permutation = torch.randperm(self.mask[idx])
-        sample["effect"][:self.mask[idx]] = sample["effect"][permutation]
-        sample["state"][:self.mask[idx]] = sample["state"][permutation]
+        # permutation = torch.randperm(self.mask[idx])
+        # sample["effect"][:self.mask[idx]] = sample["effect"][permutation]
+        # sample["state"][:self.mask[idx]] = sample["state"][permutation]
 
         mask = torch.zeros(sample["state"].shape[0])
         mask[:self.mask[idx]] = 1.0

@@ -78,11 +78,13 @@ class BlocksWorld(GenericEnv):
         self._step(40)
         self.agent.open_gripper(1, sleep=True)
 
-    def reset_objects(self):
+    def delete_objects(self):
         for key in self.obj_dict:
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
         self.obj_dict = {}
+    def reset_objects(self):
+        self.delete_objects()
         self.init_objects()
         self._step(240)
 
@@ -356,6 +358,45 @@ class BlocksWorld_v4(BlocksWorld):
                       [5*single_size, 0.025, single_size]]
         super(BlocksWorld_v4, self).__init__(**kwargs)
 
+    def create_object_from_db(self, state_row):
+        obj_type = state_row[-1]
+        position = [state_row[0], state_row[1], state_row[2]]
+
+        size = copy.deepcopy(self.sizes[0])
+        if obj_type == 4:
+            size = self.sizes[1]
+        elif obj_type == 5:
+            size = self.sizes[2]
+        elif obj_type == 3:
+            size[2] = self.sizes[2][2]
+        # obj type is never 0
+        if obj_type == 0:
+            o_id = utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
+                                       size=size, position=position, rotation=state_row[3:-1],
+                                       mass=0.1, color="random")
+        elif obj_type == 1:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=state_row[3:-1],
+                                        mass=0.1, color="random"))
+        elif obj_type == 2:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
+                                        size=size, position=position, rotation=state_row[3:-1],
+                                        mass=0.1, color="random"))
+        elif obj_type == 3:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=state_row[3:-1],
+                                        mass=0.1, color="random"))
+        elif obj_type == 4:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=state_row[3:-1],
+                                        mass=0.1, color="random"))
+        elif obj_type == 5:
+            o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
+                                        size=size, position=position, rotation=state_row[3:-1],
+                                        mass=0.1, color="random"))
+        self.obj_dict[len(self.obj_dict)] = o_id
+        self.obj_types[o_id] = obj_type
+        return o_id
     def create_object(self, obj_type, xidx, yidx):
         """
         Add an object ot the world, without collusions
@@ -584,7 +625,6 @@ class BlocksWorld_v4(BlocksWorld):
             if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
                 action_type = np.random.rand()
                 if action_type < 0.5:
-                    print("hold edge", self.obj_types[self.obj_dict[obj_1]])
                     _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
                     delta = np.random.choice([1,-1])
                     axis = 1
@@ -600,7 +640,6 @@ class BlocksWorld_v4(BlocksWorld):
             if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
                 action_type = np.random.rand()
                 if action_type < 0.5:
-                    print("put edge")
                     _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
                     if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
                         to_idx[1] += np.random.choice([1 ,-1])
@@ -609,7 +648,6 @@ class BlocksWorld_v4(BlocksWorld):
                     to_idx = np.clip(to_idx, 0, self.segments-1)
 
 
-        print((from_idx, to_idx, before_rotation, after_rotation))
         return (from_idx, to_idx, before_rotation, after_rotation)
 
 
