@@ -6,16 +6,23 @@ from utils import preprocess
 
 
 class SymbolForwardDataset(torch.utils.data.Dataset):
-    def __init__(self, path, prefix):
-        self.precond = torch.load(os.path.join(path, prefix+"z_precond.pt"))
-        self.effect = torch.load(os.path.join(path, prefix+"z_effect.pt"))
+    def __init__(self, path, prefix, wandb = {}):
+        if len(wandb) == 0:
+            self.precond = torch.load(os.path.join(path, prefix+"Z.pt"))
+            self.effect = torch.load(os.path.join(path, prefix+"E.pt"))   
+        else:
+            self.precond = torch.load(wandb["Z"].name)
+            self.effect = torch.load(wandb["E"].name)
         self.mask = torch.load(os.path.join(path, prefix+"mask.pt"))
 
     def __len__(self):
         return len(self.precond)
 
     def __getitem__(self, idx):
-        return self.precond[idx], self.effect[idx], self.mask[idx]
+        
+        mask = torch.zeros(self.precond[idx].shape[0])
+        mask[:self.mask[idx]] = 1.0
+        return self.precond[idx], self.effect[idx], mask
 
 
 class StateActionEffectDataset(torch.utils.data.Dataset):
@@ -66,6 +73,10 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
                       [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
         sample["action"] = a
         sample["effect"] = self.effect[idx]
+        # permutation = torch.randperm(self.mask[idx])
+        # sample["effect"][:self.mask[idx]] = sample["effect"][permutation]
+        # sample["state"][:self.mask[idx]] = sample["state"][permutation]
+
         mask = torch.zeros(sample["state"].shape[0])
         mask[:self.mask[idx]] = 1.0
         sample["pad_mask"] = mask

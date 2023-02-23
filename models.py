@@ -275,6 +275,12 @@ class MultiDeepSym(DeepSymbolGenerator):
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L
+    def loss_with_pred(self, sample):
+        e_truth = sample["effect"].to(self.device)
+        _, e_pred = self.forward(sample)
+        mask = sample["pad_mask"].to(self.device).unsqueeze(2)
+        L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
+        return L, e_pred
 
 
 class MultiDeepSymMLP(MultiDeepSym):
