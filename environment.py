@@ -79,6 +79,7 @@ class BlocksWorld(GenericEnv):
         self.agent.open_gripper(1, sleep=True)
 
     def delete_objects(self):
+        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         for key in self.obj_dict:
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
@@ -322,12 +323,12 @@ class BlocksWorld_v3(BlocksWorld):
 
 
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self, segments=8, x_area=0.9, y_area=0.9, **kwargs):
-        self.traj_t = 1.5
+    def __init__(self, segments=6, x_area=0.8, y_area=0.8, **kwargs):
+        self.traj_t = 2
 
         print(kwargs)
         self.x_init = 0.5
-        self.y_init = -0.5
+        self.y_init = -0.4
 
         self.x_area = x_area
         self.y_area = y_area
@@ -336,14 +337,16 @@ class BlocksWorld_v4(BlocksWorld):
         self.x_locs = {}
         self.y_locs = {}
 
-        self.del_x = x_area / segments
-        self.del_y = y_area / segments
+        ds = 0.12
+        self.del_x = ds 
+        self.del_y = ds
 
         for i in range(segments):
             self.x_locs[i] = self.x_init + self.del_x * i
             self.y_locs[i] = self.y_init + self.del_y * i
-
-        single_size = 0.025
+        
+        for i, y in enumerate([-0.4, -0.28, -0.16, -0.04, 0.08, 0.2]):
+            self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
         if 'min_objects' not in kwargs:
@@ -353,15 +356,31 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
 
+        single_size = 0.025
         self.sizes = [[single_size, single_size, 0.05],
                       [single_size, 5*single_size, 0.025],
                       [5*single_size, 0.025, single_size]]
         super(BlocksWorld_v4, self).__init__(**kwargs)
+        z_line = 4.2499e-01
+        line_color = [1,1,0]
+        for i in range(segments):
+            self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
+                    [self.x_locs[i], self.y_locs[segments-1], z_line],
+                    lifeTime = 0,
+                    lineWidth = 0.25,
+                    lineColorRGB = line_color)
+            self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
+                    [self.x_locs[segments-1], self.y_locs[i], z_line],
+                    lifeTime = 0,
+                    lineWidth = 0.125,
+                    lineColorRGB = line_color)
 
     def create_object_from_db(self, state_row):
         obj_type = state_row[-1]
         position = [state_row[0], state_row[1], state_row[2]]
-
+        rotation = [state_row[3], state_row[4], state_row[5]]
+        if obj_type == 0:
+            return
         size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
             size = self.sizes[1]
@@ -372,27 +391,27 @@ class BlocksWorld_v4(BlocksWorld):
         # obj type is never 0
         if obj_type == 0:
             o_id = utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
-                                       size=size, position=position, rotation=state_row[3:-1],
+                                       size=size, position=position, rotation=rotation,
                                        mass=0.1, color="random")
         elif obj_type == 1:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=state_row[3:-1],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 2:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
-                                        size=size, position=position, rotation=state_row[3:-1],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 3:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=state_row[3:-1],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 4:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=state_row[3:-1],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 5:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=state_row[3:-1],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
@@ -416,7 +435,7 @@ class BlocksWorld_v4(BlocksWorld):
                  (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
             return -1
 
-        position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
+        position = [self.x_locs[xidx], self.y_locs[yidx], 0.45]
 
         size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
@@ -425,6 +444,8 @@ class BlocksWorld_v4(BlocksWorld):
             size = self.sizes[2]
         elif obj_type == 3:
             size[2] = self.sizes[2][2]
+        elif obj_type == 2:
+            size[1] = 0.05
 
         self.current_obj_locs[xidx][yidx].append(obj_type)
         if obj_type == 4:
@@ -526,7 +547,7 @@ class BlocksWorld_v4(BlocksWorld):
     def step(self, from_loc, to_loc, before_grip_rotation=0, after_grip_rotation=0, sleep=False):
         if self.gui == 0:
             sleep = False
-        correction_constant = 0.003
+        correction_constant = 0.0
         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
         from_pos = [self.x_locs[from_loc[0]] + correction_constant, self.y_locs[from_loc[1]], 0.41]
         from_top_pos = from_pos[:2] + [1.0]
@@ -622,19 +643,19 @@ class BlocksWorld_v4(BlocksWorld):
             
             action_type = np.random.rand()
             
-            if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
-                action_type = np.random.rand()
-                if action_type < 0.5:
-                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
-                    delta = np.random.choice([1,-1])
-                    axis = 1
-                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
-                        axis = 0
-                    from_idx[axis] += delta
-                    to_idx[axis] += delta
+            # if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
+            #     action_type = np.random.rand()
+            #     if action_type < 0.5:
+            #         _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
+            #         delta = np.random.choice([1,-1])
+            #         axis = 1
+            #         if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
+            #             axis = 0
+            #         from_idx[axis] += delta
+            #         to_idx[axis] += delta
 
-                    from_idx = np.clip(from_idx, 0, self.segments-1)
-                    to_idx = np.clip(to_idx, 0, self.segments-1)
+            #         from_idx = np.clip(from_idx, 0, self.segments-1)
+            #         to_idx = np.clip(to_idx, 0, self.segments-1)
                     #not having this adds too much uncertainty
                     # after_rotation = 0
             if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
