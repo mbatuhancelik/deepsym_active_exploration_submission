@@ -1,4 +1,3 @@
-import torch
 import copy
 import pybullet
 import pybullet_data
@@ -84,6 +83,7 @@ class BlocksWorld(GenericEnv):
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
         self.obj_dict = {}
+
     def reset_objects(self):
         self.delete_objects()
         self.init_objects()
@@ -338,13 +338,13 @@ class BlocksWorld_v4(BlocksWorld):
         self.y_locs = {}
 
         ds = 0.12
-        self.del_x = ds 
+        self.del_x = ds
         self.del_y = ds
 
         for i in range(segments):
             self.x_locs[i] = self.x_init + self.del_x * i
             self.y_locs[i] = self.y_init + self.del_y * i
-        
+
         for i, y in enumerate([-0.4, -0.28, -0.16, -0.04, 0.08, 0.2]):
             self.y_locs[i] = y
         # TODO: ADD GRAPH
@@ -362,18 +362,18 @@ class BlocksWorld_v4(BlocksWorld):
                       [5*single_size, 0.025, single_size]]
         super(BlocksWorld_v4, self).__init__(**kwargs)
         z_line = 4.2499e-01
-        line_color = [1,1,0]
+        line_color = [1, 1, 0]
         for i in range(segments):
             self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
-                    [self.x_locs[i], self.y_locs[segments-1], z_line],
-                    lifeTime = 0,
-                    lineWidth = 0.25,
-                    lineColorRGB = line_color)
+                                     [self.x_locs[i], self.y_locs[segments-1], z_line],
+                                     lifeTime=0,
+                                     lineWidth=0.25,
+                                     lineColorRGB=line_color)
             self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
-                    [self.x_locs[segments-1], self.y_locs[i], z_line],
-                    lifeTime = 0,
-                    lineWidth = 0.125,
-                    lineColorRGB = line_color)
+                                     [self.x_locs[segments-1], self.y_locs[i], z_line],
+                                     lifeTime=0,
+                                     lineWidth=0.125,
+                                     lineColorRGB=line_color)
 
     def create_object_from_db(self, state_row):
         obj_type = state_row[-1]
@@ -416,6 +416,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
+
     def create_object(self, obj_type, xidx, yidx):
         """
         Add an object ot the world, without collusions
@@ -487,7 +488,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    
+
     def init_objects(self):
         '''
         obj_tpes index:
@@ -505,7 +506,6 @@ class BlocksWorld_v4(BlocksWorld):
         # obj_types = [4 for i in range(self.num_objects)]
         obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
-        
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
@@ -562,7 +562,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.close_gripper(self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        if after_grip_rotation != 0: 
+        if after_grip_rotation != 0:
             if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
                 target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
             else:
@@ -619,7 +619,7 @@ class BlocksWorld_v4(BlocksWorld):
         from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
         before_rotation = np.random.randint(0, 2)
         after_rotation = np.random.randint(0, 2)
-        
+
         if action_type < 0.05:
             # there might be actions that does not pick any objects
             # or actions that does not pick long objects from the middle position
@@ -640,9 +640,9 @@ class BlocksWorld_v4(BlocksWorld):
 
                 from_idx = self.get_obj_location(obj_1)
                 to_idx = self.get_obj_location(obj_2)
-            
+
             action_type = np.random.rand()
-            
+
             # if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
             #     action_type = np.random.rand()
             #     if action_type < 0.5:
@@ -656,19 +656,17 @@ class BlocksWorld_v4(BlocksWorld):
 
             #         from_idx = np.clip(from_idx, 0, self.segments-1)
             #         to_idx = np.clip(to_idx, 0, self.segments-1)
-                    #not having this adds too much uncertainty
-                    # after_rotation = 0
-            if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
+            # not having this adds too much uncertainty
+            # after_rotation = 0
+            if self.obj_types[self.obj_dict[obj_2]] in [4, 5]:
                 action_type = np.random.rand()
                 if action_type < 0.5:
                     _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
-                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
-                        to_idx[1] += np.random.choice([1 ,-1])
+                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1]) < 0.5):
+                        to_idx[1] += np.random.choice([1, -1])
                     else:
-                        to_idx[0] += np.random.choice([1,-1])
+                        to_idx[0] += np.random.choice([1, -1])
                     to_idx = np.clip(to_idx, 0, self.segments-1)
-
-
         return (from_idx, to_idx, before_rotation, after_rotation)
 
 
