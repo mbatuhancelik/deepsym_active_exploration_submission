@@ -10,7 +10,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
 from torchvision import transforms
-from torch.nn.utils.rnn import pad_sequence
 
 import blocks
 import models
@@ -52,7 +51,8 @@ def create_model_from_config(config):
     # create the projector
     projector = torch.nn.Linear(config["latent_dim"]+config["action_dim"], config["hidden_dim"])
     # create the transformer
-    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"], batch_first=True)
+    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"],
+                                             batch_first=True)
     transformer = torch.nn.TransformerEncoder(layer, num_layers=config["n_attention_layers"])
     # create the decoder
     dec_layers = [config["hidden_dim"]]*(config["n_hidden_layers"]+1) + [config["effect_dim"]]
