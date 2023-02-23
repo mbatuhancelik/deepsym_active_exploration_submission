@@ -69,7 +69,7 @@ def create_model_from_config(config):
     wandb.watch(decoder, log="all")
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
-                                   device=config["device"], lr=config["lr"], path=config["save_folder"], coeff=1.0)
+                                   device=config["device"], lr=config["lr"], path=config["save_folder"], coeff=config["coeff"])
 
     return model
 
