@@ -328,7 +328,7 @@ class BlocksWorld_v4(BlocksWorld):
 
         print(kwargs)
         self.x_init = 0.5
-        self.y_init = -0.4
+        self.y_init = -0.28
 
         self.x_area = x_area
         self.y_area = y_area
@@ -345,7 +345,7 @@ class BlocksWorld_v4(BlocksWorld):
             self.x_locs[i] = self.x_init + self.del_x * i
             self.y_locs[i] = self.y_init + self.del_y * i
         
-        for i, y in enumerate([-0.4, -0.28, -0.16, -0.04, 0.08, 0.2]):
+        for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
             self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
@@ -361,19 +361,26 @@ class BlocksWorld_v4(BlocksWorld):
                       [single_size, 5*single_size, 0.025],
                       [5*single_size, 0.025, single_size]]
         super(BlocksWorld_v4, self).__init__(**kwargs)
-        z_line = 4.2499e-01
-        line_color = [1,1,0]
-        for i in range(segments):
-            self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
-                    [self.x_locs[i], self.y_locs[segments-1], z_line],
-                    lifeTime = 0,
-                    lineWidth = 0.25,
-                    lineColorRGB = line_color)
-            self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
-                    [self.x_locs[segments-1], self.y_locs[i], z_line],
-                    lifeTime = 0,
-                    lineWidth = 0.125,
-                    lineColorRGB = line_color)
+        line_x_color = [0,0,1]
+        line_y_color = [1,0,1]
+        for z_line in  [1, 4.2499e-01]:
+            for i in range(segments):
+                self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
+                        [self.x_locs[i], self.y_locs[segments-1], z_line],
+                        lifeTime = 0,
+                        lineWidth = 0.25,
+                        lineColorRGB = line_x_color)
+                self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
+                        [self.x_locs[segments-1], self.y_locs[i], z_line],
+                        lifeTime = 0,
+                        lineWidth = 0.125,
+                        lineColorRGB = line_y_color)
+            line_x_color = [1,0.5,0]
+            line_y_color = [1,0,0]
+        self.x_loc = 0
+        self.y_loc = 0
+        self.rot = [np.pi, 0, 0]
+        self.go_to_location()
 
     def create_object_from_db(self, state_row):
         obj_type = state_row[-1]
@@ -543,42 +550,80 @@ class BlocksWorld_v4(BlocksWorld):
         self.clusters = clusters
 
         return self.contact_graph, self.clusters
-
-    def step(self, from_loc, to_loc, before_grip_rotation=0, after_grip_rotation=0, sleep=False):
+    def get_pos(self):
+        return [self.x_locs[self.x_loc], self.y_locs[self.y_loc], 1]
+    def get_ground_pos(self):
+        pos = self.get_pos()
+        pos[2] = 0.41
+        return pos
+    def get_quat(self):
+        return self._p.getQuaternionFromEuler(self.rot)
+    def go_to_location(self, sleep = False):
+        self.agent.move_in_cartesian(self.get_pos(), orientation=self.rot, t=self.traj_t, sleep=sleep)
+    def grep(self,sleep = False):
+        self.step(12, sleep)
+    def release(self,sleep = False):
+        self.step(13, sleep)
+    def go(self,x,y,sleep = False):
+        if x >= self.segments or y>=self.segments:
+            raise Exception("invalid location")
+        self.step(x, sleep)
+        self.step(y + 6, sleep)
+    def go_and_grep(self,x,y,sleep = False):
+        self.go(x,y,sleep=sleep)
+        self.step(12)
+    def go_and_put(self,x,y,sleep = False):
+        self.go(x,y,sleep=sleep)
+        self.step(13, sleep)
+    def step(self, action, sleep=False):
+        #grip type == 0 => hold
+        #grip type == 1 => put
         if self.gui == 0:
             sleep = False
-        correction_constant = 0.0
-        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = [self.x_locs[from_loc[0]] + correction_constant, self.y_locs[from_loc[1]], 0.41]
-        from_top_pos = from_pos[:2] + [1.0]
-        to_pos = [self.x_locs[to_loc[0]] + correction_constant, self.y_locs[to_loc[1]], 0.41]
-        to_top_pos = to_pos[:2] + [1.0]
-
+        #grep
+        if action == 12:
+            self.agent.open_gripper(self.traj_t, sleep=sleep)
+            self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            self.agent.close_gripper(self.traj_t, sleep=sleep)
+        #release
+        elif action == 13:
+            self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            self.agent.open_gripper(self.traj_t, sleep=sleep)
+        #rotate
+        elif action == 14:
+            self.rot[2] += np.pi / 2 
+        elif action == 15:
+            self.rot[2] -= np.pi / 2 
+        #move in x direction
+        elif action < 6:
+            self.x_loc = action
+        #move in y direction
+        elif action < 12:
+            self.y_loc = action - 6
+            
+        
+        self.agent.move_in_cartesian(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
         before_pose, types = self.state_obj_poses_and_types()
-        if before_grip_rotation != 0:
-            target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
-        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=False, sleep=sleep)
-        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        if after_grip_rotation != 0: 
-            if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
-                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
-            else:
-                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.open_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.init_agent_pose(t=1.5, sleep=sleep)
+
+        # if after_grip_rotation != 0: 
+        #     if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
+        #         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
+        #     else:
+        #         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
+        # self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        # self.agent.open_gripper(self.traj_t, sleep=sleep)
+        # self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
+        # self.init_agent_pose(t=1.5, sleep=sleep)
         after_pose, types = self.state_obj_poses_and_types()
         effect = after_pose - before_pose
 
         object_id = -1
-        if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
-            object_id = self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
-            self.current_obj_locs[to_loc[0]][to_loc[1]].append(object_id)
-        self.create_contact_graph()
+        # if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
+        #     object_id = self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
+        #     self.current_obj_locs[to_loc[0]][to_loc[1]].append(object_id)
+        # self.create_contact_graph()
         return effect, types
 
     def state_obj_poses_and_types(self):
