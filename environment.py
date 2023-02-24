@@ -571,11 +571,12 @@ class BlocksWorld_v4(BlocksWorld):
         self.step(y + 6, sleep)
     def go_and_grep(self,x,y,sleep = False):
         self.go(x,y,sleep=sleep)
-        self.step(12)
+        self.step(12, sleep)
     def go_and_put(self,x,y,sleep = False):
         self.go(x,y,sleep=sleep)
         self.step(13, sleep)
     def step(self, action, sleep=False):
+        before_pose, types = self.state_obj_poses_and_types()
         #grip type == 0 => hold
         #grip type == 1 => put
         if self.gui == 0:
@@ -605,17 +606,6 @@ class BlocksWorld_v4(BlocksWorld):
             
         
         self.agent.move_in_cartesian(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-        before_pose, types = self.state_obj_poses_and_types()
-
-        # if after_grip_rotation != 0: 
-        #     if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
-        #         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
-        #     else:
-        #         target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        # self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        # self.agent.open_gripper(self.traj_t, sleep=sleep)
-        # self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        # self.init_agent_pose(t=1.5, sleep=sleep)
         after_pose, types = self.state_obj_poses_and_types()
         effect = after_pose - before_pose
 
