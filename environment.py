@@ -512,7 +512,6 @@ class BlocksWorld_v4(BlocksWorld):
         # obj_types = [4 for i in range(self.num_objects)]
         obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
-        
 
         self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
@@ -529,7 +528,6 @@ class BlocksWorld_v4(BlocksWorld):
         self.create_contact_graph()
 
     def create_contact_graph(self):
-        positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
 
         clusters = []
@@ -618,12 +616,15 @@ class BlocksWorld_v4(BlocksWorld):
 
     def state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
-        pose = np.zeros((N_obj, 6), dtype=np.float32)
+        pose = np.zeros((N_obj, 9), dtype=np.float32)
         obj_types = np.zeros((N_obj), dtype=np.int8)
         for i in range(N_obj):
             position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
             pose[i][:3] = position
-            pose[i][3:] = self._p.getEulerFromQuaternion(quaternion)
+            euler_angles = self._p.getEulerFromQuaternion(quaternion)
+            pose[i][3:] = [np.cos(euler_angles[0]), np.sin(euler_angles[0]),
+                           np.cos(euler_angles[1]), np.sin(euler_angles[1]),
+                           np.cos(euler_angles[2]), np.sin(euler_angles[2])]
             obj_types[i] = self.obj_types[self.obj_dict[i]]
 
         return pose, obj_types
