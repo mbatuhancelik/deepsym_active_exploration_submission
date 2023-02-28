@@ -337,7 +337,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.x_locs = {}
         self.y_locs = {}
 
-        ds = 0.12
+        ds = 0.1
         self.del_x = ds 
         self.del_y = ds
 
@@ -345,8 +345,8 @@ class BlocksWorld_v4(BlocksWorld):
             self.x_locs[i] = self.x_init + self.del_x * i
             self.y_locs[i] = self.y_init + self.del_y * i
         
-        for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
-            self.y_locs[i] = y
+        # for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
+        #     self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
         if 'min_objects' not in kwargs:
@@ -379,8 +379,9 @@ class BlocksWorld_v4(BlocksWorld):
             line_y_color = [1,0,0]
         self.x_loc = 0
         self.y_loc = 0
-        self.rot = [np.pi, 0, 0]
+        self.rot = np.array([1.0,0.0,0.0])
         self.go_to_location()
+        self.previous_action = 0
 
     def create_object_from_db(self, state_row):
         obj_type = state_row[-1]
@@ -526,9 +527,9 @@ class BlocksWorld_v4(BlocksWorld):
                 continue
 
             i += 1
-        self.create_contact_graph()
+        self.update_contact_graph()
 
-    def create_contact_graph(self):
+    def update_contact_graph(self):
         positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
 
@@ -557,9 +558,9 @@ class BlocksWorld_v4(BlocksWorld):
         pos[2] = 0.41
         return pos
     def get_quat(self):
-        return self._p.getQuaternionFromEuler(self.rot)
+        return self._p.getQuaternionFromEuler(self.rot * np.pi)
     def go_to_location(self, sleep = False):
-        self.agent.move_in_cartesian(self.get_pos(), orientation=self.rot, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
     def grep(self,sleep = False):
         self.step(12, sleep)
     def release(self,sleep = False):
@@ -584,19 +585,19 @@ class BlocksWorld_v4(BlocksWorld):
         #grep
         if action == 12:
             self.agent.open_gripper(self.traj_t, sleep=sleep)
-            self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            # self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
             self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
             self.agent.close_gripper(self.traj_t, sleep=sleep)
         #release
         elif action == 13:
-            self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+            # self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
             self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
             self.agent.open_gripper(self.traj_t, sleep=sleep)
         #rotate
         elif action == 14:
-            self.rot[2] += np.pi / 2 
+            self.rot[2] = 0.5
         elif action == 15:
-            self.rot[2] -= np.pi / 2 
+            self.rot[2] = 0 
         #move in x direction
         elif action < 6:
             self.x_loc = action
@@ -609,11 +610,8 @@ class BlocksWorld_v4(BlocksWorld):
         after_pose, types = self.state_obj_poses_and_types()
         effect = after_pose - before_pose
 
-        object_id = -1
-        # if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
-        #     object_id = self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
-        #     self.current_obj_locs[to_loc[0]][to_loc[1]].append(object_id)
-        # self.create_contact_graph()
+        self.update_contact_graph()
+        self.previous_action = action
         return effect, types
 
     def state_obj_poses_and_types(self):
@@ -650,15 +648,23 @@ class BlocksWorld_v4(BlocksWorld):
 
     def sample_random_action(self):
         action_type = np.random.rand()
-        to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        before_rotation = np.random.randint(0, 2)
-        after_rotation = np.random.randint(0, 2)
-        
-        if action_type < 0.05:
+        action_seq = []
+        if action_type < 1:
             # there might be actions that does not pick any objects
             # or actions that does not pick long objects from the middle position
             from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
+            action_seq.append(from_idx[0])
+            action_seq.append(from_idx[1] + 6)
+            action_seq.append(12)
+            x = np.random.randint(self.segments)
+            y = np.random.randint(self.segments)
+            action_seq.append(x)
+            action_seq.append(y + 6)
+            rotate = np.random.rand()
+            # if rotate > 0.5:
+            action_seq.append(np.random.randint(14,16))
+            action_seq.append(13)
+                #move in y
             # TODO: perform object location change operations instead of this
         else:
             possible_actions = []
@@ -704,7 +710,7 @@ class BlocksWorld_v4(BlocksWorld):
                     to_idx = np.clip(to_idx, 0, self.segments-1)
 
 
-        return (from_idx, to_idx, before_rotation, after_rotation)
+        return action_seq
 
 
 class PushEnv(GenericEnv):
