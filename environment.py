@@ -338,6 +338,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.y_locs = {}
 
         ds = 0.1
+        self.ds = ds
         self.del_x = ds 
         self.del_y = ds
 
@@ -360,27 +361,24 @@ class BlocksWorld_v4(BlocksWorld):
         self.sizes = [[single_size, single_size, 0.05],
                       [single_size, 5*single_size, 0.025],
                       [5*single_size, 0.025, single_size]]
+        self.debug_items = []
         super(BlocksWorld_v4, self).__init__(**kwargs)
-        line_x_color = [0,0,1]
-        line_y_color = [1,0,1]
-        for z_line in  [1, 4.2499e-01]:
-            for i in range(segments):
-                self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
-                        [self.x_locs[i], self.y_locs[segments-1], z_line],
-                        lifeTime = 0,
-                        lineWidth = 0.25,
-                        lineColorRGB = line_x_color)
-                self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
-                        [self.x_locs[segments-1], self.y_locs[i], z_line],
-                        lifeTime = 0,
-                        lineWidth = 0.125,
-                        lineColorRGB = line_y_color)
-            line_x_color = [1,0.5,0]
-            line_y_color = [1,0,0]
-        self.x_loc = 0
-        self.y_loc = 0
-        self.rot = np.array([1.0,0.0,0.0])
-        self.go_to_location()
+        # line_x_color = [0,0,1]
+        # line_y_color = [1,0,1]
+        # for z_line in  [1, 4.2499e-01]:
+        #     for i in range(segments):
+        #         self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
+        #                 [self.x_locs[i], self.y_locs[segments-1], z_line],
+        #                 lifeTime = 0,
+        #                 lineWidth = 0.25,
+        #                 lineColorRGB = line_x_color)
+        #         self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
+        #                 [self.x_locs[segments-1], self.y_locs[i], z_line],
+        #                 lifeTime = 0,
+        #                 lineWidth = 0.125,
+        #                 lineColorRGB = line_y_color)
+        #     line_x_color = [1,0.5,0]
+        #     line_y_color = [1,0,0]
         self.previous_action = 0
 
     def create_object_from_db(self, state_row):
@@ -495,7 +493,6 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    
     def init_objects(self):
         '''
         obj_tpes index:
@@ -556,61 +553,78 @@ class BlocksWorld_v4(BlocksWorld):
         pos = self.get_pos()
         pos[2] = 0.41
         return pos
-    def get_quat(self):
-        return self._p.getQuaternionFromEuler(self.rot * np.pi)
-    def go_to_location(self, sleep = False):
-        self.agent.move_in_cartesian(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-    def grep(self,sleep = False):
-        self.step(12, sleep)
-    def release(self,sleep = False):
-        self.step(13, sleep)
-    def go(self,x,y,sleep = False):
-        if x >= self.segments or y>=self.segments:
-            raise Exception("invalid location")
-        self.step(x, sleep)
-        self.step(y + 6, sleep)
-    def go_and_grep(self,x,y,sleep = False):
-        self.go(x,y,sleep=sleep)
-        self.step(12, sleep)
-    def go_and_put(self,x,y,sleep = False):
-        self.go(x,y,sleep=sleep)
-        self.step(13, sleep)
-    def step(self, action, sleep=False):
-        before_pose, types = self.state_obj_poses_and_types()
-        #grip type == 0 => hold
-        #grip type == 1 => put
-        if self.gui == 0:
-            sleep = False
-        #grep
-        if action == 12:
-            self.agent.open_gripper(self.traj_t, sleep=sleep)
-            # self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-            self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-            self.agent.close_gripper(self.traj_t, sleep=sleep)
-        #release
-        elif action == 13:
-            # self.agent.set_cartesian_position(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-            self.agent.move_in_cartesian(self.get_ground_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
-            self.agent.open_gripper(self.traj_t, sleep=sleep)
-        #rotate
-        elif action == 14:
-            self.rot[2] = 0.5
-        elif action == 15:
-            self.rot[2] = 0 
-        #move in x direction
-        elif action < 6:
-            self.x_loc = action
-        #move in y direction
-        elif action < 12:
-            self.y_loc = action - 6
-            
+    def remove_grid(self):
+        for line in self.debug_items:
+            self._p.removeUserDebugItem(line)
+        self.debug_items = []
+    def print_grid(self, location):
+        line_x_color = [0,0,1]
+        line_y_color = [1,0,1]
+        x = location[0]
+        y = location[1]
+        z = location[2]
+        for i in [-1,0,1]:
+            id1 = self._p.addUserDebugLine([x + self.ds * i, y + self.ds, z],
+                    [x + self.ds * i , y -self.ds , z],
+                    lifeTime = 0,
+                    lineWidth = 0.25,
+                    lineColorRGB = line_x_color)
+            id2 = self._p.addUserDebugLine([x + self.ds, y + self.ds * i, z],
+                    [x - self.ds , y + self.ds * i , z],
+                    lifeTime = 0,
+                    lineWidth = 0.125,
+                    lineColorRGB = line_y_color)
+            self.debug_items.append(id1)
+            self.debug_items.append(id2)
+    def step(self, obj1_id, obj2_id,dx1, dy1,dx2, dy2,grap_angle,put_angle ,sleep=False):
         
-        self.agent.move_in_cartesian(self.get_pos(), orientation=self.get_quat(), t=self.traj_t, sleep=sleep)
+        obj1_loc , quat= self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
+        obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
+
+        # use these if you want to ensure grapping
+        # euler_rot = self._p.getEulerFromQuaternion(quat)
+        # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
+        
+        approach_angle1 = [np.pi, 0 , 0]
+        approach_angle2 = [np.pi, 0 , 0]
+        if grap_angle:
+            approach_angle1 = [np.pi, 0 , np.pi/2]
+        if put_angle:
+            approach_angle2 = [np.pi, 0 , np.pi/2]
+        quat1 = self._p.getQuaternionFromEuler(approach_angle1)
+        quat2 = self._p.getQuaternionFromEuler(approach_angle2)
+
+        obj1_loc = list(obj1_loc)
+        obj2_loc = list(obj2_loc)
+        if sleep:
+            self.remove_grid()
+            self.print_grid(obj1_loc)
+            self.print_grid(obj2_loc)
+        obj1_loc[0] += dx1 * self.ds 
+        obj2_loc[0] += dx2 * self.ds
+        obj1_loc[1] += dy1 * self.ds
+        obj2_loc[1] += dy2 * self.ds
+
+        up_pos_1 = copy.deepcopy(obj1_loc)
+        up_pos_1[2] = 1
+        
+        up_pos_2 = copy.deepcopy(obj2_loc)
+        up_pos_2[2] = 1
+
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.close_gripper(sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        before_pose, types = self.state_obj_poses_and_types()
+        self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.open_gripper()
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
         after_pose, types = self.state_obj_poses_and_types()
         effect = after_pose - before_pose
 
         self.update_contact_graph()
-        self.previous_action = action
         return effect, types
 
     def state_obj_poses_and_types(self):
