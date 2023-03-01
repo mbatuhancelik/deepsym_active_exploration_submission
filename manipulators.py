@@ -62,20 +62,20 @@ class Manipulator:
             targetOrientation=orientation)
         self.set_joint_position(target_joints[:-2], t=t, sleep=sleep, traj=traj)
 
-    def move_in_cartesian(self, position, orientation=None, t=1.0, sleep=False, ignore_force=False):
+    def move_in_cartesian(self, position, orientation, t=1.0, sleep=False, ignore_force=False):
         N = int(t * 240)
 
         current_position, current_orientation = self.get_tip_pose()
 
         position_traj = np.linspace(current_position, position, N+1)[1:]
-
+        orientation_traj = np.linspace(current_orientation, orientation, N+1)[1:]
         running_force_feedback = np.zeros(8, dtype=np.float)
         for i, p_i in enumerate(position_traj):
             target_joints = self._p.calculateInverseKinematics(
                 bodyUniqueId=self.id,
                 endEffectorLinkIndex=self.ik_idx,
                 targetPosition=p_i,
-                targetOrientation=orientation)
+                targetOrientation=orientation_traj[i])
             self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
             force_feedback = np.array(self.get_joint_forces())
             running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
