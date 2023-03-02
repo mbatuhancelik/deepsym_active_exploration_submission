@@ -399,7 +399,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    def create_object(self, obj_type, x, y, z = 0.42):
+    def create_object(self, obj_type, x, y, z = 0.5):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
@@ -413,7 +413,7 @@ class BlocksWorld_v4(BlocksWorld):
             size = self.sizes[1]
         elif obj_type == 5:
             size = self.sizes[2]
-        elif obj_type == 3:
+        elif obj_type == 1:
             size[2] = self.sizes[2][2]
         elif obj_type == 2:
             size[1] = 0.05
@@ -453,10 +453,11 @@ class BlocksWorld_v4(BlocksWorld):
             0 : sphere
             1 : box
             2 : cylinder
-            3 : short box
+            3 : tall
             4 : long box
             5 : long box rotated
         '''
+        self.obj_buffer = []
         self.obj_types = {}
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         # self.num_objects = 1
@@ -472,7 +473,7 @@ class BlocksWorld_v4(BlocksWorld):
             obj_type = obj_types[i]
             x = np.random.uniform(0.3, 1.1)
             y = np.random.uniform(-0.7, 0.7)
-            z = 0.41
+            z = 0.43
             pos = np.array([[x,y]])
             if np.sqrt(np.sum(pos ** 2)) > 1.2:
                 trials += 1
@@ -636,7 +637,7 @@ class BlocksWorld_v4(BlocksWorld):
         rot_after = 1 if probs[5] < 0.5 else 0
         return [obj1, obj2, dx1,dy1,dx2,dy2, rot_before,rot_after]
         # return [obj1, obj2, 0,0,0,0, 0,0]
-    def sample_2_objects_moving_together(self):
+    def sample_3_objects_moving_together(self):
         long_objects = []
         smalls = []
 
@@ -649,7 +650,7 @@ class BlocksWorld_v4(BlocksWorld):
         long_object = random.choice(long_objects)
         small1 , small2 = random.choices(smalls,  k =2)
 
-        self.obj_buffer = []
+        
         act = self.sample_random_action()
         if long_object == 4:
             self.obj_buffer.append(
@@ -673,9 +674,24 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.obj_buffer.append(act)
         return self.obj_buffer
-
-
-        
+    def sample_ungrappable(self):
+        tall = 0
+        small = 0
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 3:
+                tall = i
+            elif self.obj_types[self.obj_dict[i]] < 3:
+                small = i
+        axis = random.random()
+        if axis < 0.5:
+            dx = np.random.choice([1,-1])
+            self.obj_buffer.append([tall,small, 0,0,dx,0, 0 , 0])
+            self.obj_buffer.append([small,np.random.randint(0,self.num_objects), 0,0,0,0, 1 , 0])
+        else:
+            dy = np.random.choice([1,-1])
+            self.obj_buffer.append([tall,small, 0,0,0,dy, 0 , 0])
+            self.obj_buffer.append([small,np.random.randint(0,self.num_objects), 0,0,0,0, 0 , 0])
+        return self.obj_buffer
 
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
