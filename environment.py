@@ -3,6 +3,7 @@ import copy
 import pybullet
 import pybullet_data
 import numpy as np
+import random 
 
 import utils
 import manipulators
@@ -474,11 +475,11 @@ class BlocksWorld_v4(BlocksWorld):
         '''
         self.obj_types = {}
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
-
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
+        obj_types = np.random.randint(1, 6, (self.num_objects - 5,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
+        obj_types = np.concatenate(([i for i in range(1, 6)], obj_types))
 
         i = 0
         positions = np.array([[0,0]])
@@ -651,6 +652,44 @@ class BlocksWorld_v4(BlocksWorld):
         rot_after = 1 if probs[5] < 0.5 else 0
         return [obj1, obj2, dx1,dy1,dx2,dy2, rot_before,rot_after]
         # return [obj1, obj2, 0,0,0,0, 0,0]
+    def sample_2_objects_moving_together(self):
+        long_objects = []
+        smalls = []
+
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 4:
+                long_objects.append(i)
+            else:
+                smalls.append(i)
+
+        long_object = random.choice(long_objects)
+        small1 , small2 = random.choices(smalls,  k =2)
+
+        self.obj_buffer = []
+        act = self.sample_random_action()
+        if long_object == 4:
+            self.obj_buffer.append(
+                [small1, long_object, 0, 0, 1, 0, 0 , 0]
+            )
+            self.obj_buffer.append(
+                [small2, long_object, 0, 0, -1, 0, 0 , 0]
+            )
+            act[6] = 0
+        else:
+            self.obj_buffer.append(
+                [small1, long_object, 0, 0, 0,1, 0 , 0]
+            )
+            self.obj_buffer.append(
+                [small2, long_object, 0, 0, 0,-1, 0 , 0]
+            )
+            act[6] = 1
+        act[2] = 0
+        act[3] = 0
+        act[0] = long_object
+
+        self.obj_buffer.append(act)
+        return self.obj_buffer
+
 
         
 
