@@ -79,7 +79,6 @@ class BlocksWorld(GenericEnv):
         self.agent.open_gripper(1, sleep=True)
 
     def delete_objects(self):
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         for key in self.obj_dict:
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
@@ -323,12 +322,12 @@ class BlocksWorld_v3(BlocksWorld):
 
 
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self, segments=6, x_area=0.8, y_area=0.8, **kwargs):
+    def __init__(self, segments=6, x_area=0.7, y_area=1.2, **kwargs):
         self.traj_t = 2
 
         print(kwargs)
         self.x_init = 0.5
-        self.y_init = -0.28
+        self.y_init = -0.5
         self.x_final = self.x_init + x_area
         self.y_final = self.y_init + y_area
 
@@ -415,14 +414,14 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    def create_object(self, obj_type, x, y):
+    def create_object(self, obj_type, x, y, z = 0.42):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
         return object id if possible
         """
 
-        position = [x, y, 0.42]
+        position = [x, y, z]
 
         size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
@@ -483,22 +482,31 @@ class BlocksWorld_v4(BlocksWorld):
 
         i = 0
         positions = np.array([[0,0]])
+        trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
-            x = np.random.uniform(self.x_init, self.x_final)
-            y = np.random.uniform(self.y_init, self.y_final)
+            x = np.random.uniform(0.3, 1.1)
+            y = np.random.uniform(-0.7, 0.7)
+            z = 0.41
             pos = np.array([[x,y]])
-            if np.any(np.sum( np.abs(positions**2 - pos ** 2), axis = -1) < 2 * self.ds):
+            if np.sqrt(np.sum(pos ** 2)) > 1.2:
+                trials += 1
                 continue
-            positions = np.concatenate([positions, pos])
-            overlap = self._p.getOverlappingObjects([x + self.del_x, y + self.del_y, 0.42],[x - self.del_x, y - self.del_y, 0.42])
-            if len(overlap) != 1:
-                continue
-            obj_id = self.create_object(obj_type, x, y)
+            if np.any(np.sum( np.abs(positions**2 - pos ** 2), axis = -1) < 2.5 * self.ds):
+                trials += 1
+                if trials > 10:
+                    z = 0.55
+                else:
+                    continue
+            trials = 0
+            obj_id = self.create_object(obj_type, x, y, z=z)
             if obj_id == -1:
                 continue
+            
+            positions = np.concatenate([positions, pos])
 
             i += 1
+        #TODO: prevent rolling on x y axises 
         self.update_contact_graph()
 
     def update_contact_graph(self):
@@ -628,71 +636,23 @@ class BlocksWorld_v4(BlocksWorld):
         return self.state_obj_poses_and_types()
 
     def sample_random_action(self):
-        action_type = np.random.rand()
-        action_seq = []
-        if action_type < 1:
-            # there might be actions that does not pick any objects
-            # or actions that does not pick long objects from the middle position
-            from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
-            action_seq.append(from_idx[0])
-            action_seq.append(from_idx[1] + 6)
-            action_seq.append(12)
-            x = np.random.randint(self.segments)
-            y = np.random.randint(self.segments)
-            action_seq.append(x)
-            action_seq.append(y + 6)
-            rotate = np.random.rand()
-            # if rotate > 0.5:
-            action_seq.append(np.random.randint(14,16))
-            action_seq.append(13)
-                #move in y
-            # TODO: perform object location change operations instead of this
-        else:
-            possible_actions = []
-            for i in range((self.num_objects)):
-                for k in range(i, (self.num_objects)):
-                    if self.clusters[k] != self.clusters[i]:
-                        possible_actions.append([i, k])
+        obj1 = np.random.randint(self.num_objects)
+        obj2 = np.random.randint(self.num_objects)
 
-            if len(possible_actions) != 0:
-                action = possible_actions[np.random.randint(0, len(possible_actions))]
+        probs = np.random.rand(6)
+        non_action_prob = 0.1
+        dx1 = 1 if probs[0] < non_action_prob else -1 if probs[0] > 1-non_action_prob else 0
+        dy1 = 1 if probs[1] < non_action_prob else -1 if probs[1] > 1-non_action_prob else 0
 
-                obj_1 = action[0]
-                obj_2 = action[1]
+        adjacency_prob = 0.4
+        dx2 = 1 if probs[2] < adjacency_prob else -1 if probs[2] > 1-adjacency_prob else 0
+        dy2 = 1 if probs[3] < adjacency_prob else -1 if probs[3] > 1-adjacency_prob else 0
+        rot_before = 1 if probs[4] < 0.5 else 0
+        rot_after = 1 if probs[5] < 0.5 else 0
+        return [obj1, obj2, dx1,dy1,dx2,dy2, rot_before,rot_after]
+        # return [obj1, obj2, 0,0,0,0, 0,0]
 
-                from_idx = self.get_obj_location(obj_1)
-                to_idx = self.get_obj_location(obj_2)
-            
-            action_type = np.random.rand()
-            
-            # if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
-            #     action_type = np.random.rand()
-            #     if action_type < 0.5:
-            #         _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
-            #         delta = np.random.choice([1,-1])
-            #         axis = 1
-            #         if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
-            #             axis = 0
-            #         from_idx[axis] += delta
-            #         to_idx[axis] += delta
-
-            #         from_idx = np.clip(from_idx, 0, self.segments-1)
-            #         to_idx = np.clip(to_idx, 0, self.segments-1)
-                    #not having this adds too much uncertainty
-                    # after_rotation = 0
-            if self.obj_types[self.obj_dict[obj_2]] in [4,5]:
-                action_type = np.random.rand()
-                if action_type < 0.5:
-                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
-                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
-                        to_idx[1] += np.random.choice([1 ,-1])
-                    else:
-                        to_idx[0] += np.random.choice([1,-1])
-                    to_idx = np.clip(to_idx, 0, self.segments-1)
-
-
-        return action_seq
-
+        
 
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
