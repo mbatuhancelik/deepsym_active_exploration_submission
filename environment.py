@@ -356,22 +356,6 @@ class BlocksWorld_v4(BlocksWorld):
         self.debug_items = []
 
         super(BlocksWorld_v4, self).__init__(**kwargs)
-        # line_x_color = [0,0,1]
-        # line_y_color = [1,0,1]
-        # for z_line in  [1, 4.2499e-01]:
-        #     for i in range(segments):
-        #         self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
-        #                 [self.x_locs[i], self.y_locs[segments-1], z_line],
-        #                 lifeTime = 0,
-        #                 lineWidth = 0.25,
-        #                 lineColorRGB = line_x_color)
-        #         self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
-        #                 [self.x_locs[segments-1], self.y_locs[i], z_line],
-        #                 lifeTime = 0,
-        #                 lineWidth = 0.125,
-        #                 lineColorRGB = line_y_color)
-        #     line_x_color = [1,0.5,0]
-        #     line_y_color = [1,0,0]
         self.previous_action = 0
 
     def create_object_from_db(self, state_row):
