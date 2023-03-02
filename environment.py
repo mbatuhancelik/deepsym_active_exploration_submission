@@ -329,22 +329,16 @@ class BlocksWorld_v4(BlocksWorld):
         print(kwargs)
         self.x_init = 0.5
         self.y_init = -0.28
+        self.x_final = self.x_init + x_area
+        self.y_final = self.y_init + y_area
 
         self.x_area = x_area
         self.y_area = y_area
-        self.segments = segments
-
-        self.x_locs = {}
-        self.y_locs = {}
 
         ds = 0.1
         self.ds = ds
         self.del_x = ds 
         self.del_y = ds
-
-        for i in range(segments):
-            self.x_locs[i] = self.x_init + self.del_x * i
-            self.y_locs[i] = self.y_init + self.del_y * i
         
         # for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
         #     self.y_locs[i] = y
@@ -355,13 +349,12 @@ class BlocksWorld_v4(BlocksWorld):
         if 'max_objects' not in kwargs:
             kwargs["max_objects"] = 13
 
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
-
         single_size = 0.025
         self.sizes = [[single_size, single_size, 0.05],
                       [single_size, 5*single_size, 0.025],
                       [5*single_size, 0.025, single_size]]
         self.debug_items = []
+
         super(BlocksWorld_v4, self).__init__(**kwargs)
         # line_x_color = [0,0,1]
         # line_y_color = [1,0,1]
@@ -422,26 +415,14 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    def create_object(self, obj_type, xidx, yidx):
+    def create_object(self, obj_type, x, y):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
         return object id if possible
         """
-        if (obj_type < 4) and (len(self.current_obj_locs[xidx][yidx]) > 0):
-            return -1
-        if ((obj_type == 4) and
-                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
-                 (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
-                 (len(self.current_obj_locs[xidx][min(3, yidx+1)]) > 0))):
-            return -1
-        if ((obj_type == 5) and
-                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
-                 (len(self.current_obj_locs[max(0, xidx-1)][yidx]) > 0) or
-                 (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
-            return -1
 
-        position = [self.x_locs[xidx], self.y_locs[yidx], 0.45]
+        position = [x, y, 0.42]
 
         size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
@@ -453,17 +434,6 @@ class BlocksWorld_v4(BlocksWorld):
         elif obj_type == 2:
             size[1] = 0.05
 
-        self.current_obj_locs[xidx][yidx].append(obj_type)
-        if obj_type == 4:
-            if yidx > 0:
-                self.current_obj_locs[xidx][yidx-1].append(obj_type)
-            if yidx < len(self.y_locs) - 1:
-                self.current_obj_locs[xidx][yidx+1].append(obj_type)
-        if obj_type == 5:
-            if xidx > 0:
-                self.current_obj_locs[xidx - 1][yidx].append(obj_type)
-            if xidx < len(self.x_locs) - 1:
-                self.current_obj_locs[xidx + 1][yidx].append(obj_type)
         o_id = -1
         # obj type is never 0
         if obj_type == 0:
@@ -511,14 +481,20 @@ class BlocksWorld_v4(BlocksWorld):
         obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
 
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
+        positions = np.array([[0,0]])
         while i < self.num_objects:
             obj_type = obj_types[i]
-            xidx = np.random.randint(0, len(self.x_locs))
-            yidx = np.random.randint(0, len(self.y_locs))
-
-            obj_id = self.create_object(obj_type, xidx, yidx)
+            x = np.random.uniform(self.x_init, self.x_final)
+            y = np.random.uniform(self.y_init, self.y_final)
+            pos = np.array([[x,y]])
+            if np.any(np.sum( np.abs(positions**2 - pos ** 2), axis = -1) < 2 * self.ds):
+                continue
+            positions = np.concatenate([positions, pos])
+            overlap = self._p.getOverlappingObjects([x + self.del_x, y + self.del_y, 0.42],[x - self.del_x, y - self.del_y, 0.42])
+            if len(overlap) != 1:
+                continue
+            obj_id = self.create_object(obj_type, x, y)
             if obj_id == -1:
                 continue
 
@@ -645,19 +621,8 @@ class BlocksWorld_v4(BlocksWorld):
     def get_obj_location(self, obj_id):
 
         position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_id])
-        rel_x = position[0] - self.x_init
-        x_index = rel_x / self.del_x
-        x_index = round(x_index)
 
-        rel_y = position[1] - self.y_init
-        y_index = round(rel_y / self.del_y)
-
-        x_index = min(x_index, self.segments - 1)
-        y_index = min(y_index, self.segments - 1)
-        x_index = max(0, x_index)
-        y_index = max(0, y_index)
-
-        return [x_index, y_index]
+        return position
 
     def state(self):
         return self.state_obj_poses_and_types()
