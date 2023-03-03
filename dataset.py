@@ -69,9 +69,14 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["state"] = self.state[idx]
         # just transforming the action into a binary vector
         # don't think too much about this
-        a = torch.cat([self._dec_to_bin[a_i.item()] for a_i in self.action[idx][:4]] +
-                      [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
-        sample["action"] = a
+        # a = torch.cat([self._dec_to_bin[a_i.item()] for a_i in self.action[idx][:4]] +
+                    #   [self.action[idx][4:]], dim=0).unsqueeze(0).repeat(sample["state"].shape[0], 1)
+        a = self.action[idx]
+        sample["action"] = torch.zeros((13, 8))
+        sample["action"][a[0]][0] = 1
+        sample["action"][a[1]][1] = 1
+        sample["action"][:,2:] = a[2:]
+        
         sample["effect"] = self.effect[idx]
         # permutation = torch.randperm(self.mask[idx])
         # sample["effect"][:self.mask[idx]] = sample["effect"][permutation]
