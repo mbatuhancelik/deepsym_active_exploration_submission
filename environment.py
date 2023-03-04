@@ -634,7 +634,7 @@ class BlocksWorld_v4(BlocksWorld):
             obj1 = np.random.randint(self.num_objects)
         probs = np.random.rand(8)
         dx1 , dy1, dx2, dy2  = 0,0,0,0
-        dxdy_pairs = [[0,0], [0,1], [1,0], [-1,0], [1,0], [-1,1], [-1,-1], [1,1], [1,-1]]
+        dxdy_pairs = [[0,0], [0,1], [1,0], [-1,0], [0,-1], [-1,1], [-1,-1], [1,1], [1,-1]]
         dxdy1 = np.random.choice(
             np.arange(len(dxdy_pairs)),
             p =[ 0.5] + [0.1] * 4 + [0.025] * 4
