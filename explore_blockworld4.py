@@ -11,7 +11,7 @@ from tqdm import tqdm
 buffer = []
 
 def collect_rollout(env):
-    position_a, types = env.state()
+    _ , types = env.state()
     action = 0
     global buffer
     if len(buffer) == 0:
@@ -19,7 +19,7 @@ def collect_rollout(env):
         buffer = buffer[1:]
     else:    
         action = env.sample_random_action()
-    effect, _ = env.step(*action)
+    position_a, effect, _ = env.step(*action)
     position_b, _ = env.state()
     return position_a, position_b, types, action, effect
 def populate_buffer(env):
@@ -48,14 +48,14 @@ if __name__ == "__main__":
     # how many objects are there in the scene
     masks = torch.zeros(args.N, dtype=torch.int)
     # (x_f-x_i, y_f-y_i, z_f-z_i, rx_f-rx_i, ry_f-ry_i, rz_f-rz_i)
-    effects = torch.zeros(args.N, env.max_objects, 9, dtype=torch.float)
+    effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
 
-    prog_it = args.N
+    prog_it = args.N // 100
     start = time.time()
     env_it = 0
     i = 0
     buffer = populate_buffer(env)
-    for i in tqdm(iter(range(args.N))):
+    while i < args.N:
         env_it += 1
         position_pre, position_after, obj_types, action, effect = collect_rollout(env)
         source, target, dx1, dy1, dx2, dy2, pre_rot, after_rot = action
