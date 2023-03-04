@@ -171,14 +171,14 @@ def create_tabletop(p):
     objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 1, 0.2],
                                      position=[0.9, 0, 0.2], color=[0.9, 0.9, 0.9, 1.0])
     # walls
-    # objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
-    #                                  position=[0.8, -0.5, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall2"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
-    #                                  position=[0.8, 0.5, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall3"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 0.5, 0.05],
-    #                                  position=[0.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall4"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 0.5, 0.05],
-    #                                  position=[1.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 0.01, 0.05],
+                                     position=[0.9, -1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall2"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 0.01, 0.05],
+                                    position=[0.9, 1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall3"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1, 0.05],
+                                     position=[0.2, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall4"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1, 0.05],
+                                    position=[1.6, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
     return objects
 
 
