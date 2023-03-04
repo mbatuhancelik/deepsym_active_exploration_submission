@@ -492,10 +492,14 @@ class BlocksWorld_v4(BlocksWorld):
             positions = np.concatenate([positions, pos])
 
             i += 1
+        self.cluster_centers = []
+        for i in range(np.random.randint(1,4)):
+            self.cluster_centers.append(np.random.randint(0,self.num_objects))
         #TODO: prevent rolling on x y axises 
         self.update_contact_graph()
 
     def update_contact_graph(self):
+        return
         positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
 
@@ -580,23 +584,23 @@ class BlocksWorld_v4(BlocksWorld):
         
         up_pos_2 = copy.deepcopy(obj2_loc)
         up_pos_2[2] = 1
-
+        state1 , types = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(sleep=sleep)
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         if put_angle:
             self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
+        state2, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
-        before_pose, types = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
-        after_pose, types = self.state_obj_poses_and_types()
-        effect = after_pose - before_pose
+        state3, _ = self.state_obj_poses_and_types()
+        effect = np.concatenate([state2 - state1, state3 - state2], axis = 1)
 
-        self.update_contact_graph()
-        return effect, types
+        self.init_agent_pose(1,.5)
+        return state1, effect, types
 
     def state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
@@ -624,16 +628,27 @@ class BlocksWorld_v4(BlocksWorld):
 
     def sample_random_action(self):
         obj1 = np.random.randint(self.num_objects)
-        obj2 = np.random.randint(self.num_objects)
+        obj2 = np.random.choice(self.cluster_centers)
 
-        probs = np.random.rand(6)
-        non_action_prob = 0.1
-        dx1 = 1 if probs[0] < non_action_prob else -1 if probs[0] > 1-non_action_prob else 0
-        dy1 = 1 if probs[1] < non_action_prob else -1 if probs[1] > 1-non_action_prob else 0
+        while obj1 in self.cluster_centers: 
+            obj1 = np.random.randint(self.num_objects)
+        probs = np.random.rand(8)
+        dx1 , dy1, dx2, dy2  = 0,0,0,0
+        dxdy_pairs = [[0,0], [0,1], [1,0], [-1,0], [1,0], [-1,1], [-1,-1], [1,1], [1,-1]]
+        dxdy1 = np.random.choice(
+            np.arange(len(dxdy_pairs)),
+            p =[ 0.5] + [0.1] * 4 + [0.025] * 4
+        )
+        dxdy2 = np.random.choice(
+            np.arange(len(dxdy_pairs)),
+            p =[ 0.5] + [0.1] * 4 + [0.025] * 4
+        )
 
-        adjacency_prob = 0.4
-        dx2 = 1 if probs[2] < adjacency_prob else -1 if probs[2] > 1-adjacency_prob else 0
-        dy2 = 1 if probs[3] < adjacency_prob else -1 if probs[3] > 1-adjacency_prob else 0
+
+        [dx2, dy2] = dxdy_pairs[dxdy2]
+        [dx1, dy1] = dxdy_pairs[dxdy1]
+
+
         rot_before = 1 if probs[4] < 0.5 else 0
         rot_after = 1 if probs[5] < 0.5 else 0
         return [obj1, obj2, dx1,dy1,dx2,dy2, rot_before,rot_after]
