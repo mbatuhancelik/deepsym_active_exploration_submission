@@ -493,7 +493,7 @@ class BlocksWorld_v4(BlocksWorld):
 
             i += 1
         self.cluster_centers = []
-        for i in range(np.random.randint(1,4)):
+        for i in range(np.random.randint(1,3)):
             self.cluster_centers.append(np.random.randint(0,self.num_objects))
         #TODO: prevent rolling on x y axises 
         self.update_contact_graph()
@@ -591,8 +591,8 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         if put_angle:
             self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
-        state2, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        state2, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
@@ -641,7 +641,7 @@ class BlocksWorld_v4(BlocksWorld):
         )
         dxdy2 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p =[ 0.5] + [0.1] * 4 + [0.025] * 4
+            p =[ 0.4] + [0.125] * 4 + [0.025] * 4
         )
 
 
