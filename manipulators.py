@@ -69,7 +69,7 @@ class Manipulator:
 
         position_traj = np.linspace(current_position, position, N+1)[1:]
         orientation_traj = np.linspace(current_orientation, orientation, N+1)[1:]
-        running_force_feedback = np.zeros(8, dtype=np.float)
+        running_force_feedback = np.zeros(8, dtype=np.float32)
         for i, p_i in enumerate(position_traj):
             target_joints = self._p.calculateInverseKinematics(
                 bodyUniqueId=self.id,
@@ -99,7 +99,7 @@ class Manipulator:
             N = int(t * 240)
             current_position = self.get_joint_position()[:-2]
             trajectory = np.linspace(current_position, position, N)
-            running_force_feedback = np.zeros(8, dtype=np.float)
+            running_force_feedback = np.zeros(8, dtype=np.float32)
             for i, t_i in enumerate(trajectory):
                 self._p.setJointMotorControlArray(
                     bodyUniqueId=self.id,
