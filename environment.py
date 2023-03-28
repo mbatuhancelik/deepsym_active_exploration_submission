@@ -592,8 +592,8 @@ class BlocksWorld_v4(BlocksWorld):
         state2, _ = self.state_obj_poses_and_types()
         if approach_angle1 != approach_angle2:
             self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
-        state3, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t*2, sleep=sleep)
+        state3, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
