@@ -15,7 +15,8 @@ from torch.nn.utils.rnn import pad_sequence
 import blocks
 import models
 
-
+def wandb_finalize():
+    wandb.finish()
 def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
@@ -37,7 +38,7 @@ def parse_and_init(args):
         yaml.dump(config, f)
 
     # initialize wandb run
-    wandb.init(project="multideepsym", entity="colorslab", config=config, dir=save_folder)
+    wandb.init(project="multideepsym", entity="colorslab", config=config)
     return wandb.config
 
 
