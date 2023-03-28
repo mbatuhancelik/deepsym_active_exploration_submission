@@ -157,6 +157,8 @@ class DeepSymbolGenerator:
                 print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}")
             self.save("_last")
         self.save_symbols(val_loader)
+        self.save_wandb("_last")
+        self.save_wandb("_best")
 
     def load(self, ext, from_wandb=False):
         for name in self.module_names:
@@ -179,7 +181,7 @@ class DeepSymbolGenerator:
             module_path = os.path.join(self.path, name+ext+".pt")
             torch.save(module_dict, module_path)
             getattr(self, name).train().to(self.device)
-
+    def save_wandb(self, ext):
         wandb.save(os.path.join(self.path, "*"+ext+".pt"))
 
     def print_model(self, space=0, encoder_only=False):
@@ -297,6 +299,7 @@ class MultiDeepSymMLP(MultiDeepSym):
         return h
 
     def save_symbols(self, loader):
+        return
         self.eval_mode()
         groundings = {}
         for sample in loader:
