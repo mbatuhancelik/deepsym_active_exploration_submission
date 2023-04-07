@@ -2,7 +2,7 @@ import copy
 import pybullet
 import pybullet_data
 import numpy as np
-import random 
+import random
 
 import utils
 import manipulators
@@ -337,9 +337,9 @@ class BlocksWorld_v4(BlocksWorld):
 
         ds = 0.1
         self.ds = ds
-        self.del_x = ds 
+        self.del_x = ds
         self.del_y = ds
-        
+
         # for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
         #     self.y_locs[i] = y
         # TODO: ADD GRAPH
@@ -399,7 +399,8 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-    def create_object(self, obj_type, x, y, z = 0.5):
+
+    def create_object(self, obj_type, x, y, z=0.5):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
@@ -447,6 +448,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
+
     def init_objects(self):
         '''
         obj_tpes index:
@@ -467,18 +469,18 @@ class BlocksWorld_v4(BlocksWorld):
         obj_types = np.concatenate(([i for i in range(1, 6)], obj_types))
 
         i = 0
-        positions = np.array([[0,0]])
+        positions = np.array([[0, 0]])
         trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
             x = np.random.uniform(0.3, 1.1)
             y = np.random.uniform(-0.7, 0.7)
             z = 0.43
-            pos = np.array([[x,y]])
+            pos = np.array([[x, y]])
             if np.sqrt(np.sum(pos ** 2)) > 1.2:
                 trials += 1
                 continue
-            if np.any(np.sum( np.abs(positions**2 - pos ** 2), axis = -1) < 2.5 * self.ds):
+            if np.any(np.sum(np.abs(positions**2 - pos ** 2), axis=-1) < 2.5 * self.ds):
                 trials += 1
                 if trials > 10:
                     z = 0.55
@@ -488,14 +490,14 @@ class BlocksWorld_v4(BlocksWorld):
             obj_id = self.create_object(obj_type, x, y, z=z)
             if obj_id == -1:
                 continue
-            
+
             positions = np.concatenate([positions, pos])
 
             i += 1
         self.cluster_centers = []
-        for i in range(np.random.randint(1,3)):
-            self.cluster_centers.append(np.random.randint(0,self.num_objects))
-        #TODO: prevent rolling on x y axises 
+        for i in range(np.random.randint(1, 3)):
+            self.cluster_centers.append(np.random.randint(0, self.num_objects))
+        # TODO: prevent rolling on x y axises
         self.update_contact_graph()
 
     def update_contact_graph(self):
@@ -521,50 +523,54 @@ class BlocksWorld_v4(BlocksWorld):
         self.clusters = clusters
 
         return self.contact_graph, self.clusters
+
     def get_pos(self):
         return [self.x_locs[self.x_loc], self.y_locs[self.y_loc], 1]
+
     def get_ground_pos(self):
         pos = self.get_pos()
         pos[2] = 0.41
         return pos
+
     def remove_grid(self):
         for line in self.debug_items:
             self._p.removeUserDebugItem(line)
         self.debug_items = []
+
     def print_grid(self, location):
-        line_x_color = [0,0,1]
-        line_y_color = [1,0,1]
+        line_x_color = [0, 0, 1]
+        line_y_color = [1, 0, 1]
         x = location[0]
         y = location[1]
         z = location[2]
-        for i in [-1,0,1]:
+        for i in [-1, 0, 1]:
             id1 = self._p.addUserDebugLine([x + self.ds * i, y + self.ds, z],
-                    [x + self.ds * i , y -self.ds , z],
-                    lifeTime = 0,
-                    lineWidth = 0.25,
-                    lineColorRGB = line_x_color)
+                                           [x + self.ds * i, y - self.ds, z],
+                                           lifeTime=0,
+                                           lineWidth=0.25,
+                                           lineColorRGB=line_x_color)
             id2 = self._p.addUserDebugLine([x + self.ds, y + self.ds * i, z],
-                    [x - self.ds , y + self.ds * i , z],
-                    lifeTime = 0,
-                    lineWidth = 0.125,
-                    lineColorRGB = line_y_color)
+                                           [x - self.ds, y + self.ds * i, z],
+                                           lifeTime=0,
+                                           lineWidth=0.125,
+                                           lineColorRGB=line_y_color)
             self.debug_items.append(id1)
             self.debug_items.append(id2)
-    def step(self, obj1_id, obj2_id,dx1, dy1,dx2, dy2,grap_angle,put_angle ,sleep=False):
-        
-        obj1_loc , quat= self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
+
+    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False):
+        obj1_loc, quat = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
         obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
 
         # use these if you want to ensure grapping
         # euler_rot = self._p.getEulerFromQuaternion(quat)
         # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
-        
-        approach_angle1 = [np.pi, 0 , 0]
-        approach_angle2 = [np.pi, 0 , 0]
+
+        approach_angle1 = [np.pi, 0, 0]
+        approach_angle2 = [np.pi, 0, 0]
         if grap_angle:
-            approach_angle1 = [np.pi, 0 , np.pi/2]
+            approach_angle1 = [np.pi, 0, np.pi/2]
         if put_angle:
-            approach_angle2 = [np.pi, 0 , np.pi/2]
+            approach_angle2 = [np.pi, 0, np.pi/2]
         quat1 = self._p.getQuaternionFromEuler(approach_angle1)
         quat2 = self._p.getQuaternionFromEuler(approach_angle2)
 
@@ -574,17 +580,17 @@ class BlocksWorld_v4(BlocksWorld):
             self.remove_grid()
             self.print_grid(obj1_loc)
             self.print_grid(obj2_loc)
-        obj1_loc[0] += dx1 * self.ds 
+        obj1_loc[0] += dx1 * self.ds
         obj2_loc[0] += dx2 * self.ds
         obj1_loc[1] += dy1 * self.ds
         obj2_loc[1] += dy2 * self.ds
 
         up_pos_1 = copy.deepcopy(obj1_loc)
         up_pos_1[2] = 1
-        
+
         up_pos_2 = copy.deepcopy(obj2_loc)
         up_pos_2[2] = 1
-        state1 , types = self.state_obj_poses_and_types()
+        state1, types = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(sleep=sleep)
@@ -598,9 +604,9 @@ class BlocksWorld_v4(BlocksWorld):
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
         state4, _ = self.state_obj_poses_and_types()
-        effect = np.concatenate([state2 - state1, state4 - state3], axis = 1)
+        effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
 
-        self.init_agent_pose(1,.5)
+        self.init_agent_pose(1, 0.5)
         return state1, effect, types
 
     def state_obj_poses_and_types(self):
@@ -631,29 +637,30 @@ class BlocksWorld_v4(BlocksWorld):
         obj1 = np.random.randint(self.num_objects)
         obj2 = np.random.choice(self.cluster_centers)
 
-        while obj1 in self.cluster_centers: 
+        while obj1 in self.cluster_centers:
             obj1 = np.random.randint(self.num_objects)
         probs = np.random.rand(8)
-        dx1 , dy1, dx2, dy2  = 0,0,0,0
-        dxdy_pairs = [[0,0], [0,1], [1,0], [-1,0], [0,-1], [-1,1], [-1,-1], [1,1], [1,-1]]
+        dx1, dy1, dx2, dy2 = 0, 0, 0, 0
+        dxdy_pairs = [[0, 0], [0, 1], [1, 0],
+                      [-1, 0], [0, -1], [-1, 1],
+                      [-1, -1], [1, 1], [1, -1]]
         dxdy1 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p =[ 0.5] + [0.1] * 4 + [0.025] * 4
+            p=[0.5] + [0.1] * 4 + [0.025] * 4
         )
         dxdy2 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p =[ 0.4] + [0.125] * 4 + [0.025] * 4
+            p=[0.4] + [0.125] * 4 + [0.025] * 4
         )
-
 
         [dx2, dy2] = dxdy_pairs[dxdy2]
         [dx1, dy1] = dxdy_pairs[dxdy1]
 
-
         rot_before = 1 if probs[4] < 0.5 else 0
         rot_after = 1 if probs[5] < 0.5 else 0
-        return [obj1, obj2, dx1,dy1,dx2,dy2, rot_before,rot_after]
+        return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
         # return [obj1, obj2, 0,0,0,0, 0,0]
+
     def sample_3_objects_moving_together(self):
         long_objects = []
         smalls = []
@@ -665,24 +672,23 @@ class BlocksWorld_v4(BlocksWorld):
                 smalls.append(i)
 
         long_object = random.choice(long_objects)
-        small1 , small2 = random.choices(smalls,  k =2)
+        small1, small2 = random.choices(smalls, k=2)
 
-        
         act = self.sample_random_action()
         if long_object == 4:
             self.obj_buffer.append(
-                [small1, long_object, 0, 0, 1, 0, 0 , 0]
+                [small1, long_object, 0, 0, 1, 0, 0, 0]
             )
             self.obj_buffer.append(
-                [small2, long_object, 0, 0, -1, 0, 0 , 0]
+                [small2, long_object, 0, 0, -1, 0, 0, 0]
             )
             act[6] = 0
         else:
             self.obj_buffer.append(
-                [small1, long_object, 0, 0, 0,1, 0 , 0]
+                [small1, long_object, 0, 0, 0, 1, 0, 0]
             )
             self.obj_buffer.append(
-                [small2, long_object, 0, 0, 0,-1, 0 , 0]
+                [small2, long_object, 0, 0, 0, -1, 0, 0]
             )
             act[6] = 1
         act[2] = 0
@@ -691,6 +697,7 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.obj_buffer.append(act)
         return self.obj_buffer
+
     def sample_ungrappable(self):
         tall = 0
         small = 0
@@ -701,14 +708,15 @@ class BlocksWorld_v4(BlocksWorld):
                 small = i
         axis = random.random()
         if axis < 0.5:
-            dx = np.random.choice([1,-1])
-            self.obj_buffer.append([tall,small, 0,0,dx,0, 0 , 0])
-            self.obj_buffer.append([small,np.random.randint(0,self.num_objects), 0,0,0,0, 1 , 0])
+            dx = np.random.choice([1, -1])
+            self.obj_buffer.append([tall, small, 0, 0, dx, 0, 0, 0])
+            self.obj_buffer.append([small, np.random.randint(0, self.num_objects), 0, 0, 0, 0, 1, 0])
         else:
-            dy = np.random.choice([1,-1])
-            self.obj_buffer.append([tall,small, 0,0,0,dy, 0 , 0])
-            self.obj_buffer.append([small,np.random.randint(0,self.num_objects), 0,0,0,0, 0 , 0])
+            dy = np.random.choice([1, -1])
+            self.obj_buffer.append([tall, small, 0, 0, 0, dy, 0, 0])
+            self.obj_buffer.append([small, np.random.randint(0, self.num_objects), 0, 0, 0, 0, 0, 0])
         return self.obj_buffer
+
 
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
