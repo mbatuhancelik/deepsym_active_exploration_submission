@@ -1,4 +1,3 @@
-import torch
 import copy
 import pybullet
 import pybullet_data
@@ -84,6 +83,7 @@ class BlocksWorld(GenericEnv):
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
         self.obj_dict = {}
+
     def reset_objects(self):
         self.delete_objects()
         self.init_objects()

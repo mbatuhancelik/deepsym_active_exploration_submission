@@ -6,10 +6,10 @@ from utils import preprocess
 
 
 class SymbolForwardDataset(torch.utils.data.Dataset):
-    def __init__(self, path, prefix, wandb = {}):
+    def __init__(self, path, prefix, wandb={}):
         if len(wandb) == 0:
             self.precond = torch.load(os.path.join(path, prefix+"Z.pt"))
-            self.effect = torch.load(os.path.join(path, prefix+"E.pt"))   
+            self.effect = torch.load(os.path.join(path, prefix+"E.pt"))
         else:
             self.precond = torch.load(wandb["Z"].name)
             self.effect = torch.load(wandb["E"].name)
@@ -19,7 +19,6 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
         return len(self.precond)
 
     def __getitem__(self, idx):
-        
         mask = torch.zeros(self.precond[idx].shape[0])
         mask[:self.mask[idx]] = 1.0
         return self.precond[idx], self.effect[idx], mask
