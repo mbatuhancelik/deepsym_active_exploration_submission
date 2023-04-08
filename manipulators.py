@@ -8,6 +8,8 @@ class Manipulator:
         self._p = p
         self._timestep = self._p.getPhysicsEngineParameters()["fixedTimeStep"]
         self._freq = int(1. / self._timestep)
+        self._total_steps = 0
+        self._last_time = 0.0
         self.id = self._p.loadURDF(
             fileName=path,
             basePosition=position,
@@ -224,5 +226,8 @@ class Manipulator:
             iters = int(t*self._freq)
             for _ in range(iters):
                 self._p.stepSimulation()
+                self._total_steps += 1
                 if sleep:
-                    time.sleep(self._timestep)
+                    while time.time() - self._last_time < self._timestep:
+                        time.sleep(0.0001)
+                    self._last_time = time.time()
