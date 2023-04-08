@@ -238,8 +238,8 @@ class BlocksWorld_v2(BlocksWorld):
 
 
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self, segments=6, x_area=0.7, y_area=1.2, **kwargs):
-        self.traj_t = 2
+    def __init__(self, segments=6, x_area=0.5, y_area=1.0, **kwargs):
+        self.traj_t = 1.5
 
         print(kwargs)
         self.x_init = 0.5
@@ -250,7 +250,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.x_area = x_area
         self.y_area = y_area
 
-        ds = 0.1
+        ds = 0.075
         self.ds = ds
         self.del_x = ds
         self.del_y = ds
@@ -388,8 +388,8 @@ class BlocksWorld_v4(BlocksWorld):
         trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
-            x = np.random.uniform(0.3, 1.1)
-            y = np.random.uniform(-0.7, 0.7)
+            x = np.random.uniform(self.x_init, self.x_final)
+            y = np.random.uniform(self.y_init, self.y_final)
             z = 0.43
             pos = np.array([[x, y]])
             if np.sqrt(np.sum(pos ** 2)) > 1.2:
@@ -499,29 +499,31 @@ class BlocksWorld_v4(BlocksWorld):
         obj2_loc[0] += dx2 * self.ds
         obj1_loc[1] += dy1 * self.ds
         obj2_loc[1] += dy2 * self.ds
+        obj1_loc[2] -= 0.01
+        obj2_loc[2] -= 0.01
 
         up_pos_1 = copy.deepcopy(obj1_loc)
-        up_pos_1[2] = 1
+        up_pos_1[2] = 0.9
 
         up_pos_2 = copy.deepcopy(obj2_loc)
-        up_pos_2[2] = 1
+        up_pos_2[2] = 0.9
         state1, types = self.state_obj_poses_and_types()
+
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.close_gripper(sleep=sleep)
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         state2, _ = self.state_obj_poses_and_types()
-        if approach_angle1 != approach_angle2:
-            self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t*2, sleep=sleep)
+        # if approach_angle1 != approach_angle2:
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
         state3, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
         state4, _ = self.state_obj_poses_and_types()
         effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
-
-        self.init_agent_pose(1, 0.5)
+        self.init_agent_pose(1)
         return state1, effect, types
 
     def state_obj_poses_and_types(self):
@@ -554,27 +556,24 @@ class BlocksWorld_v4(BlocksWorld):
 
         while obj1 in self.cluster_centers:
             obj1 = np.random.randint(self.num_objects)
-        probs = np.random.rand(8)
         dx1, dy1, dx2, dy2 = 0, 0, 0, 0
         dxdy_pairs = [[0, 0], [0, 1], [1, 0],
                       [-1, 0], [0, -1], [-1, 1],
                       [-1, -1], [1, 1], [1, -1]]
         dxdy1 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p=[0.5] + [0.1] * 4 + [0.025] * 4
+            p=[0.6] + [0.075] * 4 + [0.025] * 4
         )
         dxdy2 = np.random.choice(
             np.arange(len(dxdy_pairs)),
             p=[0.4] + [0.125] * 4 + [0.025] * 4
         )
 
-        [dx2, dy2] = dxdy_pairs[dxdy2]
         [dx1, dy1] = dxdy_pairs[dxdy1]
+        [dx2, dy2] = dxdy_pairs[dxdy2]
 
-        rot_before = 1 if probs[4] < 0.5 else 0
-        rot_after = 1 if probs[5] < 0.5 else 0
+        rot_before, rot_after = np.random.randint(0, 2, (2))
         return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
-        # return [obj1, obj2, 0,0,0,0, 0,0]
 
     def sample_3_objects_moving_together(self):
         long_objects = []
