@@ -23,17 +23,18 @@ def parse_and_init(args):
     save_folder = config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
 
-    # download and extract dataset if not exists
-    data_path = os.path.join("data", config["dataset_name"])
-    if not os.path.exists(data_path):
-        get_dataset_from_wandb(config["dataset_name"])
-
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
 
     # initialize wandb run
     wandb.init(project="multideepsym", entity="colorslab", config=config)
+
+    # download and extract dataset if not exists
+    data_path = os.path.join("data", config["dataset_name"])
+    if not os.path.exists(data_path):
+        get_dataset_from_wandb(config["dataset_name"])
+
     return wandb.config
 
 
@@ -408,3 +409,5 @@ def get_dataset_from_wandb(name):
     artifact_dir = artifact.download()
     archive = zipfile.ZipFile(os.path.join(artifact_dir, f"{name}.zip"), "r")
     archive.extractall(os.path.join("data", name))
+    archive.close()
+    os.remove(os.path.join(artifact_dir, f"{name}.zip"))
