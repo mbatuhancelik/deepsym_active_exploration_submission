@@ -183,7 +183,7 @@ class DeepSymbolGenerator:
     def save_wandb(self, ext):
         wandb.save(os.path.join(self.path, "*"+ext+".pt"))
 
-    def print_model(self, space=0, encoder_only=False):
+    def print_model(self, space=0):
         for name in self.module_names:
             utils.print_module(getattr(self, name), name, space)
 
