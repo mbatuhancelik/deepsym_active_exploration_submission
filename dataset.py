@@ -186,27 +186,3 @@ class SegmentedSAEFolder(SAEFolder):
             sample["post_state"] = post_padded
             sample["post_pad_mask"] = post_pad_mask
         return sample
-
-
-class SegmentedSAEFolder3x5(SegmentedSAEFolder):
-    def __init__(self, folder_path, max_pad, valid_objects, partitions=None, normalize=False, aug=False,
-                 old=False, eff_mu=None, eff_std=None):
-        super(SegmentedSAEFolder3x5, self).__init__(folder_path, max_pad, valid_objects, partitions,
-                                                    normalize, aug, old, eff_mu, eff_std)
-
-    def __getitem__(self, idx):
-        padded, pad_mask = preprocess(self.state[idx], self.segmentation[idx], self.valid_objects,
-                                      self.max_pad, self.aug, self.old)
-        action_idx = self.action[idx]
-        eye_3, eye_5 = torch.eye(3), torch.eye(5)
-        action = torch.cat([eye_3[action_idx[0]], eye_5[action_idx[1]], eye_3[action_idx[2]], eye_5[action_idx[3]]],
-                           dim=-1)
-        action = action.unsqueeze(0)
-        action = action.repeat(padded.shape[0], 1)
-
-        sample = {}
-        sample["state"] = padded
-        sample["action"] = action
-        sample["effect"] = self.effect[idx][..., :3]
-        sample["pad_mask"] = pad_mask
-        return sample
