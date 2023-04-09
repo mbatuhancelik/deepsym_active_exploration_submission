@@ -2,7 +2,6 @@ import os
 
 import torch
 import wandb
-import matplotlib.pyplot as plt
 
 import utils
 
@@ -156,7 +155,6 @@ class DeepSymbolGenerator:
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, loss={epoch_loss:.5f}")
             self.save("_last")
-        self.save_symbols(val_loader)
         self.save_wandb("_last")
         self.save_wandb("_best")
 
@@ -181,6 +179,7 @@ class DeepSymbolGenerator:
             module_path = os.path.join(self.path, name+ext+".pt")
             torch.save(module_dict, module_path)
             getattr(self, name).train().to(self.device)
+
     def save_wandb(self, ext):
         wandb.save(os.path.join(self.path, "*"+ext+".pt"))
 
@@ -197,9 +196,6 @@ class DeepSymbolGenerator:
         for name in self.module_names:
             module = getattr(self, name)
             module.train()
-
-    def save_symbols(self, loader):
-        pass
 
 
 class MultiDeepSym(DeepSymbolGenerator):
@@ -298,50 +294,3 @@ class MultiDeepSymMLP(MultiDeepSym):
         if eval_mode:
             h = h.round()
         return h
-
-    def save_symbols(self, loader):
-        return
-        self.eval_mode()
-        groundings = {}
-        for sample in loader:
-            x = sample["state"]
-            z = self.encode(x, eval_mode=True)
-            z = z.reshape(-1, z.shape[-1])
-            x = x.reshape(z.shape[0], -1)
-            paddings = sample["pad_mask"].reshape(z.shape[0], -1)
-            z_str = utils.binary_tensor_to_str(z)
-            for zs_i, x_i, p_i in zip(z_str, x, paddings):
-                if p_i > 0.5:
-                    if zs_i in groundings:
-                        groundings[zs_i].append(x_i)
-                    else:
-                        groundings[zs_i] = [x_i]
-
-        markers = ["s", "o", "P", "p", "v"]
-        labels = ["box", "cylinder", "short box", "long box", "long box r."]
-        for zs, xs in groundings.items():
-            xs = torch.stack(xs)
-            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-            ax[0].set_title("Positions")
-            ax[0].set_xlabel("x")
-            ax[0].set_ylabel("y")
-            for i in range(1, 6):
-                axis = ax[0].scatter(xs[xs[:, 6] == i, 0], xs[xs[:, 6] == i, 1], c=xs[xs[:, 6] == i, 2], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
-            # add the colorbar
-            cbar = fig.colorbar(axis, ax=ax[0])
-            cbar.ax.set_ylabel("z")
-            ax[0].legend()
-            for i in range(1, 6):
-                axis2 = ax[1].scatter(xs[xs[:, 6] == i, 3], xs[xs[:, 6] == i, 4], c=xs[xs[:, 6] == i, 5], marker=markers[i-1], label=labels[i-1], alpha=0.1, cmap="jet")
-            ax[1].set_title("Rotations")
-            ax[1].set_xlabel("rx")
-            ax[1].set_ylabel("ry")
-            # add the colorbar
-            cbar = fig.colorbar(axis2, ax=ax[1])
-            cbar.ax.set_ylabel("rz")
-            ax[1].legend()
-            # log the plot to wandb as an image and close the figure
-            wandb.log({zs: wandb.Image(fig)})
-            plt.close(fig)
-
-        self.train_mode()
