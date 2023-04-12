@@ -8,6 +8,8 @@ class Manipulator:
         self._p = p
         self._timestep = self._p.getPhysicsEngineParameters()["fixedTimeStep"]
         self._freq = int(1. / self._timestep)
+        self._total_steps = 0
+        self._last_time = 0.0
         self.id = self._p.loadURDF(
             fileName=path,
             basePosition=position,
@@ -62,20 +64,20 @@ class Manipulator:
             targetOrientation=orientation)
         self.set_joint_position(target_joints[:-2], t=t, sleep=sleep, traj=traj)
 
-    def move_in_cartesian(self, position, orientation=None, t=1.0, sleep=False, ignore_force=False):
+    def move_in_cartesian(self, position, orientation, t=1.0, sleep=False, ignore_force=False):
         N = int(t * 240)
 
         current_position, current_orientation = self.get_tip_pose()
 
         position_traj = np.linspace(current_position, position, N+1)[1:]
-
-        running_force_feedback = np.zeros(8, dtype=np.float)
+        orientation_traj = np.linspace(current_orientation, orientation, N+1)[1:]
+        running_force_feedback = np.zeros(8, dtype=np.float32)
         for i, p_i in enumerate(position_traj):
             target_joints = self._p.calculateInverseKinematics(
                 bodyUniqueId=self.id,
                 endEffectorLinkIndex=self.ik_idx,
                 targetPosition=p_i,
-                targetOrientation=orientation)
+                targetOrientation=orientation_traj[i])
             self.set_joint_position(target_joints[:-2], t=1/240, sleep=sleep)
             force_feedback = np.array(self.get_joint_forces())
             running_force_feedback = 0.9 * running_force_feedback + 0.1 * force_feedback
@@ -99,7 +101,7 @@ class Manipulator:
             N = int(t * 240)
             current_position = self.get_joint_position()[:-2]
             trajectory = np.linspace(current_position, position, N)
-            running_force_feedback = np.zeros(8, dtype=np.float)
+            running_force_feedback = np.zeros(8, dtype=np.float32)
             for i, t_i in enumerate(trajectory):
                 self._p.setJointMotorControlArray(
                     bodyUniqueId=self.id,
@@ -224,5 +226,8 @@ class Manipulator:
             iters = int(t*self._freq)
             for _ in range(iters):
                 self._p.stepSimulation()
+                self._total_steps += 1
                 if sleep:
-                    time.sleep(self._timestep)
+                    while time.time() - self._last_time < self._timestep:
+                        time.sleep(0.0001)
+                    self._last_time = time.time()

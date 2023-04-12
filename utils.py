@@ -23,20 +23,18 @@ def parse_and_init(args):
     save_folder = config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
 
-    # download and extract dataset if not exists
-    data_path = os.path.join("data", config["dataset_name"])
-    if not os.path.exists(data_path):
-        artifact = wandb.use_artifact(f"colorslab/multideepsym/{config['dataset_name']}:latest", type="dataset")
-        artifact_dir = artifact.download()
-        archive = zipfile.ZipFile(os.path.join(artifact_dir, config["dataset_name"]+".zip"), "r")
-        archive.extractall("data")
-
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
 
     # initialize wandb run
-    wandb.init(project="multideepsym", entity="colorslab", config=config, dir=save_folder)
+    wandb.init(project="multideepsym", entity="colorslab", config=config)
+
+    # download and extract dataset if not exists
+    data_path = os.path.join("data", config["dataset_name"])
+    if not os.path.exists(data_path):
+        get_dataset_from_wandb(config["dataset_name"])
+
     return wandb.config
 
 
@@ -63,13 +61,10 @@ def create_model_from_config(config):
     transformer = transformer.to(config["device"])
     decoder = decoder.to(config["device"])
 
-    wandb.watch(encoder, log="all")
-    wandb.watch(projector, log="all")
-    wandb.watch(transformer, log="all")
-    wandb.watch(decoder, log="all")
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
-                                   device=config["device"], lr=config["lr"], path=config["save_folder"], coeff=config["coeff"])
+                                   device=config["device"], lr=config["lr"], path=config["save_folder"],
+                                   coeff=config["coeff"])
 
     return model
 
@@ -135,11 +130,12 @@ def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color
     else:
         obj_id = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collisionId, baseVisualShapeIndex=visualId,
                                    basePosition=position, baseOrientation=p.getQuaternionFromEuler(rotation))
+        p.changeDynamics(obj_id, -1, rollingFriction=0.0005, spinningFriction=0.001)
 
     return obj_id
 
 
-def create_arrow(p, from_loc, to_loc):
+def create_arrow(p, from_loc, to_loc, color=[0.0, 1.0, 1.0, 0.75]):
     delta = (np.array(to_loc) - np.array(from_loc))
     length = np.linalg.norm(delta)
     r_x = -np.arctan2(np.linalg.norm([delta[0], delta[1]]), delta[2])
@@ -149,7 +145,7 @@ def create_arrow(p, from_loc, to_loc):
     baseVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
                                        rgbaColor=[0.0, 0.0, 1.0, 0.75])
     childVisualId = p.createVisualShape(shapeType=p.GEOM_CAPSULE, radius=0.01, length=length,
-                                        rgbaColor=[0.0, 1.0, 1.0, 0.75])
+                                        rgbaColor=color)
     tipVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
                                       rgbaColor=[1.0, 0.0, 0.0, 0.75])
     obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=baseVisualId,
@@ -168,17 +164,17 @@ def create_tabletop(p):
     objects = {}
     objects["base"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.15, 0.15, 0.2],
                                     position=[0., 0., 0.2], color=[0.5, 0.5, 0.5, 1.0], with_link=True)
-    objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.65, 1, 0.2],
-                                     position=[0.8, 0, 0.2], color=[0.9, 0.9, 0.9, 1.0])
+    objects["table"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 1, 0.2],
+                                     position=[0.9, 0, 0.2], color=[0.9, 0.9, 0.9, 1.0])
     # walls
-    # objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
-    #                                  position=[0.8, -0.5, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall2"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.5, 0.01, 0.05],
-    #                                  position=[0.8, 0.5, 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall3"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 0.5, 0.05],
-    #                                  position=[0.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
-    # objects["wall4"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 0.5, 0.05],
-    #                                  position=[1.3, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall1"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 0.01, 0.05],
+                                     position=[0.9, -1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall2"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.7, 0.01, 0.05],
+                                     position=[0.9, 1, 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall3"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1, 0.05],
+                                     position=[0.2, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
+    objects["wall4"] = create_object(p, p.GEOM_BOX, mass=0, size=[0.01, 1, 0.05],
+                                     position=[1.6, 0., 0.45], color=[1.0, 0.6, 0.6, 1.0])
     return objects
 
 
@@ -389,3 +385,29 @@ def sample_prediction(prob, mask, sample_size=100):
         sampled_symbols.append(current_sample)
     sampled_symbols = torch.stack(sampled_symbols)
     return sampled_symbols
+
+
+def wandb_finalize():
+    wandb.finish()
+
+
+def upload_dataset_to_wandb(name, path):
+    with zipfile.ZipFile(f"{name}.zip", "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file in os.listdir(path):
+            if file != ".DS_Store":
+                zipf.write(os.path.join(path, file), arcname=file)
+    wandb.init(project="multideepsym", entity="colorslab")
+    artifact = wandb.Artifact(name, type="dataset")
+    artifact.add_file(f"{name}.zip")
+    wandb.log_artifact(artifact)
+    wandb_finalize()
+    os.remove(f"{name}.zip")
+
+
+def get_dataset_from_wandb(name):
+    artifact = wandb.use_artifact(f"colorslab/multideepsym/{name}:latest", type="dataset")
+    artifact_dir = artifact.download()
+    archive = zipfile.ZipFile(os.path.join(artifact_dir, f"{name}.zip"), "r")
+    archive.extractall(os.path.join("data", name))
+    archive.close()
+    os.remove(os.path.join(artifact_dir, f"{name}.zip"))

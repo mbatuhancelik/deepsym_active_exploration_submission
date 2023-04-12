@@ -2,6 +2,7 @@ import copy
 import pybullet
 import pybullet_data
 import numpy as np
+import random
 
 import utils
 import manipulators
@@ -78,7 +79,6 @@ class BlocksWorld(GenericEnv):
         self.agent.open_gripper(1, sleep=True)
 
     def delete_objects(self):
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         for key in self.obj_dict:
             obj_id = self.obj_dict[key]
             self._p.removeBody(obj_id)
@@ -237,116 +237,26 @@ class BlocksWorld_v2(BlocksWorld):
         return (from_idx, to_idx)
 
 
-class BlocksWorld_v3(BlocksWorld):
-    def __init__(self, **kwargs):
-        self.traj_t = 1.5
-        self.x_locs = {0: 0.5, 1: 0.750, 2: 1.0}
-        self.y_locs = {0: -0.4, 1: -0.2, 2: 0.0, 3: 0.2, 4: 0.4}
-        self.sizes = [[0.025, 0.025, 0.05], [0.025, 0.225, 0.025]]
-        super(BlocksWorld_v3, self).__init__(**kwargs)
-
-    def init_objects(self):
-        self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
-        obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
-        while sum(obj_types) > 3:
-            obj_types = np.random.binomial(1, 0.3, (self.num_objects,)).tolist()
-        obj_types = list(reversed(sorted(obj_types)))
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
-        i = 0
-        obj_ids = []
-        while i < self.num_objects:
-            size_idx = obj_types[i]
-            xidx = np.random.randint(0, len(self.x_locs))
-            yidx = np.random.randint(0, len(self.y_locs))
-            if (size_idx == 0) and (len(self.current_obj_locs[xidx][yidx]) > 0):
-                continue
-            if ((size_idx == 1) and
-                    ((len(self.current_obj_locs[xidx][yidx]) > 0) or
-                     (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
-                     (len(self.current_obj_locs[xidx][min(4, yidx+1)]) > 0))):
-                continue
-
-            position = [self.x_locs[xidx], self.y_locs[yidx], 0.6]
-            size = self.sizes[size_idx]
-            self.current_obj_locs[xidx][yidx].append(0)
-            if size_idx == 1:
-                self.current_obj_locs[xidx][max(0, yidx-1)].append(0)
-                self.current_obj_locs[xidx][min(4, yidx+1)].append(0)
-            obj_ids.append(utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                               size=size, position=position, rotation=[0, 0, 0],
-                                               mass=0.1, color="random"))
-            i += 1
-        for i, o_id in enumerate(sorted(obj_ids)):
-            self.obj_dict[i] = o_id
-
-    def step(self, from_loc, to_loc, sleep=False):
-        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = [self.x_locs[from_loc[0]], self.y_locs[from_loc[1]], 0.41]
-        from_top_pos = from_pos[:2] + [1.0]
-        to_pos = [self.x_locs[to_loc[0]], self.y_locs[to_loc[1]], 0.41]
-        to_top_pos = to_pos[:2] + [1.0]
-
-        before_pose = self.state_obj_poses()
-        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=False, sleep=sleep)
-        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.open_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.init_agent_pose(t=1.0, sleep=sleep)
-        after_pose = self.state_obj_poses()
-        effect = after_pose - before_pose
-        if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
-            self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
-            self.current_obj_locs[to_loc[0]][to_loc[1]].append(0)
-        return effect
-
-    def sample_random_action(self):
-        if np.random.rand() < 0.0:
-            # there might be actions that does not pick any objects
-            xidx = np.random.randint(0, len(self.x_locs))
-            yidx = np.random.randint(0, len(self.y_locs))
-            from_idx = [xidx, yidx]
-        else:
-            possible_actions = []
-            for i in range(len(self.x_locs)):
-                for j in range(len(self.y_locs)):
-                    if len(self.current_obj_locs[i][j]) > 0:
-                        possible_actions.append([i, j])
-            r = np.random.randint(0, len(possible_actions))
-            from_idx = possible_actions[r]
-
-        to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        return (from_idx, to_idx)
-
-
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self, segments=6, x_area=0.8, y_area=0.8, **kwargs):
-        self.traj_t = 2
+    def __init__(self, segments=6, x_area=0.5, y_area=1.0, **kwargs):
+        self.traj_t = 1.5
 
         print(kwargs)
         self.x_init = 0.5
-        self.y_init = -0.4
+        self.y_init = -0.5
+        self.x_final = self.x_init + x_area
+        self.y_final = self.y_init + y_area
 
         self.x_area = x_area
         self.y_area = y_area
-        self.segments = segments
 
-        self.x_locs = {}
-        self.y_locs = {}
-
-        ds = 0.12
+        ds = 0.075
+        self.ds = ds
         self.del_x = ds
         self.del_y = ds
 
-        for i in range(segments):
-            self.x_locs[i] = self.x_init + self.del_x * i
-            self.y_locs[i] = self.y_init + self.del_y * i
-
-        for i, y in enumerate([-0.4, -0.28, -0.16, -0.04, 0.08, 0.2]):
-            self.y_locs[i] = y
+        # for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
+        #     self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
         if 'min_objects' not in kwargs:
@@ -354,26 +264,14 @@ class BlocksWorld_v4(BlocksWorld):
         if 'max_objects' not in kwargs:
             kwargs["max_objects"] = 13
 
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
-
         single_size = 0.025
         self.sizes = [[single_size, single_size, 0.05],
                       [single_size, 5*single_size, 0.025],
                       [5*single_size, 0.025, single_size]]
+        self.debug_items = []
+
         super(BlocksWorld_v4, self).__init__(**kwargs)
-        z_line = 4.2499e-01
-        line_color = [1, 1, 0]
-        for i in range(segments):
-            self._p.addUserDebugLine([self.x_locs[i], self.y_locs[0], z_line],
-                                     [self.x_locs[i], self.y_locs[segments-1], z_line],
-                                     lifeTime=0,
-                                     lineWidth=0.25,
-                                     lineColorRGB=line_color)
-            self._p.addUserDebugLine([self.x_locs[0], self.y_locs[i], z_line],
-                                     [self.x_locs[segments-1], self.y_locs[i], z_line],
-                                     lifeTime=0,
-                                     lineWidth=0.125,
-                                     lineColorRGB=line_color)
+        self.previous_action = 0
 
     def create_object_from_db(self, state_row):
         obj_type = state_row[-1]
@@ -413,52 +311,29 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
-        self.obj_dict[len(self.obj_dict)] = o_id
+        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
-    def create_object(self, obj_type, xidx, yidx):
+    def create_object(self, obj_type, x, y, z=0.5):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
         return object id if possible
         """
-        if (obj_type < 4) and (len(self.current_obj_locs[xidx][yidx]) > 0):
-            return -1
-        if ((obj_type == 4) and
-                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
-                 (len(self.current_obj_locs[xidx][max(0, yidx-1)]) > 0) or
-                 (len(self.current_obj_locs[xidx][min(3, yidx+1)]) > 0))):
-            return -1
-        if ((obj_type == 5) and
-                ((len(self.current_obj_locs[xidx][yidx]) > 0) or
-                 (len(self.current_obj_locs[max(0, xidx-1)][yidx]) > 0) or
-                 (len(self.current_obj_locs[min(3, xidx+1)][yidx]) > 0))):
-            return -1
 
-        position = [self.x_locs[xidx], self.y_locs[yidx], 0.45]
+        position = [x, y, z]
 
         size = copy.deepcopy(self.sizes[0])
         if obj_type == 4:
             size = self.sizes[1]
         elif obj_type == 5:
             size = self.sizes[2]
-        elif obj_type == 3:
+        elif obj_type == 1:
             size[2] = self.sizes[2][2]
         elif obj_type == 2:
             size[1] = 0.05
 
-        self.current_obj_locs[xidx][yidx].append(obj_type)
-        if obj_type == 4:
-            if yidx > 0:
-                self.current_obj_locs[xidx][yidx-1].append(obj_type)
-            if yidx < len(self.y_locs) - 1:
-                self.current_obj_locs[xidx][yidx+1].append(obj_type)
-        if obj_type == 5:
-            if xidx > 0:
-                self.current_obj_locs[xidx - 1][yidx].append(obj_type)
-            if xidx < len(self.x_locs) - 1:
-                self.current_obj_locs[xidx + 1][yidx].append(obj_type)
         o_id = -1
         # obj type is never 0
         if obj_type == 0:
@@ -485,7 +360,7 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=[0, 0, np.pi],
                                         mass=0.1, color="random"))
-        self.obj_dict[len(self.obj_dict)] = o_id
+        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
@@ -495,33 +370,57 @@ class BlocksWorld_v4(BlocksWorld):
             0 : sphere
             1 : box
             2 : cylinder
-            3 : short box
+            3 : tall
             4 : long box
             5 : long box rotated
         '''
+        self.obj_buffer = []
         self.obj_types = {}
+        obj_ids = []
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
-
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = np.random.randint(1, 6, (self.num_objects,)).tolist()
+        obj_types = np.random.randint(1, 6, (self.num_objects - 5,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
+        obj_types = np.concatenate(([i for i in range(1, 6)], obj_types))
 
-        self.current_obj_locs = [[[] for _ in self.y_locs] for _ in self.x_locs]
         i = 0
+        positions = np.array([[0, 0]])
+        trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
-            xidx = np.random.randint(0, len(self.x_locs))
-            yidx = np.random.randint(0, len(self.y_locs))
-
-            obj_id = self.create_object(obj_type, xidx, yidx)
+            x = np.random.uniform(self.x_init, self.x_final)
+            y = np.random.uniform(self.y_init, self.y_final)
+            z = 0.43
+            pos = np.array([[x, y]])
+            if np.sqrt(np.sum(pos ** 2)) > 1.2:
+                trials += 1
+                continue
+            if np.any(np.sum(np.abs(positions**2 - pos ** 2), axis=-1) < 2.5 * self.ds):
+                trials += 1
+                if trials > 10:
+                    z = 0.55
+                else:
+                    continue
+            trials = 0
+            obj_id = self.create_object(obj_type, x, y, z=z)
             if obj_id == -1:
                 continue
 
-            i += 1
-        self.create_contact_graph()
+            positions = np.concatenate([positions, pos])
+            obj_ids.append(obj_id)
 
-    def create_contact_graph(self):
+            i += 1
+        self.cluster_centers = []
+        for i in range(np.random.randint(1, 3)):
+            self.cluster_centers.append(np.random.randint(0, self.num_objects))
+        # TODO: prevent rolling on x y axises
+        self.update_contact_graph()
+        for i, o_id in enumerate(sorted(obj_ids)):
+            self.obj_dict[i] = o_id
+
+    def update_contact_graph(self):
+        return
         positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
 
@@ -544,51 +443,104 @@ class BlocksWorld_v4(BlocksWorld):
 
         return self.contact_graph, self.clusters
 
-    def step(self, from_loc, to_loc, before_grip_rotation=0, after_grip_rotation=0, sleep=False):
-        if self.gui == 0:
-            sleep = False
-        correction_constant = 0.0
-        target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        from_pos = [self.x_locs[from_loc[0]] + correction_constant, self.y_locs[from_loc[1]], 0.41]
-        from_top_pos = from_pos[:2] + [1.0]
-        to_pos = [self.x_locs[to_loc[0]] + correction_constant, self.y_locs[to_loc[1]], 0.41]
-        to_top_pos = to_pos[:2] + [1.0]
+    def get_pos(self):
+        return [self.x_locs[self.x_loc], self.y_locs[self.y_loc], 1]
 
-        before_pose, types = self.state_obj_poses_and_types()
-        if before_grip_rotation != 0:
-            target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
-        self.agent.set_cartesian_position(from_top_pos, orientation=target_quat, t=self.traj_t, traj=False, sleep=sleep)
-        self.agent.move_in_cartesian(from_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.close_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(from_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep, ignore_force=True)
-        if after_grip_rotation != 0:
-            if target_quat == self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2]):
-                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, 0])
-            else:
-                target_quat = self._p.getQuaternionFromEuler([np.pi, 0, np.pi/2])
-        self.agent.move_in_cartesian(to_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.agent.open_gripper(self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(to_top_pos, orientation=target_quat, t=self.traj_t, sleep=sleep)
-        self.init_agent_pose(t=1.5, sleep=sleep)
-        after_pose, types = self.state_obj_poses_and_types()
-        effect = after_pose - before_pose
+    def get_ground_pos(self):
+        pos = self.get_pos()
+        pos[2] = 0.41
+        return pos
 
-        object_id = -1
-        if len(self.current_obj_locs[from_loc[0]][from_loc[1]]) > 0:
-            object_id = self.current_obj_locs[from_loc[0]][from_loc[1]].pop()
-            self.current_obj_locs[to_loc[0]][to_loc[1]].append(object_id)
-        self.create_contact_graph()
-        return effect, types
+    def remove_grid(self):
+        for line in self.debug_items:
+            self._p.removeUserDebugItem(line)
+        self.debug_items = []
+
+    def print_grid(self, location):
+        line_x_color = [0, 0, 1]
+        line_y_color = [1, 0, 1]
+        x = location[0]
+        y = location[1]
+        z = location[2]
+        for i in [-1, 0, 1]:
+            id1 = self._p.addUserDebugLine([x + self.ds * i, y + self.ds, z],
+                                           [x + self.ds * i, y - self.ds, z],
+                                           lifeTime=0,
+                                           lineWidth=0.25,
+                                           lineColorRGB=line_x_color)
+            id2 = self._p.addUserDebugLine([x + self.ds, y + self.ds * i, z],
+                                           [x - self.ds, y + self.ds * i, z],
+                                           lifeTime=0,
+                                           lineWidth=0.125,
+                                           lineColorRGB=line_y_color)
+            self.debug_items.append(id1)
+            self.debug_items.append(id2)
+
+    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False):
+        obj1_loc, quat = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
+        obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
+
+        # use these if you want to ensure grapping
+        # euler_rot = self._p.getEulerFromQuaternion(quat)
+        # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
+
+        approach_angle1 = [np.pi, 0, 0]
+        approach_angle2 = [np.pi, 0, 0]
+        if grap_angle:
+            approach_angle1 = [np.pi, 0, np.pi/2]
+        if put_angle:
+            approach_angle2 = [np.pi, 0, np.pi/2]
+        quat1 = self._p.getQuaternionFromEuler(approach_angle1)
+        quat2 = self._p.getQuaternionFromEuler(approach_angle2)
+
+        obj1_loc = list(obj1_loc)
+        obj2_loc = list(obj2_loc)
+        if sleep:
+            self.remove_grid()
+            self.print_grid(obj1_loc)
+            self.print_grid(obj2_loc)
+        obj1_loc[0] += dx1 * self.ds
+        obj2_loc[0] += dx2 * self.ds
+        obj1_loc[1] += dy1 * self.ds
+        obj2_loc[1] += dy2 * self.ds
+        obj1_loc[2] -= 0.01
+        obj2_loc[2] -= 0.01
+
+        up_pos_1 = copy.deepcopy(obj1_loc)
+        up_pos_1[2] = 0.9
+
+        up_pos_2 = copy.deepcopy(obj2_loc)
+        up_pos_2[2] = 0.9
+        state1, types = self.state_obj_poses_and_types()
+
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.close_gripper(sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        state2, _ = self.state_obj_poses_and_types()
+        # if approach_angle1 != approach_angle2:
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        state3, _ = self.state_obj_poses_and_types()
+        self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.open_gripper()
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        state4, _ = self.state_obj_poses_and_types()
+        effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
+        self.init_agent_pose(1)
+        return state1, effect, types
 
     def state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
-        pose = np.zeros((N_obj, 6), dtype=np.float32)
+        pose = np.zeros((N_obj, 9), dtype=np.float32)
         obj_types = np.zeros((N_obj), dtype=np.int8)
         for i in range(N_obj):
             position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
             pose[i][:3] = position
-            pose[i][3:] = self._p.getEulerFromQuaternion(quaternion)
+            euler_angles = self._p.getEulerFromQuaternion(quaternion)
+            pose[i][3:] = [np.cos(euler_angles[0]), np.sin(euler_angles[0]),
+                           np.cos(euler_angles[1]), np.sin(euler_angles[1]),
+                           np.cos(euler_angles[2]), np.sin(euler_angles[2])]
             obj_types[i] = self.obj_types[self.obj_dict[i]]
 
         return pose, obj_types
@@ -596,78 +548,92 @@ class BlocksWorld_v4(BlocksWorld):
     def get_obj_location(self, obj_id):
 
         position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_id])
-        rel_x = position[0] - self.x_init
-        x_index = rel_x / self.del_x
-        x_index = round(x_index)
 
-        rel_y = position[1] - self.y_init
-        y_index = round(rel_y / self.del_y)
-
-        x_index = min(x_index, self.segments - 1)
-        y_index = min(y_index, self.segments - 1)
-        x_index = max(0, x_index)
-        y_index = max(0, y_index)
-
-        return [x_index, y_index]
+        return position
 
     def state(self):
         return self.state_obj_poses_and_types()
 
     def sample_random_action(self):
-        action_type = np.random.rand()
-        to_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        from_idx = [np.random.randint(0, len(self.x_locs)), np.random.randint(0, len(self.y_locs))]
-        before_rotation = np.random.randint(0, 2)
-        after_rotation = np.random.randint(0, 2)
+        obj1 = np.random.randint(self.num_objects)
+        obj2 = np.random.choice(self.cluster_centers)
 
-        if action_type < 0.05:
-            # there might be actions that does not pick any objects
-            # or actions that does not pick long objects from the middle position
-            from_idx = self.get_obj_location(np.random.randint(0, self.num_objects))
-            # TODO: perform object location change operations instead of this
+        while obj1 in self.cluster_centers:
+            obj1 = np.random.randint(self.num_objects)
+        dx1, dy1, dx2, dy2 = 0, 0, 0, 0
+        dxdy_pairs = [[0, 0], [0, 1], [1, 0],
+                      [-1, 0], [0, -1], [-1, 1],
+                      [-1, -1], [1, 1], [1, -1]]
+        dxdy1 = np.random.choice(
+            np.arange(len(dxdy_pairs)),
+            p=[0.6] + [0.075] * 4 + [0.025] * 4
+        )
+        dxdy2 = np.random.choice(
+            np.arange(len(dxdy_pairs)),
+            p=[0.4] + [0.125] * 4 + [0.025] * 4
+        )
+
+        [dx1, dy1] = dxdy_pairs[dxdy1]
+        [dx2, dy2] = dxdy_pairs[dxdy2]
+
+        rot_before, rot_after = np.random.randint(0, 2, (2))
+        return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
+
+    def sample_3_objects_moving_together(self):
+        long_objects = []
+        smalls = []
+
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 4:
+                long_objects.append(i)
+            else:
+                smalls.append(i)
+
+        long_object = random.choice(long_objects)
+        small1, small2 = random.choices(smalls, k=2)
+
+        act = self.sample_random_action()
+        if long_object == 4:
+            self.obj_buffer.append(
+                [small1, long_object, 0, 0, 1, 0, 0, 0]
+            )
+            self.obj_buffer.append(
+                [small2, long_object, 0, 0, -1, 0, 0, 0]
+            )
+            act[6] = 0
         else:
-            possible_actions = []
-            for i in range((self.num_objects)):
-                for k in range(i, (self.num_objects)):
-                    if self.clusters[k] != self.clusters[i]:
-                        possible_actions.append([i, k])
+            self.obj_buffer.append(
+                [small1, long_object, 0, 0, 0, 1, 0, 0]
+            )
+            self.obj_buffer.append(
+                [small2, long_object, 0, 0, 0, -1, 0, 0]
+            )
+            act[6] = 1
+        act[2] = 0
+        act[3] = 0
+        act[0] = long_object
 
-            if len(possible_actions) != 0:
-                action = possible_actions[np.random.randint(0, len(possible_actions))]
+        self.obj_buffer.append(act)
+        return self.obj_buffer
 
-                obj_1 = action[0]
-                obj_2 = action[1]
-
-                from_idx = self.get_obj_location(obj_1)
-                to_idx = self.get_obj_location(obj_2)
-
-            action_type = np.random.rand()
-
-            # if self.obj_types[self.obj_dict[obj_1]] in [4,5]:
-            #     action_type = np.random.rand()
-            #     if action_type < 0.5:
-            #         _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_1])
-            #         delta = np.random.choice([1,-1])
-            #         axis = 1
-            #         if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1] )< 0.5):
-            #             axis = 0
-            #         from_idx[axis] += delta
-            #         to_idx[axis] += delta
-
-            #         from_idx = np.clip(from_idx, 0, self.segments-1)
-            #         to_idx = np.clip(to_idx, 0, self.segments-1)
-            # not having this adds too much uncertainty
-            # after_rotation = 0
-            if self.obj_types[self.obj_dict[obj_2]] in [4, 5]:
-                action_type = np.random.rand()
-                if action_type < 0.5:
-                    _, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_2])
-                    if np.all(np.array(self._p.getEulerFromQuaternion(quaternion)[-1]) < 0.5):
-                        to_idx[1] += np.random.choice([1, -1])
-                    else:
-                        to_idx[0] += np.random.choice([1, -1])
-                    to_idx = np.clip(to_idx, 0, self.segments-1)
-        return (from_idx, to_idx, before_rotation, after_rotation)
+    def sample_ungrappable(self):
+        tall = 0
+        small = 0
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 3:
+                tall = i
+            elif self.obj_types[self.obj_dict[i]] < 3:
+                small = i
+        axis = random.random()
+        if axis < 0.5:
+            dx = np.random.choice([1, -1])
+            self.obj_buffer.append([tall, small, 0, 0, dx, 0, 0, 0])
+            self.obj_buffer.append([small, np.random.randint(0, self.num_objects), 0, 0, 0, 0, 1, 0])
+        else:
+            dy = np.random.choice([1, -1])
+            self.obj_buffer.append([tall, small, 0, 0, 0, dy, 0, 0])
+            self.obj_buffer.append([small, np.random.randint(0, self.num_objects), 0, 0, 0, 0, 0, 0])
+        return self.obj_buffer
 
 
 class PushEnv(GenericEnv):
