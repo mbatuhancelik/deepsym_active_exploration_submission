@@ -135,7 +135,7 @@ def create_object(p, obj_type, size, position, rotation=[0, 0, 0], mass=1, color
     return obj_id
 
 
-def create_arrow(p, from_loc, to_loc):
+def create_arrow(p, from_loc, to_loc, color=[0.0, 1.0, 1.0, 0.75]):
     delta = (np.array(to_loc) - np.array(from_loc))
     length = np.linalg.norm(delta)
     r_x = -np.arctan2(np.linalg.norm([delta[0], delta[1]]), delta[2])
@@ -145,7 +145,7 @@ def create_arrow(p, from_loc, to_loc):
     baseVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
                                        rgbaColor=[0.0, 0.0, 1.0, 0.75])
     childVisualId = p.createVisualShape(shapeType=p.GEOM_CAPSULE, radius=0.01, length=length,
-                                        rgbaColor=[0.0, 1.0, 1.0, 0.75])
+                                        rgbaColor=color)
     tipVisualId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01,
                                       rgbaColor=[1.0, 0.0, 0.0, 0.75])
     obj_id = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=baseVisualId,
