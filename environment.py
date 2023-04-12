@@ -311,7 +311,7 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
-        self.obj_dict[len(self.obj_dict)] = o_id
+        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
@@ -360,7 +360,7 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=[0, 0, np.pi],
                                         mass=0.1, color="random"))
-        self.obj_dict[len(self.obj_dict)] = o_id
+        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
@@ -376,6 +376,7 @@ class BlocksWorld_v4(BlocksWorld):
         '''
         self.obj_buffer = []
         self.obj_types = {}
+        obj_ids = []
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
@@ -407,6 +408,7 @@ class BlocksWorld_v4(BlocksWorld):
                 continue
 
             positions = np.concatenate([positions, pos])
+            obj_ids.append(obj_id)
 
             i += 1
         self.cluster_centers = []
@@ -414,6 +416,8 @@ class BlocksWorld_v4(BlocksWorld):
             self.cluster_centers.append(np.random.randint(0, self.num_objects))
         # TODO: prevent rolling on x y axises
         self.update_contact_graph()
+        for i, o_id in enumerate(sorted(obj_ids)):
+            self.obj_dict[i] = o_id
 
     def update_contact_graph(self):
         return
