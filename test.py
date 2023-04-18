@@ -85,9 +85,10 @@ def draw_action(env):
 
 
 run_id = sys.argv[1]
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
-run.config["device"] = "cpu"
-model = utils.create_model_from_config(run.config)
+run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id )
+config = (dict(run.config))
+config["device"] = "cpu"
+model = utils.create_model_from_config(config)
 model.load("_best", from_wandb=True)
 model.print_model()
 
