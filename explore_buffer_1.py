@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-    env = environment.BlocksWorld_v4(gui=0, min_objects=8, max_objects=13)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=5)
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
 
-        if (env_it) == 8:
+        if (env_it) == 4:
             env_it = 0
             env.reset_objects()
             buffer = populate_buffer(env)
