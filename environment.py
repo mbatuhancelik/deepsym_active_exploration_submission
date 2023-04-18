@@ -383,6 +383,7 @@ class BlocksWorld_v4(BlocksWorld):
         obj_types = [4]
         obj_types += np.random.randint(1, 4, (self.num_objects - 1,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
+        np.random.shuffle(obj_types)
         # obj_types = np.concatenate(([i for i in range(1, 5)], obj_types))
 
         i = 0
