@@ -392,7 +392,7 @@ class BlocksWorld_v4(BlocksWorld):
         while i < self.num_objects:
             obj_type = obj_types[i]
             x = 0.75
-            # x = np.random.uniform(self.x_init, self.x_final)
+            x = np.random.uniform(self.x_init, self.x_final)
             y = np.random.uniform(self.y_init, self.y_final)
             z = 0.43
             pos = np.array([[x, y]])
@@ -402,7 +402,7 @@ class BlocksWorld_v4(BlocksWorld):
             if np.any(np.sum(np.abs(positions**2 - pos ** 2), axis=-1) < 2.5 * self.ds):
                 trials += 1
                 if trials > 10:
-                    z = 0.55
+                    z = 0.57
                 else:
                     continue
             trials = 0
@@ -596,6 +596,8 @@ class BlocksWorld_v4(BlocksWorld):
 
         long_object = random.choice(long_objects)
         small1, small2 = random.choices(smalls, k=2)
+        while small1 == small2:
+            small1 = random.choice(smalls)
 
         act = self.sample_random_action()
         if long_object == 4:

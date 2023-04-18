@@ -65,7 +65,7 @@ if __name__ == "__main__":
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
 
-        if (env_it) == 5:
+        if (env_it) == 4:
             env_it = 0
             env.reset_objects()
             buffer = populate_buffer(env)
