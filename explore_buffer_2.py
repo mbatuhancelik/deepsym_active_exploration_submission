@@ -11,19 +11,24 @@ buffer = []
 
 
 def collect_rollout(env):
-    action = env.sample_random_action()
+    action = 0
+    global buffer
+    if len(buffer) != 0:
+        action = buffer[0]
+        buffer = buffer[1:]
+    else:
+        action = env.sample_random_action()
     position, effect, types = env.step(*action)
     return position, types, action, effect
 
 
 def populate_buffer(env):
-    return env.sample_3_objects_moving_together()
+    return env.sample_mistarget()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Explore environment.")
     parser.add_argument("-N", help="number of interactions", type=int, required=True)
-    parser.add_argument("-T", help="interaction per episode", type=int, required=True)
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
     args = parser.parse_args()
@@ -60,7 +65,7 @@ if __name__ == "__main__":
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
 
-        if (env_it) == args.T:
+        if (env_it) == 5:
             env_it = 0
             env.reset_objects()
             buffer = populate_buffer(env)
