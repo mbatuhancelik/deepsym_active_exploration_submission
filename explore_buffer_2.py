@@ -57,15 +57,17 @@ if __name__ == "__main__":
     i = 0
     buffer = populate_buffer(env)
     while i < args.N:
-        env_it += 1
         position_pre, obj_types, action, effect = collect_rollout(env)
+        env_it += 1
+        if(len(buffer) >0):
+            continue
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
         states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         actions[i] = torch.tensor(action, dtype=torch.int)
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
 
-        if (env_it) == 4:
+        if (env_it) == 2:
             env_it = 0
             env.reset_objects()
             buffer = populate_buffer(env)
