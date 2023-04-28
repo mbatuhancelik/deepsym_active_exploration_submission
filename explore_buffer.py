@@ -8,8 +8,8 @@ import environment
 
 
 buffer = []
-
-
+buffer_type = ""
+buffer_lenght = 0
 def collect_rollout(env):
     action = 0
     global buffer
@@ -23,7 +23,14 @@ def collect_rollout(env):
 
 
 def populate_buffer(env):
-    return env.sample_3_objects_moving_together()
+    global buffer_type
+    buffer = None
+    if buffer_type == "3obj":
+        buffer = env.sample_3_objects_moving_together()
+    if buffer_type == "mistarget":
+        buffer = env.sample_mistarget()
+    assert(buffer != None)
+    return buffer
 
 
 if __name__ == "__main__":
@@ -31,6 +38,9 @@ if __name__ == "__main__":
     parser.add_argument("-N", help="number of interactions", type=int, required=True)
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
+    parser.add_argument("-b", help="buffer_type", type=str, required=True)
+    parser.add_argument("-post", help="post buffer actions", type=int,default=0)
+    parser.add_argument("-pre", help="pre buffer actions", type=int,default=0)
     args = parser.parse_args()
 
     if not os.path.exists(args.o):
@@ -52,27 +62,29 @@ if __name__ == "__main__":
     effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
 
     prog_it = args.N
+    buffer_type = args.b
     start = time.time()
     env_it = 0
     i = 0
     buffer = populate_buffer(env)
+    buffer_lenght = len(buffer)
     while i < args.N:
         position_pre, obj_types, action, effect = collect_rollout(env)
         env_it += 1
-        if(len(buffer) >0):
+        if(len(buffer) >args.pre):
             continue
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
         states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         actions[i] = torch.tensor(action, dtype=torch.int)
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
+        i += 1
 
-        if (env_it) == 4:
+        if (env_it) == buffer_lenght + args.post:
             env_it = 0
             env.reset_objects()
             buffer = populate_buffer(env)
 
-        i += 1
         if i % prog_it == 0:
             print(f"Proc {args.i}: {100*i/args.N}% completed.")
 
