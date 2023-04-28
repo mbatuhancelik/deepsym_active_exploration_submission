@@ -16,9 +16,6 @@ def collect_rollout(env):
     return position, types, action, effect
 
 
-def populate_buffer(env):
-    return env.sample_3_objects_moving_together()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Explore environment.")
@@ -50,7 +47,7 @@ if __name__ == "__main__":
     start = time.time()
     env_it = 0
     i = 0
-    buffer = populate_buffer(env)
+
     while i < args.N:
         env_it += 1
         position_pre, obj_types, action, effect = collect_rollout(env)
@@ -63,7 +60,7 @@ if __name__ == "__main__":
         if (env_it) == args.T:
             env_it = 0
             env.reset_objects()
-            buffer = populate_buffer(env)
+        
 
         i += 1
         if i % prog_it == 0:

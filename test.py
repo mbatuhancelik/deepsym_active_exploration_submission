@@ -6,14 +6,24 @@ import wandb
 import environment
 import utils
 
-
-def draw_action(env):
+def convert_to_symbol_str(z):
+    res = ""
+    for byte in z:
+        res += str(int(byte.item())) 
+    return res
+def draw_action(env, z = None):
     text_items = {}
     for o_id in env.obj_dict:
-        text_items[o_id] = env._p.addUserDebugText(str(o_id), [0., 0., 0.05],
+        if z != None:
+            text_items[o_id] = env._p.addUserDebugText(str(o_id) + ":" + convert_to_symbol_str(z[0 , o_id]), [0., 0., 0.05],
                                                    textColorRGB=[1.0, 0.0, 0.0],
                                                    parentObjectUniqueId=env.obj_dict[o_id],
-                                                   textSize=1.5)
+                                                   textSize=0.5)
+        else:
+            text_items[o_id] = env._p.addUserDebugText(str(o_id), [0., 0., 0.05],
+                                                   textColorRGB=[1.0, 0.0, 0.0],
+                                                   parentObjectUniqueId=env.obj_dict[o_id],
+                                                   textSize=0.5)
 
     from_obj = int(input("From: "))
     text_items[from_obj] = env._p.addUserDebugText(str(from_obj), [0., 0., 0.05],
@@ -98,6 +108,7 @@ for name in model.module_names:
 
 env = environment.BlocksWorld_v4(gui=1, min_objects=8, max_objects=13)
 eff_arrow_ids = []
+z = None
 while True:
     while len(eff_arrow_ids) > 0:
         arrow_id = eff_arrow_ids.pop()
@@ -106,12 +117,13 @@ while True:
     state = torch.tensor(state)
     types = torch.tensor(types).reshape(-1, 1)
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
-    action, debug_texts = draw_action(env)
+    action, debug_texts = draw_action(env, z)
     action_vector = torch.zeros(state.shape[0], 4, dtype=torch.float)
     action_vector[action[0]] = torch.tensor([-1, action[2], action[3], action[6]], dtype=torch.float)
     action_vector[action[1]] = torch.tensor([1, action[4], action[5], action[7]], dtype=torch.float)
     sample = {"state": state.unsqueeze(0), "action": action_vector.unsqueeze(0), "pad_mask": torch.ones(1, state.shape[0])}
-    _, e_pred = model.forward(sample, eval_mode=True)
+    z, e_pred = model.forward(sample, eval_mode=True)
+    print(e_pred[0, :, 2])
     e_pred = e_pred.detach()
     e_pred = e_pred.reshape(-1, 2, 9)
     for e_i, s_i in zip(e_pred, state):
