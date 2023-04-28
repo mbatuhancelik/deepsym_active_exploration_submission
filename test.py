@@ -18,12 +18,12 @@ def draw_action(env, z = None):
             text_items[o_id] = env._p.addUserDebugText(str(o_id) + ":" + convert_to_symbol_str(z[0 , o_id]), [0., 0., 0.05],
                                                    textColorRGB=[1.0, 0.0, 0.0],
                                                    parentObjectUniqueId=env.obj_dict[o_id],
-                                                   textSize=1.5)
+                                                   textSize=0.5)
         else:
             text_items[o_id] = env._p.addUserDebugText(str(o_id), [0., 0., 0.05],
                                                    textColorRGB=[1.0, 0.0, 0.0],
                                                    parentObjectUniqueId=env.obj_dict[o_id],
-                                                   textSize=1.5)
+                                                   textSize=0.5)
 
     from_obj = int(input("From: "))
     text_items[from_obj] = env._p.addUserDebugText(str(from_obj), [0., 0., 0.05],
