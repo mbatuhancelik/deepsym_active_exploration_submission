@@ -82,7 +82,6 @@ def draw_action(env, z = None):
                                                    textSize=1.5,
                                                    replaceItemUniqueId=text_items[from_obj])
     state_debug_texts.append(text_items[from_obj])
-    print("bu", state_debug_texts[-1])
     text_items[to_obj] = env._p.addUserDebugText(str(to_obj) + ":" + str(z[to_obj].item()), [0., 0., 0.05],
                                                  textColorRGB=[1.0, 0.0, 0.0],
                                                  parentObjectUniqueId=env.obj_dict[to_obj],
@@ -120,7 +119,6 @@ while True:
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
     z = model.encode(state.unsqueeze(0))
     z = utils.binary_to_decimal(z[0,:,:].round())
-    print(z)
     action, debug_texts = draw_action(env, z)
     action_vector = torch.zeros(state.shape[0], 4, dtype=torch.float)
     action_vector[action[0]] = torch.tensor([-1, action[2], action[3], action[6]], dtype=torch.float)
