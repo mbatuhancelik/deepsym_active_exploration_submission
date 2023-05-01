@@ -6,31 +6,24 @@ import wandb
 import environment
 import utils
 
-def convert_to_symbol_str(z):
-    res = ""
-    for byte in z:
-        res += str(int(byte.item())) 
-    return res
 def draw_action(env, z = None):
     text_items = {}
+    state_debug_texts = []
+
     for o_id in env.obj_dict:
-        if z != None:
-            text_items[o_id] = env._p.addUserDebugText(str(o_id) + ":" + convert_to_symbol_str(z[0 , o_id]), [0., 0., 0.05],
-                                                   textColorRGB=[1.0, 0.0, 0.0],
-                                                   parentObjectUniqueId=env.obj_dict[o_id],
-                                                   textSize=0.5)
-        else:
-            text_items[o_id] = env._p.addUserDebugText(str(o_id), [0., 0., 0.05],
-                                                   textColorRGB=[1.0, 0.0, 0.0],
-                                                   parentObjectUniqueId=env.obj_dict[o_id],
-                                                   textSize=0.5)
+        text_items[o_id] = env._p.addUserDebugText(str(o_id) + ":" + str(z[o_id].item()), [0., 0., 0.05],
+                                                textColorRGB=[1.0, 0.0, 0.0],
+                                                parentObjectUniqueId=env.obj_dict[o_id],
+                                                textSize=1)
+        state_debug_texts.append(text_items[o_id])
 
     from_obj = int(input("From: "))
-    text_items[from_obj] = env._p.addUserDebugText(str(from_obj), [0., 0., 0.05],
+    text_items[from_obj] = env._p.addUserDebugText(str(from_obj) + ":" + str(z[from_obj].item()), [0., 0., 0.05],
                                                    textColorRGB=[0.0, 0.0, 1.0],
                                                    parentObjectUniqueId=env.obj_dict[from_obj],
                                                    textSize=1.5,
                                                    replaceItemUniqueId=text_items[from_obj])
+    state_debug_texts.append(text_items[from_obj])
     x_debug_texts = []
     for i in [-1, 0, 1]:
         for j in [-1, 0, 1]:
@@ -49,13 +42,14 @@ def draw_action(env, z = None):
                                            textColorRGB=[0.0, 1.0, 1.0],
                                            textSize=1.5,
                                            parentObjectUniqueId=env.obj_dict[from_obj])
-
+    state_debug_texts.append(x_debug_text)
     to_obj = int(input("To: "))
-    text_items[to_obj] = env._p.addUserDebugText(str(to_obj), [0., 0., 0.05],
+    text_items[to_obj] = env._p.addUserDebugText(str(to_obj) + ":" + str(z[to_obj].item()), [0., 0., 0.05],
                                                  textColorRGB=[0.0, 0.0, 1.0],
                                                  parentObjectUniqueId=env.obj_dict[to_obj],
                                                  textSize=1.5,
                                                  replaceItemUniqueId=text_items[to_obj])
+    state_debug_texts.append(text_items[to_obj])
     y_debug_texts = []
     for i in [-1, 0, 1]:
         for j in [-1, 0, 1]:
@@ -74,23 +68,29 @@ def draw_action(env, z = None):
                                            textColorRGB=[0.0, 1.0, 1.0],
                                            textSize=1.5,
                                            parentObjectUniqueId=env.obj_dict[to_obj])
+    state_debug_texts.append(y_debug_text)
+
 
     init_rot, final_rot = input("Init rot, final rot: ").split(" ")
     init_rot = int(init_rot)
     final_rot = int(final_rot)
     action = [from_obj, to_obj, from_dx, from_dy, to_dx, to_dy, init_rot, final_rot]
 
-    text_items[from_obj] = env._p.addUserDebugText(str(from_obj), [0., 0., 0.05],
+    text_items[from_obj] = env._p.addUserDebugText(str(from_obj) + ":" + str(z[from_obj].item()), [0., 0., 0.05],
                                                    textColorRGB=[1.0, 0.0, 0.0],
                                                    parentObjectUniqueId=env.obj_dict[from_obj],
                                                    textSize=1.5,
                                                    replaceItemUniqueId=text_items[from_obj])
-    text_items[to_obj] = env._p.addUserDebugText(str(to_obj), [0., 0., 0.05],
+    state_debug_texts.append(text_items[from_obj])
+    text_items[to_obj] = env._p.addUserDebugText(str(to_obj) + ":" + str(z[to_obj].item()), [0., 0., 0.05],
                                                  textColorRGB=[1.0, 0.0, 0.0],
                                                  parentObjectUniqueId=env.obj_dict[to_obj],
                                                  textSize=1.5,
                                                  replaceItemUniqueId=text_items[to_obj])
-
+    state_debug_texts.append(text_items[to_obj])
+    for debug_text in state_debug_texts:
+        env._p.removeUserDebugItem(debug_text)
+        
     return action, [x_debug_text, y_debug_text]
 
 
@@ -108,7 +108,7 @@ for name in model.module_names:
 
 env = environment.BlocksWorld_v4(gui=1, min_objects=8, max_objects=13)
 eff_arrow_ids = []
-z = None
+
 while True:
     while len(eff_arrow_ids) > 0:
         arrow_id = eff_arrow_ids.pop()
@@ -117,6 +117,8 @@ while True:
     state = torch.tensor(state)
     types = torch.tensor(types).reshape(-1, 1)
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
+    z = model.encode(state.unsqueeze(0))
+    z = utils.binary_to_decimal(z[0,:,:].round())
     action, debug_texts = draw_action(env, z)
     action_vector = torch.zeros(state.shape[0], 4, dtype=torch.float)
     action_vector[action[0]] = torch.tensor([-1, action[2], action[3], action[6]], dtype=torch.float)
