@@ -6,15 +6,16 @@ import wandb
 import environment
 import utils
 
-def draw_action(env, z = None):
+
+def draw_action(env, z=None):
     text_items = {}
     state_debug_texts = []
 
     for o_id in env.obj_dict:
         text_items[o_id] = env._p.addUserDebugText(str(o_id) + ":" + str(z[o_id].item()), [0., 0., 0.05],
-                                                textColorRGB=[1.0, 0.0, 0.0],
-                                                parentObjectUniqueId=env.obj_dict[o_id],
-                                                textSize=1)
+                                                   textColorRGB=[1.0, 0.0, 0.0],
+                                                   parentObjectUniqueId=env.obj_dict[o_id],
+                                                   textSize=1)
         state_debug_texts.append(text_items[o_id])
 
     from_obj = int(input("From: "))
@@ -70,7 +71,6 @@ def draw_action(env, z = None):
                                            parentObjectUniqueId=env.obj_dict[to_obj])
     state_debug_texts.append(y_debug_text)
 
-
     init_rot, final_rot = input("Init rot, final rot: ").split(" ")
     init_rot = int(init_rot)
     final_rot = int(final_rot)
@@ -90,12 +90,12 @@ def draw_action(env, z = None):
     state_debug_texts.append(text_items[to_obj])
     for debug_text in state_debug_texts:
         env._p.removeUserDebugItem(debug_text)
-        
+
     return action, [x_debug_text, y_debug_text]
 
 
 run_id = sys.argv[1]
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id )
+run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
 config = (dict(run.config))
 config["device"] = "cpu"
 model = utils.create_model_from_config(config)
@@ -118,12 +118,14 @@ while True:
     types = torch.tensor(types).reshape(-1, 1)
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
     z = model.encode(state.unsqueeze(0))
-    z = utils.binary_to_decimal(z[0,:,:].round())
+    z = utils.binary_to_decimal(z[0, :, :].round())
     action, debug_texts = draw_action(env, z)
     action_vector = torch.zeros(state.shape[0], 4, dtype=torch.float)
     action_vector[action[0]] = torch.tensor([-1, action[2], action[3], action[6]], dtype=torch.float)
     action_vector[action[1]] = torch.tensor([1, action[4], action[5], action[7]], dtype=torch.float)
-    sample = {"state": state.unsqueeze(0), "action": action_vector.unsqueeze(0), "pad_mask": torch.ones(1, state.shape[0])}
+    sample = {"state": state.unsqueeze(0),
+              "action": action_vector.unsqueeze(0),
+              "pad_mask": torch.ones(1, state.shape[0])}
     z, e_pred = model.forward(sample, eval_mode=True)
     print(e_pred[0, :, 2])
     e_pred = e_pred.detach()
