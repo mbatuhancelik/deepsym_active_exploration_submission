@@ -380,15 +380,18 @@ class BlocksWorld_v4(BlocksWorld):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = np.random.randint(1, 6, (self.num_objects - 5,)).tolist()
+        obj_types = [4]
+        obj_types += np.random.randint(1, 4, (self.num_objects - 1,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
-        obj_types = np.concatenate(([i for i in range(1, 6)], obj_types))
+        np.random.shuffle(obj_types)
+        # obj_types = np.concatenate(([i for i in range(1, 5)], obj_types))
 
         i = 0
         positions = np.array([[0, 0]])
         trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
+            x = 0.75
             x = np.random.uniform(self.x_init, self.x_final)
             y = np.random.uniform(self.y_init, self.y_final)
             z = 0.43
@@ -399,7 +402,7 @@ class BlocksWorld_v4(BlocksWorld):
             if np.any(np.sum(np.abs(positions**2 - pos ** 2), axis=-1) < 2.5 * self.ds):
                 trials += 1
                 if trials > 10:
-                    z = 0.55
+                    z = 0.57
                 else:
                     continue
             trials = 0
@@ -556,7 +559,7 @@ class BlocksWorld_v4(BlocksWorld):
 
     def sample_random_action(self):
         obj1 = np.random.randint(self.num_objects)
-        obj2 = np.random.choice(self.cluster_centers)
+        obj2 = np.random.choice(self.num_objects)
 
         while obj1 in self.cluster_centers:
             obj1 = np.random.randint(self.num_objects)
@@ -575,8 +578,10 @@ class BlocksWorld_v4(BlocksWorld):
 
         [dx1, dy1] = dxdy_pairs[dxdy1]
         [dx2, dy2] = dxdy_pairs[dxdy2]
-
-        rot_before, rot_after = np.random.randint(0, 2, (2))
+        dx1 = 0
+        dx2 = 0
+        #rot_before, rot_after = np.random.randint(0, 2, (2))
+        rot_before, rot_after = (1,1)
         return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
 
     def sample_3_objects_moving_together(self):
@@ -591,29 +596,49 @@ class BlocksWorld_v4(BlocksWorld):
 
         long_object = random.choice(long_objects)
         small1, small2 = random.choices(smalls, k=2)
+        while small1 == small2:
+            small1 = random.choice(smalls)
 
         act = self.sample_random_action()
         if long_object == 4:
             self.obj_buffer.append(
-                [small1, long_object, 0, 0, 1, 0, 0, 0]
+                [small1, long_object, 0, 0, 1, 0, 1, 1]
             )
             self.obj_buffer.append(
-                [small2, long_object, 0, 0, -1, 0, 0, 0]
+                [small2, long_object, 0, 0, -1, 0, 1, 1]
             )
             act[6] = 0
         else:
             self.obj_buffer.append(
-                [small1, long_object, 0, 0, 0, 1, 0, 0]
+                [small1, long_object, 0, 0, 0, 1, 1, 1]
             )
             self.obj_buffer.append(
-                [small2, long_object, 0, 0, 0, -1, 0, 0]
+                [small2, long_object, 0, 0, 0, -1, 1, 1]
             )
-            act[6] = 1
+        act[6] = 1
         act[2] = 0
         act[3] = 0
         act[0] = long_object
 
         self.obj_buffer.append(act)
+        return self.obj_buffer
+    def sample_mistarget(self):
+        obj1 = np.random.randint(self.num_objects)
+        obj2 = np.random.choice(self.num_objects)
+        obj3 = np.random.choice(self.num_objects)
+        while obj1 == obj2:
+            obj2 = np.random.choice(self.num_objects)
+        while obj2 == obj3 or obj1 == obj3:
+            obj3 = np.random.choice(self.num_objects)
+        self.obj_buffer.append(
+                [obj1, obj2, 0, 0, 0, 0, 1, 1]
+            )
+        self.obj_buffer.append(
+                [obj3, obj3, 0, 0, -1, 1, 1, 1]
+            )
+        self.obj_buffer.append(
+                [obj2, obj3, 0, 0, 0, 0, 1, 1]
+            )
         return self.obj_buffer
 
     def sample_ungrappable(self):
