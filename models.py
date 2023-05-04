@@ -201,34 +201,14 @@ class DeepSymbolGenerator:
 class MultiDeepSym(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(MultiDeepSym, self).__init__(**kwargs)
-        self.projector = kwargs.get("projector")
-        self.decoder_att = kwargs.get("decoder_att")
-        self.optimizer.param_groups.append(
-                {"params": self.projector.parameters(),
-                 "lr": self.lr,
-                 "betas": (0.9, 0.999),
-                 "eps": 1e-8,
-                 "amsgrad": False,
-                 "maximize": False,
-                 "weight_decay": 0,
-                 "fused": False,
-                 "foreach": None,
-                 "capturable": False,
-                 "differentiable": False})
-        self.optimizer.param_groups.append(
-                {"params": self.decoder_att.parameters(),
-                 "lr": self.lr,
-                 "betas": (0.9, 0.999),
-                 "eps": 1e-8,
-                 "amsgrad": False,
-                 "maximize": False,
-                 "weight_decay": 0,
-                 "fused": False,
-                 "foreach": None,
-                 "capturable": False,
-                 "differentiable": False})
-        self.module_names.append("projector")
-        self.module_names.append("decoder_att")
+        self._append_module("in_proj", kwargs.get("in_proj"))
+        self._append_module("feedforward", kwargs.get("feedforward"))
+        self._append_module("attention", kwargs.get("attention"))
+
+    def _append_module(self, name, module):
+        setattr(self, name, module)
+        self.module_names.append(name)
+        self.optimizer.add_param_group({"params": module.parameters()})
 
     def encode(self, x, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
@@ -239,6 +219,13 @@ class MultiDeepSym(DeepSymbolGenerator):
             h = h.round()
         return h
 
+    def attn_weights(self, x, pad_mask):
+        # assume that x is not an image for the moment..
+        h = self.in_proj(x)
+        _, attn_weights = self.attention(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device),
+                                         average_attn_weights=False)
+        return attn_weights
+
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
         a = sample["action"].to(self.device)
@@ -246,10 +233,12 @@ class MultiDeepSym(DeepSymbolGenerator):
         z = torch.cat([h, a], dim=-1)
         return z
 
-    def aggregate(self, z, pad_mask):
-        z = self.projector(z)
-        z_att = self.decoder_att(z, src_key_padding_mask=~pad_mask.bool().to(self.device))
-        return z_att
+    def aggregate(self, z, attn_weights):
+        n_batch, n_seg, n_dim = z.shape
+        h = self.feedforward(z.reshape(-1, n_dim)).reshape(n_batch, n_seg, -1).unsqueeze(1)
+        att_out = attn_weights @ h  # (n_batch, n_head, n_seg, n_dim)
+        att_out = att_out.permute(0, 2, 1, 3).reshape(n_batch, n_seg, -1)  # (n_batch, n_seg, n_head*n_dim)
+        return att_out
 
     def decode(self, z, mask):
         n_sample, n_seg, z_dim = z.shape
@@ -263,7 +252,8 @@ class MultiDeepSym(DeepSymbolGenerator):
 
     def forward(self, sample, eval_mode=False):
         z = self.concat(sample, eval_mode)
-        z_att = self.aggregate(z, sample["pad_mask"])
+        attn_weights = self.attn_weights(sample["state"], sample["pad_mask"])
+        z_att = self.aggregate(z, attn_weights)
         e = self.decode(z_att, sample["pad_mask"])
         return z, e
 
