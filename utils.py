@@ -40,31 +40,44 @@ def parse_and_init(args):
 
 def create_model_from_config(config):
     # create the encoder
-    enc_layers = [config["state_dim"]] + [config["hidden_dim"]]*config["n_hidden_layers"] + [config["latent_dim"]]
+    enc_layers = [config["state_dim"]] + \
+                 [config["hidden_dim"]]*config["n_hidden_layers"] + \
+                 [config["latent_dim"]]
     enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"])
     encoder = torch.nn.Sequential(
         enc_mlp,
-        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"], T=config["gumbel_t"])
+        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
+                                  T=config["gumbel_t"])
     )
     # create the projector
-    projector = torch.nn.Linear(config["latent_dim"]+config["action_dim"], config["hidden_dim"])
-    # create the transformer
-    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"],
-                                             batch_first=True)
-    transformer = torch.nn.TransformerEncoder(layer, num_layers=config["n_attention_layers"])
+    in_proj = torch.nn.Linear(config["state_dim"], config["hidden_dim"])
+
+    # create the attention module
+    attention = torch.nn.MultiheadAttention(embed_dim=config["hidden_dim"],
+                                            num_heads=config["n_attention_heads"],
+                                            batch_first=True)
+
+    # create a feedforward net to process input before attention
+    ff_layers = [config["latent_dim"]+config["action_dim"]] + \
+                [config["hidden_dim"]]*config["n_hidden_layers"]
+    ff = blocks.MLP(ff_layers, batch_norm=config["batch_norm"])
+
     # create the decoder
-    dec_layers = [config["hidden_dim"]]*(config["n_hidden_layers"]+1) + [config["effect_dim"]]
+    dec_layers = [config["hidden_dim"]*config["n_attention_heads"]] + \
+                 [config["hidden_dim"]]*(config["n_hidden_layers"]) + \
+                 [config["effect_dim"]]
     decoder = blocks.MLP(dec_layers, batch_norm=config["batch_norm"])
+
     # send everything to the device
     encoder = encoder.to(config["device"])
-    projector = projector.to(config["device"])
-    transformer = transformer.to(config["device"])
+    in_proj = in_proj.to(config["device"])
+    attention = attention.to(config["device"])
     decoder = decoder.to(config["device"])
 
     # create the model
-    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
-                                   device=config["device"], lr=config["lr"], path=config["save_folder"],
-                                   coeff=config["coeff"])
+    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, in_proj=in_proj, attention=attention,
+                                   feedforward=ff, device=config["device"], lr=config["lr"],
+                                   path=config["save_folder"], coeff=config["coeff"])
 
     return model
 
