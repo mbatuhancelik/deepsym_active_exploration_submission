@@ -76,10 +76,10 @@ def merge_datasets(args):
     len_large = l_state.shape[0]
 
     divide_index = int(len_small/2)
-    action = torch.concat([s_action, l_action[:len_small*5]] , dim=0)
-    state = torch.concat([s_state, l_state[:len_small*5]], dim=0)
-    effect = torch.concat([s_effect, l_effect[:len_small*5]], dim=0)
-    mask = torch.concat([s_mask, l_mask[:len_small*5]], dim=0)
+    action = torch.concat([s_action, l_action] , dim=0)
+    state = torch.concat([s_state, l_state], dim=0)
+    effect = torch.concat([s_effect, l_effect], dim=0)
+    mask = torch.concat([s_mask, l_mask], dim=0)
 
     shuffle = torch.randperm(action.size()[0])
 
@@ -133,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", help="dataset name", type=str)
     parser.add_argument("-s", "--small", help="smaller dataset", type=str)
     parser.add_argument("-l", "--large", help="appended dataset", type=str)
+    parser.add_argument("-i", help="number of rolls", type=int)
     
     args = parser.parse_args()
     if args.action == "metrics":
