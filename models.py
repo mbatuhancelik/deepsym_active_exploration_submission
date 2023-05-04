@@ -218,13 +218,15 @@ class MultiDeepSym(DeepSymbolGenerator):
             h = h.round()
         return h
 
-    def attn_weights(self, x, pad_mask):
+    def attn_weights(self, x, pad_mask, eval_mode=False):
         # assume that x is not an image for the moment..
         attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
+        if eval_mode:
+            attn_weights = attn_weights.round()
         return attn_weights
 
     def concat(self, sample, eval_mode=False):
-        x = sample["state"].to(self.device)
+        x = sample["state"]
         a = sample["action"].to(self.device)
         h = self.encode(x, eval_mode)
         z = torch.cat([h, a], dim=-1)
@@ -233,7 +235,7 @@ class MultiDeepSym(DeepSymbolGenerator):
     def aggregate(self, z, attn_weights):
         n_batch, n_seg, n_dim = z.shape
         h = self.feedforward(z.reshape(-1, n_dim)).reshape(n_batch, n_seg, -1).unsqueeze(1)
-        att_out = attn_weights @ h  # (n_batch, n_head, n_seg, n_dim)
+        att_out = torch.relu(attn_weights @ h)  # (n_batch, n_head, n_seg, n_dim)
         att_out = att_out.permute(0, 2, 1, 3).reshape(n_batch, n_seg, -1)  # (n_batch, n_seg, n_head*n_dim)
         return att_out
 
@@ -249,21 +251,21 @@ class MultiDeepSym(DeepSymbolGenerator):
 
     def forward(self, sample, eval_mode=False):
         z = self.concat(sample, eval_mode)
-        attn_weights = self.attn_weights(sample["state"], sample["pad_mask"])
+        attn_weights = self.attn_weights(sample["state"], sample["pad_mask"], eval_mode)
         z_att = self.aggregate(z, attn_weights)
         e = self.decode(z_att, sample["pad_mask"])
-        return z, e
+        return z, attn_weights, e
 
     def loss(self, sample):
         e_truth = sample["effect"].to(self.device)
-        _, e_pred = self.forward(sample)
+        _, _, e_pred = self.forward(sample)
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L
 
     def loss_with_pred(self, sample):
         e_truth = sample["effect"].to(self.device)
-        _, e_pred = self.forward(sample)
+        _, _, e_pred = self.forward(sample)
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L, e_pred
