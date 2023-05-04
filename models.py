@@ -201,7 +201,6 @@ class DeepSymbolGenerator:
 class MultiDeepSym(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(MultiDeepSym, self).__init__(**kwargs)
-        self._append_module("in_proj", kwargs.get("in_proj"))
         self._append_module("feedforward", kwargs.get("feedforward"))
         self._append_module("attention", kwargs.get("attention"))
 
@@ -221,8 +220,7 @@ class MultiDeepSym(DeepSymbolGenerator):
 
     def attn_weights(self, x, pad_mask):
         # assume that x is not an image for the moment..
-        h = self.in_proj(x)
-        attn_weights = self.attention(h, pad_mask)
+        attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
         return attn_weights
 
     def concat(self, sample, eval_mode=False):
