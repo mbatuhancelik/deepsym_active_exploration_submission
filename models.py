@@ -222,8 +222,7 @@ class MultiDeepSym(DeepSymbolGenerator):
     def attn_weights(self, x, pad_mask):
         # assume that x is not an image for the moment..
         h = self.in_proj(x)
-        _, attn_weights = self.attention(h, h, h, key_padding_mask=~pad_mask.bool().to(self.device),
-                                         average_attn_weights=False)
+        attn_weights = self.attention(h, pad_mask)
         return attn_weights
 
     def concat(self, sample, eval_mode=False):

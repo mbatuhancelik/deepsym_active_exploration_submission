@@ -53,9 +53,9 @@ def create_model_from_config(config):
     in_proj = torch.nn.Linear(config["state_dim"], config["hidden_dim"])
 
     # create the attention module
-    attention = torch.nn.MultiheadAttention(embed_dim=config["hidden_dim"],
-                                            num_heads=config["n_attention_heads"],
-                                            batch_first=True)
+    attention = blocks.GumbelAttention(in_dim=config["state_dim"],
+                                       out_dim=config["hidden_dim"],
+                                       num_heads=config["n_attention_heads"])
 
     # create a feedforward net to process input before attention
     ff_layers = [config["latent_dim"]+config["action_dim"]] + \
