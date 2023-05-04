@@ -49,8 +49,6 @@ def create_model_from_config(config):
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
                                   T=config["gumbel_t"])
     )
-    # create the projector
-    in_proj = torch.nn.Linear(config["state_dim"], config["hidden_dim"])
 
     # create the attention module
     attention = blocks.GumbelAttention(in_dim=config["state_dim"],
@@ -70,13 +68,12 @@ def create_model_from_config(config):
 
     # send everything to the device
     encoder = encoder.to(config["device"])
-    in_proj = in_proj.to(config["device"])
     attention = attention.to(config["device"])
     ff = ff.to(config["device"])
     decoder = decoder.to(config["device"])
 
     # create the model
-    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, in_proj=in_proj, attention=attention,
+    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
                                    feedforward=ff, device=config["device"], lr=config["lr"],
                                    path=config["save_folder"], coeff=config["coeff"])
 
