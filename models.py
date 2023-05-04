@@ -226,7 +226,7 @@ class MultiDeepSym(DeepSymbolGenerator):
         return attn_weights
 
     def concat(self, sample, eval_mode=False):
-        x = sample["state"]
+        x = sample["state"].to(self.device)
         a = sample["action"].to(self.device)
         h = self.encode(x, eval_mode)
         z = torch.cat([h, a], dim=-1)

@@ -72,6 +72,7 @@ def create_model_from_config(config):
     encoder = encoder.to(config["device"])
     in_proj = in_proj.to(config["device"])
     attention = attention.to(config["device"])
+    ff = ff.to(config["device"])
     decoder = decoder.to(config["device"])
 
     # create the model
