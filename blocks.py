@@ -241,12 +241,14 @@ class GumbelAttention(torch.nn.Module):
             torch.Tensor(num_heads, out_dim, in_dim)
         ))
 
-    def forward(self, x, temperature=1.0, hard=False):
+    def forward(self, x, src_key_mask=None, temperature=1.0, hard=False):
         """
         Parameters
         ----------
         x : torch.Tensor
             shape (batch, token, dim)
+        src_key_mask : torch.Tensor
+            shape (batch, token)
         temperature : float
             temperature of gumbel sigmoid
         hard : bool
@@ -256,11 +258,20 @@ class GumbelAttention(torch.nn.Module):
         attn : torch.Tensor
             shape (batch, head, token, token)
         """
+        if src_key_mask is None:
+            src_key_mask = torch.ones(x.shape[0], x.shape[1], dtype=torch.float, device=x.device)
         batch, token, dim = x.shape
         x = x.reshape(batch*token, 1, dim, 1)  # (batch*token, placeholder_for_head, in_dim, 1)
         wq = self.wq.unsqueeze(0)  # (placeholder_for_batch, head, out_dim, in_dim)
         wk = self.wk.unsqueeze(0)  # (placeholder_for_batch, head, out_dim, in_dim)
-        q = (wq @ x).reshape(batch, token, self.num_heads, -1).permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
-        k = (wk @ x).reshape(batch, token, self.num_heads, -1).permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
+        pad_mask = src_key_mask.reshape(batch, token, 1, 1)
+        q = (wq @ x).reshape(batch, token, self.num_heads, -1) * pad_mask
+        q = q.permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
+        k = (wk @ x).reshape(batch, token, self.num_heads, -1) * pad_mask
+        k = k.permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
         attn = (q @ k.permute(0, 1, 3, 2)) / self._denom  # (batch, head, token, token)
-        return gumbel_sigmoid(attn, temperature, hard)
+        binarized_attn = gumbel_sigmoid(attn, temperature, hard)
+        # currently, it returns non-zero value for the masked position
+        # however, there is no gradient flow from masked positions.
+        # TODO: it would have been nice to return zero values for the masked positions.
+        return binarized_attn
