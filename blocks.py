@@ -225,3 +225,42 @@ def gumbel_sigmoid(logits, T=1.0, hard=False):
         s_hard = s.round()
         s = (s_hard - s).detach() + s
     return s
+
+
+class GumbelAttention(torch.nn.Module):
+    def __init__(self, in_dim, out_dim, num_heads):
+        super(GumbelAttention, self).__init__()
+        self.num_heads = num_heads
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self._denom = math.sqrt(out_dim)
+        self.wq = torch.nn.Parameter(torch.nn.init.xavier_normal_(
+            torch.Tensor(num_heads, out_dim, in_dim)
+        ))
+        self.wk = torch.nn.Parameter(torch.nn.init.xavier_normal_(
+            torch.Tensor(num_heads, out_dim, in_dim)
+        ))
+
+    def forward(self, x, temperature=1.0, hard=False):
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            shape (batch, token, dim)
+        temperature : float
+            temperature of gumbel sigmoid
+        hard : bool
+            if True, use hard gumbel sigmoid
+        Returns
+        -------
+        attn : torch.Tensor
+            shape (batch, head, token, token)
+        """
+        batch, token, dim = x.shape
+        x = x.reshape(batch*token, 1, dim, 1)  # (batch*token, placeholder_for_head, in_dim, 1)
+        wq = self.wq.unsqueeze(0)  # (placeholder_for_batch, head, out_dim, in_dim)
+        wk = self.wk.unsqueeze(0)  # (placeholder_for_batch, head, out_dim, in_dim)
+        q = (wq @ x).reshape(batch, token, self.num_heads, -1).permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
+        k = (wk @ x).reshape(batch, token, self.num_heads, -1).permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
+        attn = (q @ k.permute(0, 1, 3, 2)) / self._denom  # (batch, head, token, token)
+        return gumbel_sigmoid(attn, temperature, hard)
