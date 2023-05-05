@@ -106,7 +106,7 @@ for name in model.module_names:
     getattr(model, name).eval()
 
 
-env = environment.BlocksWorld_v4(gui=1, min_objects=8, max_objects=13)
+env = environment.BlocksWorld_v4(gui=1, min_objects=5, max_objects=5)
 eff_arrow_ids = []
 
 while True:
@@ -126,8 +126,10 @@ while True:
     sample = {"state": state.unsqueeze(0),
               "action": action_vector.unsqueeze(0),
               "pad_mask": torch.ones(1, state.shape[0])}
-    z, e_pred = model.forward(sample, eval_mode=True)
-    print(e_pred[0, :, 2])
+    z, z_rel, e_pred = model.forward(sample, eval_mode=True)
+    print(z)
+    print(z_rel)
+    print(e_pred[0, :, 2], e_pred[0, :, 11])
     e_pred = e_pred.detach()
     e_pred = e_pred.reshape(-1, 2, 9)
     for e_i, s_i in zip(e_pred, state):
