@@ -640,7 +640,29 @@ class BlocksWorld_v4(BlocksWorld):
                 [obj2, obj3, 0, 0, 0, 0, 1, 1]
             )
         return self.obj_buffer
+    def sample_both(self):
+        #TODO: introduce clustering
+        long_objects = []
+        smalls = []
 
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 4:
+                long_objects.append(i)
+            else:
+                smalls.append(i)
+        
+        long_object = long_objects.pop(0)
+        smalls += long_objects
+        self.obj_buffer.append(
+                [smalls[0], long_object, 0, 0, 0, 1, 1, 1]
+            )
+        self.obj_buffer.append(
+            [smalls[1], long_object, 0, 0, 0, -1, 1, 1]
+        )
+        self.obj_buffer.append(
+                [smalls[2], smalls[3], 0, 0, 0, 0, 1, 1]
+            )
+        return self.obj_buffer
     def sample_ungrappable(self):
         tall = 0
         small = 0
