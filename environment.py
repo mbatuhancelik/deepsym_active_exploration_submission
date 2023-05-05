@@ -634,7 +634,7 @@ class BlocksWorld_v4(BlocksWorld):
                 [obj1, obj2, 0, 0, 0, 0, 1, 1]
             )
         self.obj_buffer.append(
-                [obj3, obj3, 0, 0, -1, 1, 1, 1]
+                self.sample_random_action()
             )
         self.obj_buffer.append(
                 [obj2, obj3, 0, 0, 0, 0, 1, 1]
