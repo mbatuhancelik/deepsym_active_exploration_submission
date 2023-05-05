@@ -235,7 +235,7 @@ class MultiDeepSym(DeepSymbolGenerator):
     def aggregate(self, z, attn_weights):
         n_batch, n_seg, n_dim = z.shape
         h = self.feedforward(z.reshape(-1, n_dim)).reshape(n_batch, n_seg, -1).unsqueeze(1)
-        att_out = torch.relu(attn_weights @ h)  # (n_batch, n_head, n_seg, n_dim)
+        att_out = attn_weights @ h  # (n_batch, n_head, n_seg, n_dim)
         att_out = att_out.permute(0, 2, 1, 3).reshape(n_batch, n_seg, -1)  # (n_batch, n_seg, n_head*n_dim)
         return att_out
 
