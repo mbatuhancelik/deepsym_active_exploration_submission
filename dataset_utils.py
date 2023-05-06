@@ -87,6 +87,7 @@ def merge_datasets(args):
     state=state[shuffle]
     effect=effect[shuffle]
     mask=mask[shuffle]
+    args.o = os.path.join("./data", args.o)
     if not os.path.exists(args.o):
             os.makedirs(args.o)
 
