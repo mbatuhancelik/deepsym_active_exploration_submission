@@ -13,7 +13,6 @@ head_pre = 0
 active_selector_pre = 0
 obj_pre = -1
 attention_arrow_ids = []
-continue_pre = 0
 colors = [
     [0.7, 0.0, 0.0, 0.75],
     [0.0, 0.7, 0.0, 0.75],
@@ -42,7 +41,7 @@ def draw_attention(env: environment.BlocksWorld_v4,attention, head, active_selec
                 attention_arrow_ids.append(utils.create_arrow(env._p, env.get_obj_location(i), env.get_obj_location(k), color=colors[i % len(colors)]))
     
 def draw_attention_loop(env, attention_maps):
-    global head_pre, active_selector_pre, obj_pre, continue_pre
+    global head_pre, active_selector_pre, obj_pre
     print("===== ATTENTION VISUALIZER ======")
     print("head x : head x as active head")
     print("selec y : which element from attention will be visualized(0 or 1)")
@@ -53,7 +52,7 @@ def draw_attention_loop(env, attention_maps):
     head = head_pre
     active_selector = active_selector_pre
     obj = obj_pre
-    print(f"active head{head}")
+    print(f"active head {head}")
     print(attention_maps[head])
     while True:
         com = input()
@@ -78,8 +77,6 @@ def draw_attention_loop(env, attention_maps):
             head_pre = head
             active_selector_pre = active_selector
             obj_pre = obj
-        time.sleep(1)
-    continue_pre = env._p.readUserDebugParameter(parameter_ids["perform"])
     remove_attention_arrows(env)
 def draw_single_symbols(env, z):
     global text_items
@@ -223,6 +220,3 @@ while True:
     env.step(*action)
     for debug_text in debug_texts:
         env._p.removeUserDebugItem(debug_text)
-    head_pre = None
-    active_selector_pre = None
-    obj_pre = None
