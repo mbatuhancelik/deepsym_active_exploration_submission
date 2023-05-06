@@ -108,11 +108,16 @@ for name in model.module_names:
 
 env = environment.BlocksWorld_v4(gui=1, min_objects=5, max_objects=5)
 eff_arrow_ids = []
+relation_arrows = []
+
+def deleteArrows(env, arrows):
+    while len(arrows) > 0:
+        arrow_id = arrows.pop()
+        env._p.removeBody(arrow_id)
+
 
 while True:
-    while len(eff_arrow_ids) > 0:
-        arrow_id = eff_arrow_ids.pop()
-        env._p.removeBody(arrow_id)
+    deleteArrows(env, eff_arrow_ids) 
     state, types = env.state()
     state = torch.tensor(state)
     types = torch.tensor(types).reshape(-1, 1)
@@ -127,6 +132,8 @@ while True:
               "action": action_vector.unsqueeze(0),
               "pad_mask": torch.ones(1, state.shape[0])}
     z, z_rel, e_pred = model.forward(sample, eval_mode=True)
+
+    deleteArrows(env, relation_arrows)
     print(z)
     print(z_rel)
     print(e_pred[0, :, 2], e_pred[0, :, 11])
@@ -142,5 +149,18 @@ while True:
         eff_arrow_ids.append(utils.create_arrow(env._p, from_before, from_after, color=[1.0, 0.0, 0.0, 0.75]))
         eff_arrow_ids.append(utils.create_arrow(env._p, to_before, to_after, color=[0.0, 1.0, 0.0, 0.75]))
     env.step(*action)
+
+    #draws relation arrows
+    state, types = env.state()
+    state = torch.tensor(state)
+    for i in range(len(state)):
+        from_pos = state[i][:3]
+        for j in range(len(state)):
+            to_pos = state[j][:3]
+            if(z_rel[0][0][i][j] == 1):
+                relation_arrows.append(utils.create_arrow(env._p, from_pos, to_pos, color=[0.0, 0.0, 1.0, 0.75]))
+
+
+
     for debug_text in debug_texts:
         env._p.removeUserDebugItem(debug_text)
