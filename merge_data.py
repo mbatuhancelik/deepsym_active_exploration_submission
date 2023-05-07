@@ -9,7 +9,7 @@ parser.add_argument("-o", help="dataset name", type=str, required=True)
 parser.add_argument("-i", help="number of rolls", type=int, required=True)
 args = parser.parse_args()
 
-keys = ["action", "effect", "mask", "state"]
+keys = ["action", "effect", "mask", "state", "post_state"]
 
 output_folder = os.path.join("./data", args.o)
 for key in keys:
@@ -19,6 +19,3 @@ for key in keys:
         os.remove(os.path.join(output_folder, f"{key}_{i}.pt"))
 
 metrics_by_name(args.o)
-
-
-

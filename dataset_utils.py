@@ -64,6 +64,7 @@ def merge_datasets(args):
     l_action = torch.load(os.path.join(path, "action.pt"))
     l_effect = torch.load(os.path.join(path, "effect.pt"))
     l_mask = torch.load(os.path.join(path, "mask.pt"))
+    l_post_state = torch.load(os.path.join(path, "post_state.pt"))
 
 
     path = os.path.join("data", args.small)
@@ -71,6 +72,7 @@ def merge_datasets(args):
     s_action = torch.load(os.path.join(path, "action.pt"))
     s_effect = torch.load(os.path.join(path, "effect.pt"))
     s_mask = torch.load(os.path.join(path, "mask.pt"))
+    s_post_state = torch.load(os.path.join(path, "post_state.pt"))
 
     len_small = s_state.shape[0]
     len_large = l_state.shape[0]
@@ -80,6 +82,7 @@ def merge_datasets(args):
     state = torch.concat([s_state, l_state], dim=0)
     effect = torch.concat([s_effect, l_effect], dim=0)
     mask = torch.concat([s_mask, l_mask], dim=0)
+    post_state = torch.concat([s_post_state, l_post_state], dim=0)
 
     shuffle = torch.randperm(action.size()[0])
 
@@ -87,6 +90,7 @@ def merge_datasets(args):
     state=state[shuffle]
     effect=effect[shuffle]
     mask=mask[shuffle]
+    post_state=post_state[shuffle]
     args.o = os.path.join("./data", args.o)
     if not os.path.exists(args.o):
             os.makedirs(args.o)
@@ -95,8 +99,10 @@ def merge_datasets(args):
     torch.save(action, os.path.join(args.o, f"action.pt"))
     torch.save(mask, os.path.join(args.o, f"mask.pt"))
     torch.save(effect, os.path.join(args.o, f"effect.pt"))
+    torch.save(post_state, os.path.join(args.o, f"post_state.pt"))
+
 def merge_rolls(args):
-    keys = ["action", "effect", "mask", "state"]
+    keys = ["action", "effect", "mask", "state", "post_state"]
 
     output_folder = os.path.join("./data", args.o)
     for key in keys:
@@ -105,6 +111,7 @@ def merge_rolls(args):
         for i in range(args.i):
             os.remove(os.path.join(output_folder, f"{key}_{i}.pt"))
     metrics_by_name(args.o)
+
 
 def upload_dataset_to_wandb(name, path):
     with zipfile.ZipFile(f"{name}.zip", "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -135,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--small", help="smaller dataset", type=str)
     parser.add_argument("-l", "--large", help="appended dataset", type=str)
     parser.add_argument("-i", help="number of rolls", type=int)
-    
+
     args = parser.parse_args()
     if args.action == "metrics":
         metrics_by_name(args.o)
@@ -147,7 +154,7 @@ if __name__ == "__main__":
         name = args.o
         metrics_by_name(name)
         path = os.path.join("./data", name)
-        upload_dataset_to_wandb(name, path )
+        upload_dataset_to_wandb(name, path)
     if args.action == "download":
         wandb.init()
         get_dataset_from_wandb(args.o)

@@ -21,7 +21,8 @@ def collect_rollout(env):
     else:
         action = env.sample_random_action()
     position, effect, types = env.step(*action)
-    return position, types, action, effect
+    post_position, _ = env.state_obj_poses_and_types()
+    return position, types, action, effect, post_position
 
 
 def populate_buffer(env):
@@ -66,6 +67,7 @@ if __name__ == "__main__":
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
     effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
+    post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
 
     prog_it = args.N
     buffer_type = args.b
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     buffer = populate_buffer(env)
     buffer_lenght = len(buffer)
     while i < args.N:
-        position_pre, obj_types, action, effect = collect_rollout(env)
+        position_pre, obj_types, action, effect, position_post = collect_rollout(env)
         env_it += 1
         if (len(buffer) > args.pre):
             continue
@@ -84,6 +86,8 @@ if __name__ == "__main__":
         actions[i] = torch.tensor(action, dtype=torch.int)
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
+        post_states[i, :env.num_objects, :-1] = torch.tensor(position_post, dtype=torch.float)
+        post_states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         i += 1
 
         if (env_it) == buffer_lenght + args.post:
@@ -98,6 +102,7 @@ if __name__ == "__main__":
     torch.save(actions, os.path.join(args.o, f"action_{args.i}.pt"))
     torch.save(masks, os.path.join(args.o, f"mask_{args.i}.pt"))
     torch.save(effects, os.path.join(args.o, f"effect_{args.i}.pt"))
+    torch.save(post_states, os.path.join(args.o, f"post_state_{args.i}.pt"))
     end = time.time()
     del env
     print(f"Completed in {end-start:.2f} seconds.")
