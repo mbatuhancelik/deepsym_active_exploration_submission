@@ -10,6 +10,8 @@ import environment
 buffer = []
 buffer_type = ""
 buffer_lenght = 0
+
+
 def collect_rollout(env):
     action = 0
     global buffer
@@ -31,7 +33,8 @@ def populate_buffer(env):
         buffer = env.sample_mistarget()
     if buffer_type == "both":
         buffer = env.sample_both()
-    assert(buffer != None)
+
+    assert (buffer is not None)
     return buffer
 
 
@@ -41,8 +44,8 @@ if __name__ == "__main__":
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
     parser.add_argument("-b", help="buffer_type", type=str, required=True)
-    parser.add_argument("-post", help="post buffer actions", type=int,default=0)
-    parser.add_argument("-pre", help="pre buffer actions", type=int,default=0)
+    parser.add_argument("-post", help="post buffer actions", type=int, default=0)
+    parser.add_argument("-pre", help="pre buffer actions", type=int, default=0)
     args = parser.parse_args()
 
     if not os.path.exists(args.o):
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     while i < args.N:
         position_pre, obj_types, action, effect = collect_rollout(env)
         env_it += 1
-        if(len(buffer) >args.pre):
+        if (len(buffer) > args.pre):
             continue
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
         states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
