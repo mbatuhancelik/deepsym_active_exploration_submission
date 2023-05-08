@@ -49,9 +49,11 @@ def create_model_from_config(config):
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
                                   T=config["gumbel_t"])
     )
-
+    pre_att_enc_layers = [config["state_dim"]] + \
+                 [config["hidden_dim"]]*config["n_pre_att_hidden_layers"]
+    pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
     # create the attention module
-    attention = blocks.GumbelAttention(in_dim=config["state_dim"],
+    attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
                                        out_dim=config["hidden_dim"],
                                        num_heads=config["n_attention_heads"])
 
@@ -68,13 +70,14 @@ def create_model_from_config(config):
 
     # send everything to the device
     encoder = encoder.to(config["device"])
+    pre_att_enc = pre_att_enc.to(config["device"])
     attention = attention.to(config["device"])
     ff = ff.to(config["device"])
     decoder = decoder.to(config["device"])
 
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
-                                   feedforward=ff, device=config["device"], lr=config["lr"],
+                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],
                                    path=config["save_folder"], coeff=config["coeff"])
 
     return model
