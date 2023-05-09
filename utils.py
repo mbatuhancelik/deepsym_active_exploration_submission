@@ -53,6 +53,12 @@ def create_model_from_config(config):
                  [config["hidden_dim"]]*config["n_pre_att_hidden_layers"]
     pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
     # create the attention module
+    btw_proj = torch.nn.Linear( 10, config["hidden_dim"]).to(config["device"])
+
+    # create the attention module
+    pre_attention = torch.nn.MultiheadAttention(embed_dim=config["hidden_dim"],
+                                            num_heads=config["n_attention_heads"],
+                                            batch_first=True).to(config["device"])
     attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
                                        out_dim=config["hidden_dim"],
                                        num_heads=config["n_attention_heads"])
@@ -77,7 +83,7 @@ def create_model_from_config(config):
 
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
-                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],
+                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],btw_proj = btw_proj, pre_attention = pre_attention,
                                    path=config["save_folder"], coeff=config["coeff"])
 
     return model
