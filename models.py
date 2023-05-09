@@ -205,8 +205,8 @@ class MultiDeepSym(DeepSymbolGenerator):
         self._append_module("feedforward", kwargs.get("feedforward"))
         self._append_module("attention", kwargs.get("attention"))
         self._append_module("pre_attention_mlp", kwargs.get("pre_attention_mlp"))
-        self._append_module("btw_proj", kwargs.get("btw_proj"))
-        self._append_module("pre_attention", kwargs.get("pre_attention"))
+        self._append_module("post_attention_gumbell_encoder", kwargs.get("post_attention_gumbell_encoder"))
+        #self._append_module("pre_attention", kwargs.get("pre_attention"))
 
     def _append_module(self, name, module):
         setattr(self, name, module)
@@ -228,13 +228,16 @@ class MultiDeepSym(DeepSymbolGenerator):
         x = x.reshape(-1, n_feat)
         x = self.pre_attention_mlp(x.to(self.device))
         x = x.reshape(n_sample, n_seg, -1)
-        _, attn_weights = self.pre_attention(x, x, x, key_padding_mask=~pad_mask.bool().to(self.device),average_attn_weights=False)
-        x = self.btw_proj(attn_weights.view( -1, 10))
-        x = x.reshape(n_sample, n_seg, -1)
-        attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
-        #if eval_mode:
-            #attn_weights = attn_weights.round()
-        return attn_weights
+        att_out, attn_weights = self.attention(x, x, x, key_padding_mask=~pad_mask.bool().to(self.device),average_attn_weights=False)
+        att_shape = attn_weights.shape
+        x = self.post_attention_gumbell_encoder(attn_weights.reshape( n_sample* self.attention.num_heads, -1))
+        x = x.reshape(att_shape)
+        #bunlar eskiden kalma
+        #x = x.reshape(n_sample, n_seg, -1)
+        #attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
+        if eval_mode:
+            attn_weights = attn_weights.round()
+        return x
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
