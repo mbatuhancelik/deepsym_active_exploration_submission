@@ -31,7 +31,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         self.action = torch.load(os.path.join(path, "action.pt"))
         self.effect = torch.load(os.path.join(path, "effect.pt"))
         self.mask = torch.load(os.path.join(path, "mask.pt"))
-        self.post_state = torch.load(os.path.join(path, "post_state.pt"))
+        #self.post_state = torch.load(os.path.join(path, "post_state.pt"))
         n_train = int(len(self.state) * 0.8)
         n_val = int(len(self.state) * 0.1)
         if split == "train":
@@ -39,19 +39,19 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
             self.action = self.action[:n_train]
             self.effect = self.effect[:n_train]
             self.mask = self.mask[:n_train]
-            self.post_state = self.post_state[:n_train]
+            #self.post_state = self.post_state[:n_train]
         elif split == "val":
             self.state = self.state[n_train:n_train+n_val]
             self.action = self.action[n_train:n_train+n_val]
             self.effect = self.effect[n_train:n_train+n_val]
             self.mask = self.mask[n_train:n_train+n_val]
-            self.post_state = self.post_state[n_train:n_train+n_val]
+            #self.post_state = self.post_state[n_train:n_train+n_val]
         elif split == "test":
             self.state = self.state[n_train+n_val:]
             self.action = self.action[n_train+n_val:]
             self.effect = self.effect[n_train+n_val:]
             self.mask = self.mask[n_train+n_val:]
-            self.post_state = self.post_state[n_train+n_val:]
+            #self.post_state = self.post_state[n_train+n_val:]
 
     def __len__(self):
         return len(self.state)
@@ -59,14 +59,14 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         sample = {}
         sample["state"] = self.state[idx]
-        sample["post_state"] = self.post_state[idx]
+        #sample["post_state"] = self.post_state[idx]
         dv = sample["state"].device
         n_objects, _ = sample["state"].shape
         a = self.action[idx]
         # [grasp_or_release, dx_loc, dy_loc, rot]
-        sample["action"] = torch.zeros(n_objects, 4, dtype=torch.float, device=dv)
-        sample["action"][a[0]] = torch.tensor([-1, a[2], a[3], a[6]], dtype=torch.float, device=dv)
-        sample["action"][a[1]] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float, device=dv)
+        sample["action"] = torch.zeros(n_objects, 1, dtype=torch.float, device=dv)
+        sample["action"][a[0]] = torch.tensor([-1], dtype=torch.float, device=dv)
+        sample["action"][a[1]] = torch.tensor([1], dtype=torch.float, device=dv)
         sample["effect"] = self.effect[idx]
         mask = torch.zeros(n_objects, dtype=torch.float, device=dv)
         mask[:self.mask[idx]] = 1.0

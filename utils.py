@@ -53,9 +53,9 @@ def create_model_from_config(config):
                  [config["hidden_dim"]]*config["n_pre_att_hidden_layers"]
     pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
     #max obje sayisina dependent
-    post_attention_gumbell_encoder_layers =   [25] + \
+    post_attention_gumbell_encoder_layers =   [5 * config["hidden_dim"]] + \
                         [config["hidden_dim"]]*config["n_hidden_layers"] + \
-                        [ 25  ]
+                        [ 25 * config["n_attention_heads"]]
     post_attention_gumbell_encoder = torch.nn.Sequential(
         blocks.MLP(post_attention_gumbell_encoder_layers, batch_norm=config["batch_norm"]),
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],

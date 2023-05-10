@@ -230,11 +230,8 @@ class MultiDeepSym(DeepSymbolGenerator):
         x = x.reshape(n_sample, n_seg, -1)
         att_out, attn_weights = self.attention(x, x, x, key_padding_mask=~pad_mask.bool().to(self.device),average_attn_weights=False)
         att_shape = attn_weights.shape
-        x = self.post_attention_gumbell_encoder(attn_weights.reshape( n_sample* self.attention.num_heads, -1))
+        x = self.post_attention_gumbell_encoder(att_out.reshape( n_sample, -1))
         x = x.reshape(att_shape)
-        #bunlar eskiden kalma
-        #x = x.reshape(n_sample, n_seg, -1)
-        #attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
         if eval_mode:
             attn_weights = attn_weights.round()
         return x
