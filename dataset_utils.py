@@ -156,5 +156,5 @@ if __name__ == "__main__":
         path = os.path.join("./data", name)
         upload_dataset_to_wandb(name, path)
     if args.action == "download":
-        wandb.init()
+        wandb.init(project="multideepsym", entity="colorslab")
         get_dataset_from_wandb(args.o)
