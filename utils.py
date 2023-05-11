@@ -52,10 +52,24 @@ def create_model_from_config(config):
     pre_att_enc_layers = [config["state_dim"]] + \
                  [config["hidden_dim"]]*config["n_pre_att_hidden_layers"]
     pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
+    #max obje sayisina dependent
+    post_attention_gumbell_encoder_layers =   [5 * config["hidden_dim"]] + \
+                        [config["hidden_dim"]]*config["n_hidden_layers"] + \
+                        [ 25 * config["n_attention_heads"]]
+    gumbell_enc_mlp = blocks.MLP(post_attention_gumbell_encoder_layers, batch_norm=config["batch_norm"])
+    post_attention_gumbell_encoder = torch.nn.Sequential(
+        gumbell_enc_mlp,
+        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
+                                  T=config["gumbel_t"])
+    ).to(config["device"])
+
     # create the attention module
-    attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
-                                       out_dim=config["hidden_dim"],
-                                       num_heads=config["n_attention_heads"])
+    attention = torch.nn.MultiheadAttention(embed_dim=config["hidden_dim"],
+                                            num_heads=config["n_attention_heads"],
+                                            batch_first=True).to(config["device"])
+    #attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
+      #                                 out_dim=config["hidden_dim"],
+      #                                 num_heads=config["n_attention_heads"])
 
     # create a feedforward net to process input before attention
     ff_layers = [config["latent_dim"]+config["action_dim"]] + \
@@ -77,7 +91,7 @@ def create_model_from_config(config):
 
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
-                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],
+                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],post_attention_gumbell_encoder = post_attention_gumbell_encoder,
                                    path=config["save_folder"], coeff=config["coeff"])
 
     return model
