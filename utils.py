@@ -56,8 +56,9 @@ def create_model_from_config(config):
     post_attention_gumbell_encoder_layers =   [5 * config["hidden_dim"]] + \
                         [config["hidden_dim"]]*config["n_hidden_layers"] + \
                         [ 25 * config["n_attention_heads"]]
+    gumbell_enc_mlp = blocks.MLP(post_attention_gumbell_encoder_layers, batch_norm=config["batch_norm"])
     post_attention_gumbell_encoder = torch.nn.Sequential(
-        blocks.MLP(post_attention_gumbell_encoder_layers, batch_norm=config["batch_norm"]),
+        gumbell_enc_mlp,
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
                                   T=config["gumbel_t"])
     ).to(config["device"])
