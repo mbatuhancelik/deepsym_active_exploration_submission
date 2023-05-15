@@ -146,6 +146,7 @@ class DeepSymbolGenerator:
                 wandb.log({"val_loss": val_loss, "epoch": self.epoch})
 
                 if val_loss < self.best_loss:
+                    wandb.log({"best_val_loss": val_loss, "best_val_loss_epoch": self.epoch})
                     self.best_loss = val_loss
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, "
