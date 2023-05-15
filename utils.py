@@ -18,17 +18,16 @@ import models
 def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
-
+    #init run
+    run = wandb.init(project="multideepsym", entity="colorslab", config=config)
+    #use wandb folder for uniqe save location
+    wandb.config.update({"save_folder": os.path.join( config["save_folder"] ,wandb.run.id )}, allow_val_change=True)
     # create a save folder if not exists
-    save_folder = config["save_folder"]
+    save_folder = run.config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
-
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
-
-    # initialize wandb run
-    wandb.init(project="multideepsym", entity="colorslab", config=config)
 
     # download and extract dataset if not exists
     data_path = os.path.join("data", config["dataset_name"])
