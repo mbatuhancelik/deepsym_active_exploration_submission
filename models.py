@@ -137,6 +137,7 @@ class DeepSymbolGenerator:
 
             # calculate validation loss
             if val_loader is not None:
+                self.eval_mode()
                 val_loss = 0.0
                 for i, sample in enumerate(val_loader):
                     with torch.no_grad():
@@ -151,6 +152,7 @@ class DeepSymbolGenerator:
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, "
                       f"train loss={epoch_loss:.5f}, val loss={val_loss:.5f}")
+                self.train_mode()
             else:
                 if epoch_loss < self.best_loss:
                     self.best_loss = epoch_loss
