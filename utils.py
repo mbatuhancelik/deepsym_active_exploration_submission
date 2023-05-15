@@ -21,10 +21,10 @@ def parse_and_init(args):
     #init run
     run = wandb.init(project="multideepsym", entity="colorslab", config=config)
     #use wandb folder for uniqe save location
-    wandb.config.update({"save_folder": os.path.join( wandb.run.dir ,config["save_folder"] )}, allow_val_change=True)
+    wandb.config.update({"save_folder": os.path.join( config["save_folder"] ,wandb.run.id )}, allow_val_change=True)
     # create a save folder if not exists
     save_folder = run.config["save_folder"]
-
+    os.makedirs(save_folder, exist_ok=True)
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
