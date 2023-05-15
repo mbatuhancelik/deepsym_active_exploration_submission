@@ -233,7 +233,7 @@ class MultiDeepSym(DeepSymbolGenerator):
         x = self.post_attention_gumbell_encoder(att_out.reshape( n_sample, -1))
         x = x.reshape(att_shape)
         if eval_mode:
-            attn_weights = attn_weights.round()
+            x = x.round()
         return x
 
     def concat(self, sample, eval_mode=False):
