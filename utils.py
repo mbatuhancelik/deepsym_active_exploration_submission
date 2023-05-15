@@ -18,17 +18,16 @@ import models
 def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
-
+    #init run
+    run = wandb.init(project="multideepsym", entity="colorslab", config=config)
+    #use wandb folder for uniqe save location
+    wandb.config.update({"save_folder": os.path.join( config["save_folder"] ,wandb.run.id )}, allow_val_change=True)
     # create a save folder if not exists
-    save_folder = config["save_folder"]
+    save_folder = run.config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
-
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
-
-    # initialize wandb run
-    wandb.init(project="multideepsym", entity="colorslab", config=config)
 
     # download and extract dataset if not exists
     data_path = os.path.join("data", config["dataset_name"])
@@ -50,26 +49,11 @@ def create_model_from_config(config):
                                   T=config["gumbel_t"])
     )
     pre_att_enc_layers = [config["state_dim"]] + \
-                 [config["hidden_dim"]]*config["n_pre_att_hidden_layers"]
+                         [config["hidden_dim"]]*config["n_hidden_layers"]
     pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
-    #max obje sayisina dependent
-    post_attention_gumbell_encoder_layers =   [5 * config["hidden_dim"]] + \
-                        [config["hidden_dim"]]*config["n_hidden_layers"] + \
-                        [ 25 * config["n_attention_heads"]]
-    gumbell_enc_mlp = blocks.MLP(post_attention_gumbell_encoder_layers, batch_norm=config["batch_norm"])
-    post_attention_gumbell_encoder = torch.nn.Sequential(
-        gumbell_enc_mlp,
-        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
-                                  T=config["gumbel_t"])
-    ).to(config["device"])
-
-    # create the attention module
-    attention = torch.nn.MultiheadAttention(embed_dim=config["hidden_dim"],
-                                            num_heads=config["n_attention_heads"],
-                                            batch_first=True).to(config["device"])
-    #attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
-      #                                 out_dim=config["hidden_dim"],
-      #                                 num_heads=config["n_attention_heads"])
+    attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
+                                       out_dim=config["hidden_dim"],
+                                       num_heads=config["n_attention_heads"])
 
     # create a feedforward net to process input before attention
     ff_layers = [config["latent_dim"]+config["action_dim"]] + \
@@ -91,7 +75,8 @@ def create_model_from_config(config):
 
     # create the model
     model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
-                                   feedforward=ff,pre_attention_mlp= pre_att_enc, device=config["device"], lr=config["lr"],post_attention_gumbell_encoder = post_attention_gumbell_encoder,
+                                   feedforward=ff, pre_attention_mlp=pre_att_enc,
+                                   device=config["device"], lr=config["lr"],
                                    path=config["save_folder"], coeff=config["coeff"])
 
     return model

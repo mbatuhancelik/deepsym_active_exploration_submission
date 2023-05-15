@@ -146,6 +146,7 @@ class DeepSymbolGenerator:
                 wandb.log({"val_loss": val_loss, "epoch": self.epoch})
 
                 if val_loss < self.best_loss:
+                    wandb.log({"best_val_loss": val_loss, "best_val_loss_epoch": self.epoch})
                     self.best_loss = val_loss
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, "
@@ -205,8 +206,6 @@ class MultiDeepSym(DeepSymbolGenerator):
         self._append_module("feedforward", kwargs.get("feedforward"))
         self._append_module("attention", kwargs.get("attention"))
         self._append_module("pre_attention_mlp", kwargs.get("pre_attention_mlp"))
-        self._append_module("post_attention_gumbell_encoder", kwargs.get("post_attention_gumbell_encoder"))
-        #self._append_module("pre_attention", kwargs.get("pre_attention"))
 
     def _append_module(self, name, module):
         setattr(self, name, module)
@@ -228,13 +227,10 @@ class MultiDeepSym(DeepSymbolGenerator):
         x = x.reshape(-1, n_feat)
         x = self.pre_attention_mlp(x.to(self.device))
         x = x.reshape(n_sample, n_seg, -1)
-        att_out, attn_weights = self.attention(x, x, x, key_padding_mask=~pad_mask.bool().to(self.device),average_attn_weights=False)
-        att_shape = attn_weights.shape
-        x = self.post_attention_gumbell_encoder(att_out.reshape( n_sample, -1))
-        x = x.reshape(att_shape)
+        attn_weights = self.attention(x, src_key_mask=pad_mask.to(self.device))
         if eval_mode:
             attn_weights = attn_weights.round()
-        return x
+        return attn_weights
 
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
