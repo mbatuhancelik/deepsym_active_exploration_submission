@@ -24,7 +24,7 @@ def parse_and_init(args):
     wandb.config.update({"save_folder": os.path.join( wandb.run.dir ,config["save_folder"] )}, allow_val_change=True)
     # create a save folder if not exists
     save_folder = run.config["save_folder"]
-
+    os.makedirs(save_folder, exist_ok=True)
     # also save the config file in the save folder
     with open(os.path.join(save_folder, "config.yaml"), "w") as f:
         yaml.dump(config, f)
