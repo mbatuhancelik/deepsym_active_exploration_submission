@@ -31,7 +31,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         self.action = torch.load(os.path.join(path, "action.pt"))
         self.effect = torch.load(os.path.join(path, "effect.pt"))
         self.mask = torch.load(os.path.join(path, "mask.pt"))
-        #self.post_state = torch.load(os.path.join(path, "post_state.pt"))
+        self.post_state = torch.load(os.path.join(path, "post_state.pt"))
         n_train = int(len(self.state) * 0.8)
         n_val = int(len(self.state) * 0.1)
         if split == "train":
@@ -39,19 +39,19 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
             self.action = self.action[:n_train]
             self.effect = self.effect[:n_train]
             self.mask = self.mask[:n_train]
-            #self.post_state = self.post_state[:n_train]
+            self.post_state = self.post_state[:n_train]
         elif split == "val":
             self.state = self.state[n_train:n_train+n_val]
             self.action = self.action[n_train:n_train+n_val]
             self.effect = self.effect[n_train:n_train+n_val]
             self.mask = self.mask[n_train:n_train+n_val]
-            #self.post_state = self.post_state[n_train:n_train+n_val]
+            self.post_state = self.post_state[n_train:n_train+n_val]
         elif split == "test":
             self.state = self.state[n_train+n_val:]
             self.action = self.action[n_train+n_val:]
             self.effect = self.effect[n_train+n_val:]
             self.mask = self.mask[n_train+n_val:]
-            #self.post_state = self.post_state[n_train+n_val:]
+            self.post_state = self.post_state[n_train+n_val:]
 
     def __len__(self):
         return len(self.state)
@@ -59,7 +59,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         sample = {}
         sample["state"] = self.state[idx]
-        #sample["post_state"] = self.post_state[idx]
+        sample["post_state"] = self.post_state[idx]
         dv = sample["state"].device
         n_objects, _ = sample["state"].shape
         a = self.action[idx]
