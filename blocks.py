@@ -271,7 +271,6 @@ class GumbelAttention(torch.nn.Module):
         k = k.permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
         attn = (q @ k.permute(0, 1, 3, 2)) / self._denom  # (batch, head, token, token)
         binarized_attn = gumbel_sigmoid(attn, temperature, hard)
-        # currently, it returns non-zero value for the masked position
-        # however, there is no gradient flow from masked positions.
-        # TODO: it would have been nice to return zero values for the masked positions.
+        pad_mask = src_key_mask.reshape(batch,-1,1) @ src_key_mask.reshape(batch,1,-1)
+        binarized_attn = binarized_attn * pad_mask.unsqueeze(1)
         return binarized_attn
