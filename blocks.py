@@ -240,6 +240,7 @@ class GumbelAttention(torch.nn.Module):
         self.wk = torch.nn.Parameter(torch.nn.init.xavier_normal_(
             torch.Tensor(num_heads, out_dim, in_dim)
         ))
+        self.bias = torch.nn.Parameter(torch.zeros(1, num_heads, 1, 1))
 
     def forward(self, x, src_key_mask=None, temperature=1.0, hard=False):
         """
@@ -270,6 +271,7 @@ class GumbelAttention(torch.nn.Module):
         k = (wk @ x).reshape(batch, token, self.num_heads, -1) * pad_mask
         k = k.permute(0, 2, 1, 3)  # (batch, head, token, out_dim)
         attn = (q @ k.permute(0, 1, 3, 2)) / self._denom  # (batch, head, token, token)
+        attn = attn - self.bias
         binarized_attn = gumbel_sigmoid(attn, temperature, hard)
         pad_mask = src_key_mask.reshape(batch, token, 1) @ src_key_mask.reshape(batch, 1, token)
         binarized_attn = binarized_attn * pad_mask.unsqueeze(1)
