@@ -137,6 +137,7 @@ class DeepSymbolGenerator:
 
             # calculate validation loss
             if val_loader is not None:
+                self.eval_mode()
                 val_loss = 0.0
                 for i, sample in enumerate(val_loader):
                     with torch.no_grad():
@@ -146,10 +147,12 @@ class DeepSymbolGenerator:
                 wandb.log({"val_loss": val_loss, "epoch": self.epoch})
 
                 if val_loss < self.best_loss:
+                    wandb.log({"best_val_loss": val_loss, "best_val_loss_epoch": self.epoch})
                     self.best_loss = val_loss
                     self.save("_best")
                 print(f"epoch={self.epoch}, iter={self.iteration}, "
                       f"train loss={epoch_loss:.5f}, val loss={val_loss:.5f}")
+                self.train_mode()
             else:
                 if epoch_loss < self.best_loss:
                     self.best_loss = epoch_loss
@@ -226,7 +229,7 @@ class MultiDeepSym(DeepSymbolGenerator):
         x = x.reshape(-1, n_feat)
         x = self.pre_attention_mlp(x.to(self.device))
         x = x.reshape(n_sample, n_seg, -1)
-        attn_weights = self.attention(x.to(self.device), pad_mask.to(self.device))
+        attn_weights = self.attention(x, src_key_mask=pad_mask.to(self.device))
         if eval_mode:
             attn_weights = attn_weights.round()
         return attn_weights
