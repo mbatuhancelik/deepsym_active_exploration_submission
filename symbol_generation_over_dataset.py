@@ -8,7 +8,7 @@ from dataset import StateActionEffectDataset
 
 
 run_id = sys.argv[1]
-run = wandb.init(entity="colorslab",project="multideepsym", resume="must", id=run_id)
+run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
 model = utils.create_model_from_config(run.config)
 model.load("_best", from_wandb=True)
 model.print_model()
@@ -39,12 +39,15 @@ for sample in loader:
         z_rel_post.append(zr_f.cpu())
         mask.append(sample["pad_mask"].cpu())
 
-z_obj_pre = torch.cat(z_obj_pre, axis = 0)
-z_rel_pre = torch.cat(z_rel_pre, axis = 0)
-z_act = torch.cat(z_act, axis = 0)
-z_obj_post = torch.cat(z_obj_post, axis = 0)
-z_rel_post = torch.cat(z_rel_post, axis = 0)
-mask = torch.cat(mask, axis = 0)
+z_obj_pre = torch.cat(z_obj_pre, axis=0)
+z_rel_pre = torch.cat(z_rel_pre, axis=0)
+z_act = torch.cat(z_act, axis=0)
+z_obj_post = torch.cat(z_obj_post, axis=0)
+z_rel_post = torch.cat(z_rel_post, axis=0)
+mask = torch.cat(mask, axis=0)
+
+if not os.path.exists(run.config["save_folder"]):
+    os.makedirs(run.config["save_folder"])
 
 torch.save(z_obj_pre, os.path.join(run.config["save_folder"], "z_obj_pre.pt"))
 torch.save(z_rel_pre, os.path.join(run.config["save_folder"], "z_rel_pre.pt"))
