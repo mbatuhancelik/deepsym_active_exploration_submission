@@ -20,20 +20,19 @@ args = parser.parse_args()
 run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
 device = get_device()
 wandb.config.update({"device": device}, allow_val_change=True)
-torch.set_default_device(device)
 
 # load the data from wandb
-z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_obj_pre.pt")).name)
-z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_rel_pre.pt")).name)
-z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_act.pt")).name)
-z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_obj_post.pt")).name)
-z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_rel_post.pt")).name)
-mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "mask.pt")).name)
+z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_obj_pre.pt")).name).to(device)
+z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_rel_pre.pt")).name).to(device)
+z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_act.pt")).name).to(device)
+z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_obj_post.pt")).name).to(device)
+z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "z_rel_post.pt")).name).to(device)
+mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], "mask.pt")).name).to(device)
 
 input_dim = run.config["latent_dim"] + run.config["action_dim"]
 model = models.SymbolForward(input_dim=input_dim, hidden_dim=args.n,
                              output_dim=run.config["latent_dim"], num_layers=args.l,
-                             num_heads=run.config["n_attention_heads"])
+                             num_heads=run.config["n_attention_heads"]).to(device)
 print(model)
 print(f"Number of parameters: {get_parameter_count(model)}")
 wandb.config.update({"forward_model":
