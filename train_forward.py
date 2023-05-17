@@ -47,21 +47,19 @@ dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
                                          z_obj_post, z_rel_post, mask)
 
 loader = torch.utils.data.DataLoader(dataset, batch_size=args.b, shuffle=True)
-criterion = torch.nn.MSELoss(reduction="none")
+criterion = torch.nn.BCEWithLogitsLoss(reduction="none")
 optimizer = torch.optim.Adam(lr=args.lr, params=model.parameters())
 
 for e in range(args.e):
     avg_obj_loss = 0.0
     avg_rel_loss = 0.0
     for zo_i, zr_i, a, zo_f, zr_f, m in loader:
-        y_o = zo_f - zo_i
-        y_r = zr_f - zr_i
         zi_cat = torch.cat([zo_i, a], dim=-1)
-        y_o_bar, y_r_bar = model(zi_cat, zr_i)
+        zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
         m = m.unsqueeze(2)
         m_rel = (m @ m.permute(0, 2, 1)).unsqueeze(1)
-        obj_loss = (criterion(y_o_bar, y_o) * m).sum(dim=[1, 2]).mean()
-        rel_loss = (criterion(y_r_bar, y_r) * m_rel).sum(dim=[1, 2, 3]).mean()
+        obj_loss = (criterion(zo_f_bar, zo_f) * m).sum(dim=[1, 2]).mean()
+        rel_loss = (criterion(zo_r_bar, zr_f) * m_rel).sum(dim=[1, 2, 3]).mean()
         loss = obj_loss + rel_loss
 
         optimizer.zero_grad()
