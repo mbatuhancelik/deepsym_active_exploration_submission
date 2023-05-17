@@ -29,7 +29,13 @@ def populate_buffer(env):
         buffer = env.sample_3_objects_moving_together()
     if buffer_type == "mistarget":
         buffer = env.sample_mistarget()
-    assert(buffer != None)
+    if buffer_type == "both":
+        buffer = env.sample_both()
+    if buffer_type == "proximity":
+        buffer = env.sample_proximity()
+
+    assert (buffer is not None)
+
     return buffer
 
 
@@ -45,7 +51,12 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
+
+    min_obj = 5 if args.b == "both" else 3
     env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=5)
+
+   
+
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)

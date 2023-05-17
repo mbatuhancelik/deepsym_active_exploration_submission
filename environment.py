@@ -557,7 +557,7 @@ class BlocksWorld_v4(BlocksWorld):
     def state(self):
         return self.state_obj_poses_and_types()
 
-    def sample_random_action(self):
+    def sample_random_action(self, p1 = None, p2 = None):
         obj1 = np.random.randint(self.num_objects)
         obj2 = np.random.choice(self.num_objects)
 
@@ -567,13 +567,17 @@ class BlocksWorld_v4(BlocksWorld):
         dxdy_pairs = [[0, 0], [0, 1], [1, 0],
                       [-1, 0], [0, -1], [-1, 1],
                       [-1, -1], [1, 1], [1, -1]]
+        if p1 == None:
+            p1 = [0.6] + [0.075] * 4 + [0.025] * 4
+        if p2 == None:
+            p2 = [0.4] + [0.125] * 4 + [0.025] * 4
         dxdy1 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p=[0.6] + [0.075] * 4 + [0.025] * 4
+            p= p1
         )
         dxdy2 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p=[0.4] + [0.125] * 4 + [0.025] * 4
+            p=p2
         )
 
         [dx1, dy1] = dxdy_pairs[dxdy1]
@@ -640,6 +644,15 @@ class BlocksWorld_v4(BlocksWorld):
                 [obj2, obj3, 0, 0, 0, 0, 1, 1]
             )
         return self.obj_buffer
+
+
+    def sample_proximity(self):
+        while len(self.obj_buffer < 10):
+            act = self.sample_random_action(p1 = [1] + [0] * 4 + [0] * 4, p2 = [0] + [1/8] * 8)
+            if act[0] != act[1]:
+                self.obj_buffer.append(act)
+        return self.obj_buffer
+
 
     def sample_ungrappable(self):
         tall = 0
