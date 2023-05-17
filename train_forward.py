@@ -42,6 +42,8 @@ wandb.config.update({"forward_model":
                       "batch_size": args.b,
                       "learning_rate": args.lr}}, allow_val_change=True)
 save_path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
+if not os.path.exists(run.config["save_folder"]):
+    os.makedirs(run.config["save_folder"])
 
 dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
                                          z_obj_post, z_rel_post, mask)
