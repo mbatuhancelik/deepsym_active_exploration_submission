@@ -313,6 +313,7 @@ class SymbolForward(torch.nn.Module):
         rel_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
                          [num_heads*hidden_dim]
         self.rel_decoder = blocks.MLP(rel_dec_layers)
+        self.rel_bias = torch.nn.Parameter(torch.zeros(1, num_heads, 1, 1))
 
     def forward(self, x, attn_weights):
         n_batch, n_token, _ = x.shape
@@ -326,4 +327,5 @@ class SymbolForward(torch.nn.Module):
         rel_pred = self.rel_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
         rel_pred = rel_pred.permute(0, 2, 1, 3)
         rel_pred = (rel_pred @ rel_pred.permute(0, 1, 3, 2)) / (rel_pred.shape[-1]**0.5)
+        rel_pred = rel_pred + self.rel_bias
         return obj_pred, rel_pred
