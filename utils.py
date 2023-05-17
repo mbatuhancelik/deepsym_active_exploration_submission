@@ -4,7 +4,6 @@ import zipfile
 
 import wandb
 import yaml
-import pybullet
 from pybullet_utils import bullet_client
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -84,9 +83,9 @@ def create_model_from_config(config):
 
 def connect(gui=1):
     if gui:
-        p = bullet_client.BulletClient(connection_mode=pybullet.GUI)
+        p = bullet_client.BulletClient(connection_mode=bullet_client.pybullet.GUI)
     else:
-        p = bullet_client.BulletClient(connection_mode=pybullet.DIRECT)
+        p = bullet_client.BulletClient(connection_mode=bullet_client.pybullet.DIRECT)
         egl = pkgutil.get_loader("eglRenderer")
         if (egl):
             p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
