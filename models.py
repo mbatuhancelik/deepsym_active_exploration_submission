@@ -4,6 +4,7 @@ import torch
 import wandb
 
 import utils
+import blocks
 
 
 class DeepSymbolGenerator:
@@ -292,3 +293,39 @@ class MultiDeepSymMLP(MultiDeepSym):
         if eval_mode:
             h = h.round()
         return h
+
+
+class SymbolForward(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, num_heads):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+
+        enc_layers = [torch.nn.Linear(input_dim, hidden_dim)]
+        for _ in range(num_layers - 1):
+            enc_layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
+        self.encoder = torch.nn.ModuleList(enc_layers)
+
+        obj_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                         [output_dim]
+        self.obj_decoder = blocks.MLP(obj_dec_layers)
+
+        rel_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                         [num_heads*hidden_dim]
+        self.rel_decoder = blocks.MLP(rel_dec_layers)
+
+    def forward(self, x, attn_weights):
+        n_batch, n_token, _ = x.shape
+        x = x.unsqueeze(1)
+        for layer in self.encoder:
+            x = torch.nn.functional.relu(layer(x))
+            x = attn_weights @ x
+        # (batch, head, token, dim) -> (batch, token, head*dim)
+        x = x.permute(0, 2, 1, 3).reshape(n_batch, n_token, -1)
+        obj_pred = self.obj_decoder(x)
+        rel_pred = self.rel_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
+        rel_pred = rel_pred.permute(0, 2, 1, 3)
+        rel_pred = (rel_pred @ rel_pred.permute(0, 1, 3, 2)) / (rel_pred.shape[-1]**0.5)
+        return obj_pred, rel_pred
