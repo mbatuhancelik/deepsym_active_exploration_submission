@@ -1,10 +1,8 @@
-import pkgutil
 import os
 import zipfile
 
 import wandb
 import yaml
-from pybullet_utils import bullet_client
 import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
@@ -82,6 +80,8 @@ def create_model_from_config(config):
 
 
 def connect(gui=1):
+    import pkgutil
+    from pybullet_utils import bullet_client
     if gui:
         p = bullet_client.BulletClient(connection_mode=bullet_client.pybullet.GUI)
     else:
