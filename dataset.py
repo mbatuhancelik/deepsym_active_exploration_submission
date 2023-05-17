@@ -59,9 +59,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         n_objects, _ = sample["state"].shape
         a = self.action[idx]
         # [grasp_or_release, dx_loc, dy_loc, rot]
-        sample["action"] = torch.zeros(n_objects, 4, dtype=torch.float, device=dv)
-        sample["action"][a[0]] = torch.tensor([-1, a[2], a[3], a[6]], dtype=torch.float, device=dv)
-        sample["action"][a[1]] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float, device=dv)
+        sample["action"] = torch.zeros(n_objects, 5, dtype=torch.float, device=dv)
+        sample["action"][a[0]] = torch.tensor([1, 0, a[2], a[3], a[6]], dtype=torch.float, device=dv)
+        sample["action"][a[1]] = torch.tensor([0, 1, a[4], a[5], a[7]], dtype=torch.float, device=dv)
         sample["effect"] = self.effect[idx]
         mask = torch.zeros(n_objects, dtype=torch.float, device=dv)
         mask[:self.mask[idx]] = 1.0
