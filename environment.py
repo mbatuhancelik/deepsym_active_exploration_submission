@@ -668,7 +668,7 @@ class BlocksWorld_v4(BlocksWorld):
         return self.obj_buffer
 
     def sample_proximity(self):
-        while len(self.obj_buffer < 10):
+        while len(self.obj_buffer)< 8:
             act = self.sample_random_action(p1 = [1] + [0] * 4 + [0] * 4, p2 = [0] + [1/8] * 8)
             if act[0] != act[1]:
                 self.obj_buffer.append(act)
