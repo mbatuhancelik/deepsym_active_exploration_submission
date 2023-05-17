@@ -310,11 +310,15 @@ class SymbolForward(torch.nn.Module):
 
         obj_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
                          [output_dim]
-        self.obj_decoder = blocks.MLP(obj_dec_layers)
+        self.obj_decoder = torch.nn.Sequential(
+            blocks.MLP(obj_dec_layers),
+            torch.nn.Tanh())
 
         rel_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
                          [num_heads*hidden_dim]
-        self.rel_decoder = blocks.MLP(rel_dec_layers)
+        self.rel_decoder = torch.nn.Sequential(
+            blocks.MLP(rel_dec_layers),
+            torch.nn.Tanh())
 
     def forward(self, x, attn_weights):
         n_batch, n_token, _ = x.shape

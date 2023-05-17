@@ -4,7 +4,7 @@ import argparse
 import torch
 import wandb
 
-from utils import get_device
+from utils import get_device, get_parameter_count
 import models
 
 
@@ -19,7 +19,7 @@ args = parser.parse_args()
 
 run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
 device = get_device()
-wandb.config.update({"device": device})
+wandb.config.update({"device": device}, allow_val_change=True)
 torch.set_default_device(device)
 
 # load the data from wandb
@@ -34,30 +34,35 @@ input_dim = run.config["latent_dim"] + run.config["action_dim"]
 model = models.SymbolForward(input_dim=input_dim, hidden_dim=args.n,
                              output_dim=run.config["latent_dim"], num_layers=args.l,
                              num_heads=run.config["n_attention_heads"])
+print(model)
+print(f"Number of parameters: {get_parameter_count(model)}")
 wandb.config.update({"forward_model":
                      {"hidden_unit": args.n,
                       "layer": args.l,
                       "epoch": args.e,
                       "batch_size": args.b,
-                      "learning_rate": args.lr}})
+                      "learning_rate": args.lr}}, allow_val_change=True)
+save_path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
 
 dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
                                          z_obj_post, z_rel_post, mask)
 
 loader = torch.utils.data.DataLoader(dataset, batch_size=args.b, shuffle=True)
-criterion = torch.nn.BCEWithLogitsLoss(reduction="none")
+criterion = torch.nn.MSELoss(reduction="none")
 optimizer = torch.optim.Adam(lr=args.lr, params=model.parameters())
 
 for e in range(args.e):
     avg_obj_loss = 0.0
     avg_rel_loss = 0.0
     for zo_i, zr_i, a, zo_f, zr_f, m in loader:
+        y_o = zo_f - zo_i
+        y_r = zr_f - zr_i
         zi_cat = torch.cat([zo_i, a], dim=-1)
-        zo_f_bar, zr_f_bar = model(zi_cat, zr_i)
+        y_o_bar, y_r_bar = model(zi_cat, zr_i)
         m = m.unsqueeze(2)
         m_rel = (m @ m.permute(0, 2, 1)).unsqueeze(1)
-        obj_loss = (criterion(zo_f_bar, zo_f) * m).sum(dim=[1, 2]).mean()
-        rel_loss = (criterion(zr_f_bar, zr_f) * m_rel).sum(dim=[1, 2, 3]).mean()
+        obj_loss = (criterion(y_o_bar, y_o) * m).sum(dim=[1, 2]).mean()
+        rel_loss = (criterion(y_r_bar, y_r) * m_rel).sum(dim=[1, 2, 3]).mean()
         loss = obj_loss + rel_loss
 
         optimizer.zero_grad()
@@ -68,7 +73,7 @@ for e in range(args.e):
         avg_rel_loss += rel_loss.item()
     print(f"Epoch={e}, Obj loss={avg_obj_loss/len(loader):.5f}, Rel loss={avg_rel_loss/len(loader):.5f}")
 
-sd = model.eval().cpu().state_dict()
-save_path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
-torch.save(sd, save_path)
+    sd = model.eval().cpu().state_dict()
+    torch.save(sd, save_path)
+    model.train().to(device)
 wandb.save(save_path)
