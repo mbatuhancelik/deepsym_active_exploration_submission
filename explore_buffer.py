@@ -34,8 +34,11 @@ def populate_buffer(env):
         buffer = env.sample_mistarget()
     if buffer_type == "both":
         buffer = env.sample_both()
+    if buffer_type == "proximity":
+        buffer = env.sample_proximity()
 
     assert (buffer is not None)
+
     return buffer
 
 
