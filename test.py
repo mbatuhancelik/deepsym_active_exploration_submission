@@ -120,9 +120,9 @@ while True:
     z = model.encode(state.unsqueeze(0))
     z = utils.binary_to_decimal(z[0, :, :].round())
     action, debug_texts = draw_action(env, z)
-    action_vector = torch.zeros(state.shape[0], 4, dtype=torch.float)
-    action_vector[action[0]] = torch.tensor([-1, action[2], action[3], action[6]], dtype=torch.float)
-    action_vector[action[1]] = torch.tensor([1, action[4], action[5], action[7]], dtype=torch.float)
+    action_vector = torch.zeros(state.shape[0], 8, dtype=torch.float)
+    action_vector[action[0], :4] = torch.tensor([1, action[2], action[3], action[6]], dtype=torch.float)
+    action_vector[action[1], 4:] = torch.tensor([1, action[4], action[5], action[7]], dtype=torch.float)
     sample = {"state": state.unsqueeze(0),
               "action": action_vector.unsqueeze(0),
               "pad_mask": torch.ones(1, state.shape[0])}
