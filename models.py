@@ -179,12 +179,12 @@ class DeepSymbolGenerator:
         for name in self.module_names:
             module = getattr(self, name)
             module_dict = module.eval().cpu().state_dict()
-            module_path = os.path.join(self.path, name+ext+".pt")
+            module_path = os.path.join(self.path, wandb.run.id + "_"+name+ext+".pt")
             torch.save(module_dict, module_path)
             getattr(self, name).train().to(self.device)
 
     def save_wandb(self, ext):
-        wandb.save(os.path.join(self.path, "*"+ext+".pt"))
+        wandb.save(os.path.join(self.path, wandb.run.id + "_"+"*"+ext+".pt"))
 
     def print_model(self, space=0):
         for name in self.module_names:
