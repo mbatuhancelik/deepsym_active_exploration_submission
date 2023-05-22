@@ -164,7 +164,7 @@ class DeepSymbolGenerator:
     def load(self, ext, from_wandb=False):
         for name in self.module_names:
             if from_wandb:
-                module_path = os.path.join(self.path, name+ext+".pt")
+                module_path = os.path.join(self.path, wandb.run.id + "_"+name+ext+".pt")
                 module_dict = wandb.restore(module_path, run_path=f"colorslab/multideepsym/{wandb.run.id}").name
                 module_dict = torch.load(module_dict)
             else:
