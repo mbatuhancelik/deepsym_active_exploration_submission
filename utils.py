@@ -15,10 +15,8 @@ import models
 def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
-    #init run
+    # init run
     run = wandb.init(project="multideepsym", entity="colorslab", config=config)
-    #use wandb folder for uniqe save location
-    #wandb.config.update({"save_folder": os.path.join( config["save_folder"] ,wandb.run.id )}, allow_val_change=True)
     # create a save folder if not exists
     save_folder = run.config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
@@ -296,6 +294,42 @@ def in_array(element, array):
         if element.is_equal(e_i):
             return True, i
     return False, None
+
+
+def to_str_state(obj, rel, mask=None):
+    if mask is None:
+        mask = torch.ones(obj.shape[0])
+    m = (mask == 1)
+    n_obj = m.sum()
+    mm = torch.outer(m, m)
+    obj_str = "-".join(binary_tensor_to_str(obj.bernoulli()[m]))
+    rel_str = "-".join([",".join(binary_tensor_to_str(r_i.bernoulli()[mm].reshape(n_obj, n_obj))) for r_i in rel])
+    return obj_str + "_" + rel_str
+
+
+def to_str_action(action):
+    to_idx = int(torch.where(action[:, 0] > 0.5)[0])
+    to_dx = int(action[to_idx, 1])
+    to_dy = int(action[to_idx, 2])
+
+    from_idx = torch.where(action[:, 0] < -0.5)[0]
+    if len(from_idx) == 0:
+        from_idx = to_idx
+        from_dx = 0
+        from_dy = 0
+    else:
+        from_idx = int(from_idx)
+        from_dx = int(action[from_idx, 1])
+        from_dy = int(action[from_idx, 2])
+    act_str = f"{from_idx},{from_dx},{from_dy},{to_idx},{to_dx},{to_dy}"
+    return act_str
+
+
+def to_tensor_state(str_state):
+    obj_str, rel_str = str_state.split("_")
+    obj = str_to_binary_tensor(obj_str.split("-"))
+    rel = torch.stack([str_to_binary_tensor(r_i.split(",")) for r_i in rel_str.split("-")])
+    return obj, rel
 
 
 def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10, aug=False):
