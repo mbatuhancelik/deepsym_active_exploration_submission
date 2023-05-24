@@ -50,7 +50,7 @@ def metrics(dataset):
     metrics +=(f"{count } samples\n")
     count = 0
     for sample in dataset:
-        target = torch.argmin(sample["action"][0])
+        target = torch.argmax(sample["action"][:,4])
         if sample["effect"][target][2] < 0.1:
             if torch.any((((sample["action"][:,0]) != -1).view((-1,1)) * sample["effect"])[:,2] > 0.2):
                 count += 1
@@ -76,7 +76,15 @@ def merge_datasets(args):
 
     len_small = s_state.shape[0]
     len_large = l_state.shape[0]
-
+    while s_state.shape[1] != l_state.shape[1]:
+        if s_state.shape[1] < l_state.shape[1]:
+            s_state = torch.cat((s_state, torch.zeros((s_state.shape[0],1 ,s_state.shape[2]))), dim = 1)
+            s_post_state = torch.cat((s_post_state, torch.zeros((s_state.shape[0],1 ,s_state.shape[2]))), dim = 1)
+            s_effect = torch.cat((s_effect, torch.zeros((s_effect.shape[0],1 ,s_effect.shape[2]))), dim = 1)
+        else:
+            l_state = torch.cat((l_state, torch.zeros((l_state.shape[0],1 ,l_state.shape[2]))), dim = 1)
+            l_post_state = torch.cat((l_post_state, torch.zeros((l_state.shape[0],1 ,l_state.shape[2]))), dim = 1)
+            l_effect = torch.cat((l_effect, torch.zeros((l_effect.shape[0],1 ,l_effect.shape[2]))), dim = 1)
     divide_index = int(len_small/2)
     action = torch.concat([s_action, l_action] , dim=0)
     state = torch.concat([s_state, l_state], dim=0)
