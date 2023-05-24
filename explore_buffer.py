@@ -25,7 +25,7 @@ def collect_rollout(env):
     return position, types, action, effect, post_position
 
 
-def populate_buffer(env):
+def populate_buffer(env:environment.BlocksWorld_v4):
     global buffer_type
     buffer = None
     if buffer_type == "3obj":
@@ -36,6 +36,8 @@ def populate_buffer(env):
         buffer = env.sample_both()
     if buffer_type == "proximity":
         buffer = env.sample_proximity()
+    if buffer_type == "long_rot":
+        buffer = env.sample_long_rotation()
 
     assert (buffer is not None)
 
@@ -55,7 +57,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.o):
         os.makedirs(args.o)
     min_obj = 5 if args.b == "both" else 3
-    env = environment.BlocksWorld_v4(gui=0, min_objects=min_obj, max_objects=5)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=2, max_objects=2)
 
     np.random.seed()
 

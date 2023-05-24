@@ -674,7 +674,32 @@ class BlocksWorld_v4(BlocksWorld):
             if act[0] != act[1]:
                 self.obj_buffer.append(act)
         return self.obj_buffer
+    def sample_long_rotation(self):
+        long_objects = []
+        smalls = []
 
+        for i in self.obj_dict.keys():
+            if self.obj_types[self.obj_dict[i]] == 4:
+                long_objects.append(i)
+            else:
+                smalls.append(i)
+        
+        long = long_objects.pop(0)
+        small = smalls[0]
+        locs = [-1,0,1]
+        locs.remove(np.random.randint(-1,2))
+        loc1 , loc2 = locs
+
+        self.obj_buffer.append(
+                [small, long, 0, 0, 0, loc1, 1, 1]
+            )
+        self.obj_buffer.append(
+                [long, long, 0, loc1, 0, loc2, 1, 1]
+            )
+        self.obj_buffer.append(
+                [long, np.random.randint(0,self.num_objects), 0 , loc1, 0, np.random.randint(-1,2), 1 , 1]  
+            )
+        return self.obj_buffer
 
     def sample_ungrappable(self):
         tall = 0
