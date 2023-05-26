@@ -120,7 +120,7 @@ class MCTSNode:
             return self.state, "", [(idx, 0)], 1.0
         elif len(self.children[idx]) == 1:
             child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].plan()
-            return child_state, "-".join(filter(None, [self.actions[idx], child_plan_txt])), \
+            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
                 [(idx, 0)]+child_plan, child_prob
         else:
             probs = []
@@ -131,7 +131,34 @@ class MCTSNode:
             prob_max = np.argmax(probs)
             p = np.max(probs)
             child_state, child_plan_txt, child_plan, child_prob = self.children[idx][prob_max].plan()
-            return child_state, "-".join(filter(None, [self.actions[idx], child_plan_txt])), [(idx, prob_max)]+child_plan, p*child_prob
+            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
+                [(idx, prob_max)]+child_plan, p*child_prob
+
+    def best_reward_path(self):
+        if self.is_terminal:
+            return self.state, "", [], 1.0
+        idx = self.best_child_for_plan()
+        if self.children[idx] is None:
+            print("Plan not found.")
+            return self.state, "", [(idx, 0)], 1.0
+        elif len(self.children[idx]) == 1:
+            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].best_reward_path()
+            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
+                [(idx, 0)]+child_plan, child_prob
+        else:
+            probs = []
+            rewards = []
+            for out in self.children[idx]:
+                probs.append(out.count)
+                rewards.append(out.reward)
+            probs = np.array(probs)
+            probs = probs / probs.sum()
+            rewards = np.array(rewards)
+            best_idx = np.argmax(rewards)
+            p = probs[best_idx]
+            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][best_idx].best_reward_path()
+            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
+                [(idx, best_idx)]+child_plan, p*child_prob
 
     def _expand(self):
         idx = self.children.index(None)
@@ -287,7 +314,7 @@ class State(MCTSState):
         self.goal = goal
 
     def reward(self):
-        reward = int(self.is_equal(self.goal))
+        reward = int(self.is_terminal())
         return reward
 
     def get_available_actions(self):
@@ -296,19 +323,17 @@ class State(MCTSState):
         n_obj = len(o_arr)
         actions = []
         for i in range(n_obj):
-            for ix in range(-1, 2):
-                for iy in range(-1, 2):
-                    for j in range(n_obj):
-                        for jx in range(-1, 2):
-                            for jy in range(-1, 2):
-                                actions.append(f"{i},{ix},{iy},{j},{jx},{jy}")
+            for iy in range(-1, 2):
+                for j in range(n_obj):
+                    for jy in range(-1, 2):
+                        actions.append(f"{i},0,{iy},{j},0,{jy}")
         return actions
 
     def is_terminal(self):
-        return self.is_equal(self.goal)
+        return self.state == self.goal
 
     def is_equal(self, other):
-        return self.state == other
+        return self.state == other.state
 
     def __repr__(self):
         return self.state
