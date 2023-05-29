@@ -56,6 +56,14 @@ def metrics(dataset):
                 count += 1
     metrics += (f"{count / len(dataset) * 100:.2f}% mistargets\n")
     metrics +=(f"{count } samples\n")
+    num_objects = {}
+    for mask in dataset.mask:
+        mask = mask.item()
+        if mask  in num_objects.keys():
+            num_objects[mask] += 1
+        else:
+            num_objects[mask] = 1
+    metrics += str(num_objects)
     return metrics
 def merge_datasets(args):
 
