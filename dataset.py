@@ -34,7 +34,11 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         self.post_state = torch.load(os.path.join(path, "post_state.pt"))
         n_train = int(len(self.state) * 0.8)
         n_val = int(len(self.state) * 0.1)
-        self.binary = torch.tensor([[0,0,0,0], [0,0,0,1], [0,0,1,0],[0,1,0,0],[1,0,0,0]])
+        self.binary = torch.tensor([[0, 0, 0, 0],
+                                    [0, 0, 0, 1],
+                                    [0, 0, 1, 0],
+                                    [0, 1, 0, 0],
+                                    [1, 0, 0, 0]])
         if split == "train":
             self.state = self.state[:n_train]
             self.action = self.action[:n_train]
@@ -62,9 +66,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["state"] = self.state[idx]
         a = self.action[idx]
         sample["mask"] = self.mask[idx]
-        sample["state"] = torch.cat([sample["state"][:,:-1], self.binary[[sample["state"][:, -1].int()]]], dim = -1)
+        sample["state"] = torch.cat([sample["state"][:, :-1], self.binary[[sample["state"][:, -1].int()]]], dim=-1)
         sample["post_state"] = self.post_state[idx]
-        #sample["state"][:, :3] =sample["state"][:, :3] - sample["state"][a[0], :3]
+        sample["post_state"] = torch.cat([sample["post_state"][:, :-1], self.binary[[sample["post_state"][:, -1].int()]]], dim=-1)
         dv = sample["state"].device
         n_objects, _ = sample["state"].shape
         # [grasp_or_release, dx_loc, dy_loc, rot]
