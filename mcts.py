@@ -296,9 +296,9 @@ class ForwardModel(MCTSForward):
     def forward(self, state, action):
         obj_symbol, rel_symbol = utils.to_tensor_state(state.state)
         action = torch.tensor([int(a_i) for a_i in action.split(",")])
-        action_placeholder = torch.zeros(obj_symbol.shape[0], 4)  # (grasp_or_release, dx_loc, dy_loc, rot)
-        action_placeholder[action[0]] = torch.tensor([-1, action[1], action[2], 1], dtype=torch.float)
-        action_placeholder[action[3]] = torch.tensor([1, action[4], action[5], 1], dtype=torch.float)
+        action_placeholder = torch.zeros(obj_symbol.shape[0], 8)  # (grasp_or_release, dx_loc, dy_loc, rot)
+        action_placeholder[action[0], :4] = torch.tensor([1, action[1], action[2], 1], dtype=torch.float)
+        action_placeholder[action[3], 4:] = torch.tensor([1, action[4], action[5], 1], dtype=torch.float)
         z_cat = torch.cat([obj_symbol, action_placeholder], dim=-1)
         with torch.no_grad():
             obj_symbol_next, rel_symbol_next = self.model(z_cat.unsqueeze(0), rel_symbol.unsqueeze(0))
