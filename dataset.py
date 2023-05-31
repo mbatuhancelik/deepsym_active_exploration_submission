@@ -66,9 +66,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["state"] = self.state[idx]
         a = self.action[idx]
         sample["mask"] = self.mask[idx]
-        sample["state"] = torch.cat([sample["state"][:, :-1], self.binary[[sample["state"][:, -1].int()]]], dim=-1)
+        sample["state"] = torch.cat([sample["state"][:, :-1], self.binary[[sample["state"][:, -1].long()]]], dim=-1)
         sample["post_state"] = self.post_state[idx]
-        sample["post_state"] = torch.cat([sample["post_state"][:, :-1], self.binary[[sample["post_state"][:, -1].int()]]], dim=-1)
+        sample["post_state"] = torch.cat([sample["post_state"][:, :-1], self.binary[[sample["post_state"][:, -1].long()]]], dim=-1)
         dv = sample["state"].device
         n_objects, _ = sample["state"].shape
         # [grasp_or_release, dx_loc, dy_loc, rot]
