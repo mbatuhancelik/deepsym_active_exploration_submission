@@ -412,6 +412,7 @@ class BlocksWorld_v4(BlocksWorld):
 
             positions = np.concatenate([positions, pos])
             obj_ids.append(obj_id)
+            self._p.addUserDebugText(str(i), [0, 0, 0.1], [0, 0, 0], 1, 0, parentObjectUniqueId=obj_id)
 
             i += 1
         self.cluster_centers = []
