@@ -289,26 +289,26 @@ class MCTSForward:
         pass
 
 
-class ForwardModel(MCTSForward):
+class SymbolicForwardModel(MCTSForward):
     def __init__(self, model):
         self.model = model
 
     def forward(self, state, action):
         obj_symbol, rel_symbol = utils.to_tensor_state(state.state)
         action = torch.tensor([int(a_i) for a_i in action.split(",")])
-        action_placeholder = torch.zeros(obj_symbol.shape[0], 4)  # (grasp_or_release, dx_loc, dy_loc, rot)
-        action_placeholder[action[0]] = torch.tensor([-1, action[1], action[2], 1], dtype=torch.float)
-        action_placeholder[action[3]] = torch.tensor([1, action[4], action[5], 1], dtype=torch.float)
+        action_placeholder = torch.zeros(obj_symbol.shape[0], 8)  # (grasp_or_release, dx_loc, dy_loc, rot)
+        action_placeholder[action[0], :4] = torch.tensor([1, action[1], action[2], 1], dtype=torch.float)
+        action_placeholder[action[3], 4:] = torch.tensor([1, action[4], action[5], 1], dtype=torch.float)
         z_cat = torch.cat([obj_symbol, action_placeholder], dim=-1)
         with torch.no_grad():
             obj_symbol_next, rel_symbol_next = self.model(z_cat.unsqueeze(0), rel_symbol.unsqueeze(0))
         obj_symbol_next = obj_symbol_next.sigmoid().bernoulli()[0]
         rel_symbol_next = rel_symbol_next.sigmoid().bernoulli()[0]
         str_state = utils.to_str_state(obj_symbol_next, rel_symbol_next, torch.ones(obj_symbol_next.shape[0]))
-        return State(state=deepcopy(str_state), goal=deepcopy(state.goal))
+        return SymbolicState(state=deepcopy(str_state), goal=deepcopy(state.goal))
 
 
-class State(MCTSState):
+class SymbolicState(MCTSState):
     def __init__(self, state, goal):
         self.state = state
         self.goal = goal
@@ -337,3 +337,73 @@ class State(MCTSState):
 
     def __repr__(self):
         return self.state
+
+
+class SubsymbolicState(MCTSState):
+    threshold = 0.03
+
+    def __init__(self, state, goal):
+        self.state = state
+        self.goal = goal
+
+    def reward(self):
+        return -self.goal_diff()
+
+    def goal_diff(self):
+        diff = (self.state[:, :3] - self.goal[:, :3]).abs().sum()
+        return diff
+
+    def get_available_actions(self):
+        n_obj = self.state.shape[0]
+        actions = []
+        for i in range(n_obj):
+            for iy in range(-1, 2):
+                for j in range(n_obj):
+                    for jy in range(-1, 2):
+                        actions.append(f"{i},0,{iy},{j},0,{jy}")
+        return actions
+
+    def is_terminal(self):
+        diff = self.goal_diff()
+        return diff < SubsymbolicState.threshold
+
+    def is_equal(self, other):
+        diff = (self.state[:, :3] - other.state[:, :3]).abs().sum()
+        return diff < SubsymbolicState.threshold
+
+    def __repr__(self):
+        return self.state.__repr__()
+
+
+class SubsymbolicForwardModel(MCTSForward):
+    def __init__(self, model):
+        self.model = model
+
+    def forward(self, state, action):
+        n_objs = state.state.shape[0]
+        mask = torch.ones(1, n_objs)
+        action = torch.tensor([int(a_i) for a_i in action.split(",")])
+        action_placeholder = torch.zeros(state.state.shape[0], 8)  # (grasp_or_release, dx_loc, dy_loc, rot)
+        action_placeholder[action[0], :4] = torch.tensor([1, action[1], action[2], 1], dtype=torch.float)
+        action_placeholder[action[3], 4:] = torch.tensor([1, action[4], action[5], 1], dtype=torch.float)
+        inp = {
+            "state": state.state.unsqueeze(0),
+            "action": action_placeholder.unsqueeze(0),
+            "pad_mask": mask
+        }
+        with torch.no_grad():
+            _, _, e = self.model.forward(inp, eval_mode=False)
+            delta_pos = state.state[action[3]] - state.state[action[0]]
+            dx, dy = delta_pos[0], delta_pos[1]
+            dx += (-action[1] * 0.075) + (action[4] * 0.075)
+            dy += (-action[2] * 0.075) + (action[5] * 0.075)
+            next_state = state.state.clone()
+        next_state[:, :3] = next_state[:, :3] + e[0, :, :3] + e[0, :, 3:]
+        # print(dx, dy, e[0, :, :3], e[0, :, 3:])
+        for i in range(n_objs):
+            # if the object is lifted, it should be moved
+            if e[0, i, 2] > 0.1:
+                next_state[i, 0] += dx
+                next_state[i, 1] += dy
+
+        return SubsymbolicState(state=next_state, goal=state.goal)

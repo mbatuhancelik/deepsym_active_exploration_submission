@@ -34,7 +34,11 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         self.post_state = torch.load(os.path.join(path, "post_state.pt"))
         n_train = int(len(self.state) * 0.8)
         n_val = int(len(self.state) * 0.1)
-        self.binary = torch.tensor([[0,0,0,0], [0,0,0,1], [0,0,1,0],[0,1,0,0],[1,0,0,0]])
+        self.binary = torch.tensor([[0, 0, 0, 0],
+                                    [0, 0, 0, 1],
+                                    [0, 0, 1, 0],
+                                    [0, 1, 0, 0],
+                                    [1, 0, 0, 0]])
         if split == "train":
             self.state = self.state[:n_train]
             self.action = self.action[:n_train]
@@ -62,9 +66,9 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["state"] = self.state[idx]
         a = self.action[idx]
         sample["mask"] = self.mask[idx]
-        sample["state"] = torch.cat([sample["state"][:,:-1], self.binary[[sample["state"][:, -1].int()]]], dim = -1)
+        sample["state"] = torch.cat([sample["state"][:, :-1], self.binary[[sample["state"][:, -1].long()]]], dim=-1)
         sample["post_state"] = self.post_state[idx]
-        #sample["state"][:, :3] =sample["state"][:, :3] - sample["state"][a[0], :3]
+        sample["post_state"] = torch.cat([sample["post_state"][:, :-1], self.binary[[sample["post_state"][:, -1].long()]]], dim=-1)
         dv = sample["state"].device
         n_objects, _ = sample["state"].shape
         # [grasp_or_release, dx_loc, dy_loc, rot]
@@ -72,7 +76,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["action"][a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float, device=dv)
         sample["action"][a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float, device=dv)
 
-        sample["effect"] = torch.cat([self.effect[idx][:, :3], self.effect[idx][:, 9:12]], dim = -1)
+        sample["effect"] = torch.cat([self.effect[idx][:, :3], self.effect[idx][:, 9:12]], dim=-1)
         mask = torch.zeros(n_objects, dtype=torch.float, device=dv)
         mask[:self.mask[idx]] = 1.0
         sample["pad_mask"] = mask
