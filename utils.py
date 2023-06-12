@@ -1,11 +1,8 @@
-import pkgutil
 import os
 import zipfile
 
 import wandb
 import yaml
-import pybullet
-from pybullet_utils import bullet_client
 import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
@@ -18,10 +15,8 @@ import models
 def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
-    #init run
+    # init run
     run = wandb.init(project="multideepsym", entity="colorslab", config=config)
-    #use wandb folder for uniqe save location
-    #wandb.config.update({"save_folder": os.path.join( config["save_folder"] ,wandb.run.id )}, allow_val_change=True)
     # create a save folder if not exists
     save_folder = run.config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
@@ -39,40 +34,56 @@ def parse_and_init(args):
 
 def create_model_from_config(config):
     # create the encoder
-    enc_layers = [config["state_dim"]] + [config["hidden_dim"]]*config["n_hidden_layers"] + [config["latent_dim"]]
+    enc_layers = [config["state_dim"]] + \
+                 [config["hidden_dim"]]*config["n_hidden_layers"] + \
+                 [config["latent_dim"]]
     enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"])
     encoder = torch.nn.Sequential(
         enc_mlp,
-        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"], T=config["gumbel_t"])
+        blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
+                                  T=config["gumbel_t"])
     )
-    # create the projector
-    projector = torch.nn.Linear(config["latent_dim"]+config["action_dim"], config["hidden_dim"])
-    # create the transformer
-    layer = torch.nn.TransformerEncoderLayer(d_model=config["hidden_dim"], nhead=config["n_attention_heads"],
-                                             batch_first=True)
-    transformer = torch.nn.TransformerEncoder(layer, num_layers=config["n_attention_layers"])
+    pre_att_enc_layers = [config["state_dim"]] + \
+                         [config["hidden_dim"]]*config["n_hidden_layers"]
+    pre_att_enc = blocks.MLP(pre_att_enc_layers, batch_norm=config["batch_norm"])
+    attention = blocks.GumbelAttention(in_dim=config["hidden_dim"],
+                                       out_dim=config["hidden_dim"],
+                                       num_heads=config["n_attention_heads"])
+
+    # create a feedforward net to process input before attention
+    ff_layers = [config["latent_dim"]+config["action_dim"]] + \
+                [config["hidden_dim"]]*config["n_hidden_layers"]
+    ff = blocks.MLP(ff_layers, batch_norm=config["batch_norm"])
+
     # create the decoder
-    dec_layers = [config["hidden_dim"]]*(config["n_hidden_layers"]+1) + [config["effect_dim"]]
+    dec_layers = [config["hidden_dim"]*config["n_attention_heads"]] + \
+                 [config["hidden_dim"]]*(config["n_hidden_layers"]) + \
+                 [config["effect_dim"]]
     decoder = blocks.MLP(dec_layers, batch_norm=config["batch_norm"])
+
     # send everything to the device
     encoder = encoder.to(config["device"])
-    projector = projector.to(config["device"])
-    transformer = transformer.to(config["device"])
+    pre_att_enc = pre_att_enc.to(config["device"])
+    attention = attention.to(config["device"])
+    ff = ff.to(config["device"])
     decoder = decoder.to(config["device"])
 
     # create the model
-    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, projector=projector, decoder_att=transformer,
-                                   device=config["device"], lr=config["lr"], path=config["save_folder"],
-                                   coeff=config["coeff"])
+    model = models.MultiDeepSymMLP(encoder=encoder, decoder=decoder, attention=attention,
+                                   feedforward=ff, pre_attention_mlp=pre_att_enc,
+                                   device=config["device"], lr=config["lr"],
+                                   path=config["save_folder"], coeff=config["coeff"])
 
     return model
 
 
 def connect(gui=1):
+    import pkgutil
+    from pybullet_utils import bullet_client
     if gui:
-        p = bullet_client.BulletClient(connection_mode=pybullet.GUI)
+        p = bullet_client.BulletClient(connection_mode=bullet_client.pybullet.GUI)
     else:
-        p = bullet_client.BulletClient(connection_mode=pybullet.DIRECT)
+        p = bullet_client.BulletClient(connection_mode=bullet_client.pybullet.DIRECT)
         egl = pkgutil.get_loader("eglRenderer")
         if (egl):
             p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
@@ -283,6 +294,42 @@ def in_array(element, array):
         if element.is_equal(e_i):
             return True, i
     return False, None
+
+
+def to_str_state(obj, rel, mask=None):
+    if mask is None:
+        mask = torch.ones(obj.shape[0])
+    m = (mask == 1)
+    n_obj = m.sum()
+    mm = torch.outer(m, m)
+    obj_str = "-".join(binary_tensor_to_str(obj.bernoulli()[m]))
+    rel_str = "-".join([",".join(binary_tensor_to_str(r_i.bernoulli()[mm].reshape(n_obj, n_obj))) for r_i in rel])
+    return obj_str + "_" + rel_str
+
+
+def to_str_action(action):
+    to_idx = int(torch.where(action[:, 0] > 0.5)[0])
+    to_dx = int(action[to_idx, 1])
+    to_dy = int(action[to_idx, 2])
+
+    from_idx = torch.where(action[:, 0] < -0.5)[0]
+    if len(from_idx) == 0:
+        from_idx = to_idx
+        from_dx = 0
+        from_dy = 0
+    else:
+        from_idx = int(from_idx)
+        from_dx = int(action[from_idx, 1])
+        from_dy = int(action[from_idx, 2])
+    act_str = f"{from_idx},{from_dx},{from_dy},{to_idx},{to_dx},{to_dy}"
+    return act_str
+
+
+def to_tensor_state(str_state):
+    obj_str, rel_str = str_state.split("_")
+    obj = str_to_binary_tensor(obj_str.split("-"))
+    rel = torch.stack([str_to_binary_tensor(r_i.split(",")) for r_i in rel_str.split("-")])
+    return obj, rel
 
 
 def segment_img_with_mask(img, mask, valid_objects, window=64, padding=10, aug=False):

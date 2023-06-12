@@ -10,6 +10,8 @@ import environment
 buffer = []
 buffer_type = ""
 buffer_lenght = 0
+
+
 def collect_rollout(env):
     action = 0
     global buffer
@@ -19,10 +21,11 @@ def collect_rollout(env):
     else:
         action = env.sample_random_action()
     position, effect, types = env.step(*action)
-    return position, types, action, effect
+    post_position, _ = env.state_obj_poses_and_types()
+    return position, types, action, effect, post_position
 
 
-def populate_buffer(env):
+def populate_buffer(env:environment.BlocksWorld_v4):
     global buffer_type
     buffer = None
     if buffer_type == "3obj":
@@ -33,6 +36,8 @@ def populate_buffer(env):
         buffer = env.sample_both()
     if buffer_type == "proximity":
         buffer = env.sample_proximity()
+    if buffer_type == "long_rot":
+        buffer = env.sample_long_rotation()
 
     assert (buffer is not None)
 
@@ -45,17 +50,14 @@ if __name__ == "__main__":
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
     parser.add_argument("-b", help="buffer_type", type=str, required=True)
-    parser.add_argument("-post", help="post buffer actions", type=int,default=0)
-    parser.add_argument("-pre", help="pre buffer actions", type=int,default=0)
+    parser.add_argument("-post", help="post buffer actions", type=int, default=0)
+    parser.add_argument("-pre", help="pre buffer actions", type=int, default=0)
     args = parser.parse_args()
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-
     min_obj = 5 if args.b == "both" else 3
-    env = environment.BlocksWorld_v4(gui=0, min_objects=min_obj, max_objects=5)
-
-   
+    env = environment.BlocksWorld_v4(gui=0, min_objects=2, max_objects=2)
 
     np.random.seed()
 
@@ -71,6 +73,7 @@ if __name__ == "__main__":
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
     effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
+    post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
 
     prog_it = args.N
     buffer_type = args.b
@@ -80,15 +83,17 @@ if __name__ == "__main__":
     buffer = populate_buffer(env)
     buffer_lenght = len(buffer)
     while i < args.N:
-        position_pre, obj_types, action, effect = collect_rollout(env)
+        position_pre, obj_types, action, effect, position_post = collect_rollout(env)
         env_it += 1
-        if(len(buffer) >args.pre):
+        if (len(buffer) > args.pre):
             continue
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
         states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         actions[i] = torch.tensor(action, dtype=torch.int)
         masks[i] = env.num_objects
         effects[i, :env.num_objects] = torch.tensor(effect, dtype=torch.float)
+        post_states[i, :env.num_objects, :-1] = torch.tensor(position_post, dtype=torch.float)
+        post_states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         i += 1
 
         if (env_it) == buffer_lenght + args.post:
@@ -103,6 +108,7 @@ if __name__ == "__main__":
     torch.save(actions, os.path.join(args.o, f"action_{args.i}.pt"))
     torch.save(masks, os.path.join(args.o, f"mask_{args.i}.pt"))
     torch.save(effects, os.path.join(args.o, f"effect_{args.i}.pt"))
+    torch.save(post_states, os.path.join(args.o, f"post_state_{args.i}.pt"))
     end = time.time()
     del env
     print(f"Completed in {end-start:.2f} seconds.")

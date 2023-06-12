@@ -4,6 +4,7 @@ import torch
 import wandb
 
 import utils
+import blocks
 
 
 class DeepSymbolGenerator:
@@ -203,34 +204,14 @@ class DeepSymbolGenerator:
 class MultiDeepSym(DeepSymbolGenerator):
     def __init__(self, **kwargs):
         super(MultiDeepSym, self).__init__(**kwargs)
-        self.projector = kwargs.get("projector")
-        self.decoder_att = kwargs.get("decoder_att")
-        self.optimizer.param_groups.append(
-                {"params": self.projector.parameters(),
-                 "lr": self.lr,
-                 "betas": (0.9, 0.999),
-                 "eps": 1e-8,
-                 "amsgrad": False,
-                 "maximize": False,
-                 "weight_decay": 0,
-                 "fused": False,
-                 "foreach": None,
-                 "capturable": False,
-                 "differentiable": False})
-        self.optimizer.param_groups.append(
-                {"params": self.decoder_att.parameters(),
-                 "lr": self.lr,
-                 "betas": (0.9, 0.999),
-                 "eps": 1e-8,
-                 "amsgrad": False,
-                 "maximize": False,
-                 "weight_decay": 0,
-                 "fused": False,
-                 "foreach": None,
-                 "capturable": False,
-                 "differentiable": False})
-        self.module_names.append("projector")
-        self.module_names.append("decoder_att")
+        self._append_module("feedforward", kwargs.get("feedforward"))
+        self._append_module("attention", kwargs.get("attention"))
+        self._append_module("pre_attention_mlp", kwargs.get("pre_attention_mlp"))
+
+    def _append_module(self, name, module):
+        setattr(self, name, module)
+        self.module_names.append(name)
+        self.optimizer.add_param_group({"params": module.parameters()})
 
     def encode(self, x, eval_mode=False):
         n_sample, n_seg, ch, h, w = x.shape
@@ -241,6 +222,17 @@ class MultiDeepSym(DeepSymbolGenerator):
             h = h.round()
         return h
 
+    def attn_weights(self, x, pad_mask, eval_mode=False):
+        # assume that x is not an image for the moment..
+        n_sample, n_seg, n_feat = x.shape
+        x = x.reshape(-1, n_feat)
+        x = self.pre_attention_mlp(x.to(self.device))
+        x = x.reshape(n_sample, n_seg, -1)
+        attn_weights = self.attention(x, src_key_mask=pad_mask.to(self.device))
+        if eval_mode:
+            attn_weights = attn_weights.round()
+        return attn_weights
+
     def concat(self, sample, eval_mode=False):
         x = sample["state"]
         a = sample["action"].to(self.device)
@@ -248,10 +240,12 @@ class MultiDeepSym(DeepSymbolGenerator):
         z = torch.cat([h, a], dim=-1)
         return z
 
-    def aggregate(self, z, pad_mask):
-        z = self.projector(z)
-        z_att = self.decoder_att(z, src_key_padding_mask=~pad_mask.bool().to(self.device))
-        return z_att
+    def aggregate(self, z, attn_weights):
+        n_batch, n_seg, n_dim = z.shape
+        h = self.feedforward(z.reshape(-1, n_dim)).reshape(n_batch, n_seg, -1).unsqueeze(1)
+        att_out = attn_weights @ h  # (n_batch, n_head, n_seg, n_dim)
+        att_out = att_out.permute(0, 2, 1, 3).reshape(n_batch, n_seg, -1)  # (n_batch, n_seg, n_head*n_dim)
+        return att_out
 
     def decode(self, z, mask):
         n_sample, n_seg, z_dim = z.shape
@@ -265,20 +259,21 @@ class MultiDeepSym(DeepSymbolGenerator):
 
     def forward(self, sample, eval_mode=False):
         z = self.concat(sample, eval_mode)
-        z_att = self.aggregate(z, sample["pad_mask"])
+        attn_weights = self.attn_weights(sample["state"], sample["pad_mask"], eval_mode)
+        z_att = self.aggregate(z, attn_weights)
         e = self.decode(z_att, sample["pad_mask"])
-        return z, e
+        return z, attn_weights, e
 
     def loss(self, sample):
         e_truth = sample["effect"].to(self.device)
-        _, e_pred = self.forward(sample)
+        _, _, e_pred = self.forward(sample)
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L
 
     def loss_with_pred(self, sample):
         e_truth = sample["effect"].to(self.device)
-        _, e_pred = self.forward(sample)
+        _, _, e_pred = self.forward(sample)
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L, e_pred
@@ -296,3 +291,46 @@ class MultiDeepSymMLP(MultiDeepSym):
         if eval_mode:
             h = h.round()
         return h
+
+
+class SymbolForward(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, num_heads):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+
+        enc_layers = [torch.nn.Linear(input_dim, hidden_dim)]
+        for _ in range(num_layers - 1):
+            enc_layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
+        self.encoder = torch.nn.ModuleList(enc_layers)
+
+        obj_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                         [output_dim]
+        self.obj_decoder = blocks.MLP(obj_dec_layers)
+
+        query_decoder_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                               [num_heads*hidden_dim]
+        self.query_decoder = blocks.MLP(query_decoder_layers)
+        key_decoder_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                             [num_heads*hidden_dim]
+        self.key_decoder = blocks.MLP(key_decoder_layers)
+        self.rel_bias = torch.nn.Parameter(torch.zeros(1, num_heads, 1, 1))
+
+    def forward(self, x, attn_weights):
+        n_batch, n_token, _ = x.shape
+        x = x.unsqueeze(1)
+        for layer in self.encoder:
+            x = torch.nn.functional.relu(layer(x))
+            x = attn_weights @ x
+        # (batch, head, token, dim) -> (batch, token, head*dim)
+        x = x.permute(0, 2, 1, 3).reshape(n_batch, n_token, -1)
+        obj_pred = self.obj_decoder(x)
+        query_pred = self.query_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
+        key_pred = self.key_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
+        query_pred = query_pred.permute(0, 2, 1, 3)
+        key_pred = key_pred.permute(0, 2, 3, 1)
+        rel_pred = query_pred @ key_pred
+        rel_pred = rel_pred + self.rel_bias
+        return obj_pred, rel_pred

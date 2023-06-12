@@ -16,6 +16,10 @@ if __name__ == "__main__":
     parser.add_argument("-T", help="interaction per episode", type=int, required=True)
     parser.add_argument("-p", help="number of procs", type=int, required=True)
     args = parser.parse_args()
+
+    if not os.path.exists(args.d):
+        os.makedirs(args.d)
+
     procs = []
     start = time.time()
     for i in range(args.p):

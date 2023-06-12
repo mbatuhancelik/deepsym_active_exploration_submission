@@ -2,86 +2,112 @@ import os
 import argparse
 
 import torch
-import blocks
-from tqdm import tqdm
+import wandb
 
-from dataset import SymbolForwardDataset
-from utils import get_device
-
-
-def save_model(path, prefix):
-    torch.save(proj_in.cpu().state_dict(), os.path.join(path, prefix+"proj_in.ckpt"))
-    torch.save(attention.cpu().state_dict(), os.path.join(path, prefix+"attention.ckpt"))
-    torch.save(proj_out.cpu().state_dict(), os.path.join(path, prefix+"proj_out.ckpt"))
+from utils import get_device, get_parameter_count
+import models
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser("train a symbol forward model")
-    parser.add_argument("-s", help="path", type=str, required=True)
-    parser.add_argument("-e", help="epoch", type=int, default=1000)
-    parser.add_argument("-bs", help="batch size", type=int, default=128)
-    parser.add_argument("-lr", help="learning rate", type=float, default=0.001)
-    parser.add_argument("-hs", help="hidden size", type=int, default=128)
-    args = parser.parse_args()
+def load_dataset(name, run, device):
+    z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_pre.pt")).name).to(device)
+    z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_pre.pt")).name).to(device)
+    z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_act.pt")).name).to(device)
+    z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_post.pt")).name).to(device)
+    z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_post.pt")).name).to(device)
+    mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_mask.pt")).name).to(device)
 
-    device = get_device()
+    dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
+                                             z_obj_post, z_rel_post, mask)
+    return dataset
 
-    train_set = SymbolForwardDataset(args.s, "train_")
-    val_set = SymbolForwardDataset(args.s, "val_")
-    train_loader = torch.utils.data.DataLoader(train_set, args.bs, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_set, args.bs, shuffle=True)
 
-    proj_in = blocks.MLP([20, args.hs, args.hs])
-    attention = torch.nn.MultiheadAttention(embed_dim=args.hs, num_heads=8, batch_first=True)
-    proj_out = blocks.MLP([args.hs, args.hs, 8])
+parser = argparse.ArgumentParser("Train symbol forward model")
+parser.add_argument("-i", help="Wandb run id", type=str)
+parser.add_argument("-n", help="Number of hidden units", type=int)
+parser.add_argument("-l", help="Number of layers", type=int)
+parser.add_argument("-e", help="Number of epochs", type=int)
+parser.add_argument("-b", help="Batch size", type=int)
+parser.add_argument("-lr", help="Learning rate", type=float)
+args = parser.parse_args()
 
-    proj_in.to(device)
-    attention.to(device)
-    proj_out.to(device)
+run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+device = get_device()
+wandb.config.update({"device": device}, allow_val_change=True)
 
-    optimizer = torch.optim.Adam(lr=args.lr, params=[
-            {"params": proj_in.parameters()},
-            {"params": attention.parameters()},
-            {"params": proj_out.parameters()}])
-    criterion = torch.nn.BCEWithLogitsLoss()
-    best_loss = 1e100
 
-    for e in range(args.e):
-        epoch_loss = 0.0
-        val_loss = 0.0
-        for i, (pre_i, eff_i, m_i) in enumerate(tqdm(train_loader)):
-            pre_i = pre_i.to(device)
-            eff_i = eff_i.to(device)
-            m_i = m_i.to(device)
+input_dim = run.config["latent_dim"] + run.config["action_dim"]
+model = models.SymbolForward(input_dim=input_dim, hidden_dim=args.n,
+                             output_dim=run.config["latent_dim"], num_layers=args.l,
+                             num_heads=run.config["n_attention_heads"]).to(device)
+print(model)
+print(f"Number of parameters: {get_parameter_count(model)}")
+wandb.config.update({"forward_model":
+                     {"hidden_unit": args.n,
+                      "layer": args.l,
+                      "epoch": args.e,
+                      "batch_size": args.b,
+                      "learning_rate": args.lr}}, allow_val_change=True)
+save_path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
+if not os.path.exists(run.config["save_folder"]):
+    os.makedirs(run.config["save_folder"])
 
-            p_i = proj_in(pre_i)
-            h_i, _ = attention(p_i, p_i, p_i, key_padding_mask=~m_i.bool())
-            e_bar = proj_out(h_i)
-            loss = criterion(e_bar, eff_i)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+train_set = load_dataset("train", run, device)
+val_set = load_dataset("val", run, device)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.b, shuffle=True)
+val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.b, shuffle=False)
 
-            epoch_loss += loss.item()
-        epoch_loss /= (i+1)
+criterion = torch.nn.BCEWithLogitsLoss(reduction="none")
+optimizer = torch.optim.Adam(lr=args.lr, params=model.parameters())
 
-        for i, (pre_i, eff_i, m_i) in enumerate(tqdm(val_loader)):
-            pre_i = pre_i.to(device)
-            eff_i = eff_i.to(device)
-            m_i = m_i.to(device)
+for e in range(args.e):
+    train_obj_loss = 0.0
+    train_rel_loss = 0.0
+    for zo_i, zr_i, a, zo_f, zr_f, m in train_loader:
+        zi_cat = torch.cat([zo_i, a], dim=-1)
+        zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
+        m = m.unsqueeze(2)
+        m_rel = (m @ m.permute(0, 2, 1)).unsqueeze(1)
+        obj_loss = (criterion(zo_f_bar, zo_f) * m).sum(dim=[1, 2]).mean()
+        rel_loss = (criterion(zo_r_bar, zr_f) * m_rel).sum(dim=[1, 2, 3]).mean()
+        loss = obj_loss + rel_loss
 
-            with torch.no_grad():
-                p_i = proj_in(pre_i)
-                h_i, _ = attention(p_i, p_i, p_i, key_padding_mask=~m_i.bool())
-                e_bar = proj_out(h_i)
-            val_loss += criterion(e_bar, eff_i)
-        val_loss /= (i+1)
-        if val_loss < best_loss:
-            save_model(args.s, "best_")
-        save_model(args.s, "last_")
-        proj_in.to(device)
-        attention.to(device)
-        proj_out.to(device)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-        print(f"Epoch={e+1}, train loss={epoch_loss}, val loss={val_loss}")
+        train_obj_loss += obj_loss.item()
+        train_rel_loss += rel_loss.item()
+
+    train_obj_loss = train_obj_loss / len(train_loader)
+    train_rel_loss = train_rel_loss / len(train_loader)
+
+    val_obj_loss = 0.0
+    val_rel_loss = 0.0
+    with torch.no_grad():
+        for zo_i, zr_i, a, zo_f, zr_f, m in val_loader:
+            zi_cat = torch.cat([zo_i, a], dim=-1)
+            zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
+            m = m.unsqueeze(2)
+            m_rel = (m @ m.permute(0, 2, 1)).unsqueeze(1)
+            obj_loss = (criterion(zo_f_bar, zo_f) * m).sum(dim=[1, 2]).mean()
+            rel_loss = (criterion(zo_r_bar, zr_f) * m_rel).sum(dim=[1, 2, 3]).mean()
+
+            val_obj_loss += obj_loss.item()
+            val_rel_loss += rel_loss.item()
+
+    val_obj_loss = val_obj_loss / len(val_loader)
+    val_rel_loss = val_rel_loss / len(val_loader)
+
+    wandb.log({"train_obj_loss": train_obj_loss,
+               "train_rel_loss": train_rel_loss,
+               "val_obj_loss": val_obj_loss,
+               "val_rel_loss": val_rel_loss})
+
+    print(f"Epoch={e}, Train obj loss={train_obj_loss:.5f}, Train rel loss={train_rel_loss:.5f}, "
+          f"Val obj loss={val_obj_loss:.5f}, Val rel loss={val_rel_loss:.5f}")
+
+    sd = model.eval().cpu().state_dict()
+    torch.save(sd, save_path)
+    model.train().to(device)
+wandb.save(save_path)
