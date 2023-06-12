@@ -1,6 +1,6 @@
 import os
 import zipfile
-
+import copy
 import wandb
 import yaml
 import numpy as np
@@ -457,3 +457,56 @@ def get_dataset_from_wandb(name):
     archive.extractall(os.path.join("data", name))
     archive.close()
     os.remove(os.path.join(artifact_dir, f"{name}.zip"))
+
+
+
+def find_columns(matrix):
+    columns = []
+    for i in range(len(matrix[0])):
+        column = []
+        for j in range(len(matrix)):
+            column.append(matrix[j][i])
+        columns.append(column)
+        column = []
+    return columns
+
+def change_columns(matrix, column, index):
+    for i in range(len(matrix)):
+        matrix[i][index] = column[i]
+    return matrix
+
+def matrix_shuffler(matrix):
+    original = copy.deepcopy(matrix)
+    result = []
+
+    for i in range(len(matrix)):
+        for j in range(len(matrix)):
+            if (i == j or i > j):
+                continue
+            matrix[i] = copy.deepcopy(original[j])
+            matrix[j] = copy.deepcopy(original[i])
+            columns = find_columns(matrix)
+            matrix = change_columns(matrix, columns[i], j)
+            matrix = change_columns(matrix, columns[j], i)
+            result.append(copy.deepcopy(matrix))
+            matrix = copy.deepcopy(original)
+
+    return result
+    
+    
+
+
+def create_dictionary(data):
+    dictionary = {}
+    for i in range(len(data)):
+        key = []
+        key.append(data[i][0])
+        key.append(data[i][1])
+        key.append(data[i][2])
+        value = [data[i][3], data[i][4]]
+        dictionary[str(key)] = value
+        rels = matrix_shuffler(data[i][2])
+        for rel in rels:
+            key[2] = rel
+            dictionary[str(key)] = value
+    return dictionary
