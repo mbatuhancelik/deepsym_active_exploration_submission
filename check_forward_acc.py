@@ -1,4 +1,5 @@
 import os
+import argparse
 
 import torch
 import wandb
@@ -19,8 +20,10 @@ def load_dataset(name, run, device):
     return dataset
 
 
-run_id = "mhd6ocdg"
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--run-id", type=str)
+args = parser.parse_args()
+run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.run_id)
 wandb.config.update({"device": "cpu"}, allow_val_change=True)
 config = dict(run.config)
 
