@@ -1,5 +1,4 @@
 import time
-import uuid
 from copy import deepcopy
 
 import numpy as np
@@ -9,8 +8,8 @@ import utils
 
 
 class MCTSNode:
-    def __init__(self, parent, state, forward_fn):
-        self.name = uuid.uuid4().hex
+    def __init__(self, node_id, parent, state, forward_fn):
+        self.node_id = node_id
         self.parent = parent
         self.state = state
         self.count = 0
@@ -48,13 +47,25 @@ class MCTSNode:
                 node_count, depth = self._tree_stats()
                 print(f"Tree depth={depth}, node count={node_count}, "
                       f"node/sec={(node_count-start_node_count)/time_elapsed:.2f}, "
-                      f"best reward={self.reward/self.count}")
+                      f"best yield={self.best_yield():.2f}")
 
         return self.children_yield()
 
     def best_child_idx(self):
         idx = np.argmax(self.children_ucb1())
         return idx
+
+    def best_yield(self):
+        best_yield = -1
+        for child in self.children:
+            if child is not None:
+                for outcome in child:
+                    yield_ = outcome.best_yield()
+                    if yield_ > best_yield:
+                        best_yield = yield_
+        if best_yield == -1:
+            best_yield = self.reward/self.count
+        return best_yield
 
     def best_child_for_plan(self):
         idx = np.argmax(self.children_yield())
@@ -116,7 +127,7 @@ class MCTSNode:
             return self.state, "", [], 1.0
         idx = self.best_child_for_plan()
         if self.children[idx] is None:
-            print("Plan not found.")
+            print("Plan might not be successful.")
             return self.state, "", [(idx, 0)], 1.0
         elif len(self.children[idx]) == 1:
             child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].plan()
@@ -139,7 +150,7 @@ class MCTSNode:
             return self.state, "", [], 1.0
         idx = self.best_child_for_plan()
         if self.children[idx] is None:
-            print("Plan not found.")
+            print("Plan might not be successful.")
             return self.state, "", [(idx, 0)], 1.0
         elif len(self.children[idx]) == 1:
             child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].best_reward_path()
@@ -165,7 +176,8 @@ class MCTSNode:
         action = self.actions[idx]
         # ACT HERE #
         next_state = self._forward_fn.forward(self.state, action)
-        self.children[idx] = [MCTSNode(parent=self,
+        self.children[idx] = [MCTSNode(node_id=self.node_id+1,
+                                       parent=self,
                                        state=next_state,
                                        forward_fn=self._forward_fn)]
         ############
@@ -185,7 +197,8 @@ class MCTSNode:
             children_states = list(map(lambda x: x.state, self.children[idx]))
             result, out_idx = utils.in_array(next_state, children_states)
             if not result:
-                self.children[idx].append(MCTSNode(parent=self,
+                self.children[idx].append(MCTSNode(node_id=self.node_id+1,
+                                                   parent=self,
                                                    state=next_state,
                                                    forward_fn=self._forward_fn))
                 return self.children[idx][-1]._tree_policy()
@@ -197,7 +210,7 @@ class MCTSNode:
             random_action = np.random.choice(self.actions)
             # ACT HERE #
             next_state = self._forward_fn.forward(self.state, random_action)
-            v = MCTSNode(parent=None, state=next_state, forward_fn=self._forward_fn)
+            v = MCTSNode(node_id=-1, parent=None, state=next_state, forward_fn=self._forward_fn)
             ############
             return v._default_policy(depth_limit-1)
         else:
@@ -224,7 +237,7 @@ class MCTSNode:
                     outcomes = list(map(lambda x: x.name, c))
                     outcomes = "[" + ", ".join(outcomes) + "]"
                     children.append(outcomes)
-        string = "Name: " + self.name + "\n"
+        string = "Node id: " + self.node_id + "\n"
         if self.parent:
             string += "Parent: " + self.parent.name + "\n"
         else:
@@ -347,7 +360,9 @@ class SubsymbolicState(MCTSState):
         self.goal = goal
 
     def reward(self):
-        return -self.goal_diff()
+        diff = self.goal_diff()
+        reward = min(SubsymbolicState.threshold / diff, 1)
+        return reward
 
     def goal_diff(self):
         diff = (self.state[:, :3] - self.goal[:, :3]).abs().sum()
