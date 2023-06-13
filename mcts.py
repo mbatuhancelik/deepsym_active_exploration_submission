@@ -52,7 +52,7 @@ class MCTSNode:
         return self.children_yield()
 
     def best_child_idx(self):
-        idx = np.argmax(self.children_ucb1())
+        idx = np.argmax(self.children_uct())
         return idx
 
     def best_yield(self):
@@ -71,7 +71,7 @@ class MCTSNode:
         idx = np.argmax(self.children_yield())
         return idx
 
-    def children_ucb1(self):
+    def children_uct(self):
         if not self.is_terminal:
             scores = []
             for child in self.children:
@@ -81,7 +81,7 @@ class MCTSNode:
                     # there may be stochastic outcomes for the same action
                     for outcome in child:
                         probs.append(outcome.count)
-                        bounds.append(outcome.UCB1())
+                        bounds.append(outcome.UCT())
                     probs = np.array(probs)
                     bounds = np.array(bounds)
                     probs = probs/probs.sum()
@@ -114,7 +114,7 @@ class MCTSNode:
         else:
             return None
 
-    def UCB1(self):
+    def UCT(self):
         if self.parent is None:
             return None
         else:
@@ -189,7 +189,7 @@ class MCTSNode:
             return self
         if None in self.children:
             return self._expand()
-        # else choose the best child by UCB1
+        # else choose the best child by UCT
         else:
             # have to change here
             idx = self.best_child_idx()
@@ -229,7 +229,7 @@ class MCTSNode:
         state = str(self.state)
         children = []
         if not self.is_terminal:
-            children_scores = list(map(lambda x: "%.2f" % x, self.children_ucb1()))
+            children_scores = list(map(lambda x: "%.2f" % x, self.children_uct()))
             for c in self.children:
                 if c is None:
                     children.append("None")
@@ -244,7 +244,7 @@ class MCTSNode:
             string += "Parent: None\n"
         if not self.is_terminal:
             string += "Children: [" + ", ".join(children) + "]\n"
-            string += "Children UCB1: [" + ", ".join(children_scores) + "]\n"
+            string += "Children UCT: [" + ", ".join(children_scores) + "]\n"
         string += "State:\n" + state + "\n"
         string += "Reward: " + str(self.reward) + "\n"
         string += "Count: " + str(self.count) + "\n"
