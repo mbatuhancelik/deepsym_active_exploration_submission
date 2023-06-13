@@ -207,7 +207,7 @@ while True:
     z,_ ,e_pred = model.forward(sample, eval_mode=True)
     print(e_pred[0, :, 2])
     e_pred = e_pred.detach()
-    e_pred = e_pred.reshape(-1, 2, 9)
+    e_pred = e_pred.reshape(-1, 2, 3)
     for e_i, s_i in zip(e_pred, state):
         e_before, e_after = e_i
         from_before = s_i[:3].clone()

@@ -310,9 +310,12 @@ class SymbolForward(torch.nn.Module):
                          [output_dim]
         self.obj_decoder = blocks.MLP(obj_dec_layers)
 
-        rel_dec_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
-                         [num_heads*hidden_dim]
-        self.rel_decoder = blocks.MLP(rel_dec_layers)
+        query_decoder_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                               [num_heads*hidden_dim]
+        self.query_decoder = blocks.MLP(query_decoder_layers)
+        key_decoder_layers = [num_heads*hidden_dim] + [hidden_dim] * (num_layers - 2) + \
+                             [num_heads*hidden_dim]
+        self.key_decoder = blocks.MLP(key_decoder_layers)
         self.rel_bias = torch.nn.Parameter(torch.zeros(1, num_heads, 1, 1))
 
     def forward(self, x, attn_weights):
@@ -324,8 +327,10 @@ class SymbolForward(torch.nn.Module):
         # (batch, head, token, dim) -> (batch, token, head*dim)
         x = x.permute(0, 2, 1, 3).reshape(n_batch, n_token, -1)
         obj_pred = self.obj_decoder(x)
-        rel_pred = self.rel_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
-        rel_pred = rel_pred.permute(0, 2, 1, 3)
-        rel_pred = (rel_pred @ rel_pred.permute(0, 1, 3, 2)) / (rel_pred.shape[-1]**0.5)
+        query_pred = self.query_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
+        key_pred = self.key_decoder(x).reshape(n_batch, n_token, self.num_heads, -1)
+        query_pred = query_pred.permute(0, 2, 1, 3)
+        key_pred = key_pred.permute(0, 2, 3, 1)
+        rel_pred = query_pred @ key_pred
         rel_pred = rel_pred + self.rel_bias
         return obj_pred, rel_pred
