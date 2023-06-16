@@ -7,6 +7,186 @@ import torch
 import utils
 
 
+class Tree:
+    def __init__(self, root_state, max_nodes=100000, forward_fn=None):
+        self.max_nodes = max_nodes
+        self.node = []  # [state_id0, state_id1, ...]
+        self.id_to_state = []  # [state0, state1, ...]
+        self.state_to_id = {}  # {state0: state_id0, state1: state_id1, ...}
+        self.transition_table = {}  # {(state_id, action_id): (next_state_id, count)}
+        self.forward_fn = forward_fn  # state = forward_fn(state, action)
+        self.children = []  # [{action_id0: [node_id0, node_id1, ...], action_id1: [node_id2, node_id3, ...]}, ...]
+
+        self.id_to_action = []  # [action0, action1, ...]
+        self.action_to_id = {}  # {action0: action_id0, action1: action_id1, ...}
+
+        self.parent = -1 * np.ones(max_nodes, dtype=np.int64)
+        self.parent_action = -1 * np.ones(max_nodes, dtype=np.int64)
+        self.count = np.zeros(max_nodes, dtype=np.int64)
+        self.reward = np.zeros(max_nodes, dtype=np.float)
+        self.is_terminal = np.zeros(max_nodes, dtype=np.bool)
+
+        self.node.append(0)
+        self.id_to_state.append(root_state)
+        self.children.append({})
+        self.is_terminal[0] = root_state.is_terminal()
+
+    def search(self, iter_limit, time_limit, default_depth_limit=1, default_batch_size=1):
+        i = 0
+        start = time.time()
+        end = time.time()
+        time_elapsed = end - start
+        n_nodes, n_states, n_actions, n_transitions = self._tree_stats()
+        while (i < iter_limit) and (time_elapsed < time_limit) and (n_nodes < self.max_nodes):
+            node_id = self._tree_policy()
+            reward = 0.0
+
+            # sequential
+            for _ in range(default_batch_size):
+                reward += self._default_policy(node_id, default_depth_limit)
+            reward /= default_batch_size
+
+            self._backup(node_id, reward)
+
+            i += 1
+            end = time.time()
+            time_elapsed = end - start
+            n_nodes, n_states, n_actions, n_transitions = self._tree_stats()
+            if i % 100 == 0:
+                print('iter: {}, time: {:.3f}, nodes: {}, states: {}, actions: {}, transitions: {}, node/sec: {:.1f}'.format(
+                    i, time_elapsed, n_nodes, n_states, n_actions, n_transitions, n_nodes/time_elapsed))
+
+    def _tree_policy(self):
+        node_id = 0
+        while not self.is_terminal[node_id]:
+            state_id = self.node[node_id]
+            state = self.id_to_state[state_id]
+            action_ids = self._get_available_actions(state)
+            children = self.children[node_id]
+            n_children = len(children)
+            if n_children != len(action_ids):
+                return self._expand(node_id)
+            else:
+                uct = np.zeros(n_children)
+                child_action_ids = list(children.keys())
+                for i, action_id in enumerate(child_action_ids):
+                    outcomes = children[action_id]
+                    outcome_n = self.count[outcomes]
+                    outcome_r = self.reward[outcomes]
+                    outcome_uct = outcome_r/outcome_n + np.sqrt((2*np.log(self.count[node_id])) / outcome_n)
+                    p = outcome_n / outcome_n.sum()
+                    uct[i] = (p * outcome_uct).sum()
+                best_action_id = child_action_ids[np.argmax(uct)]
+                if np.random.rand() < 0.05:
+                    next_state_id = self._get_next_state_id(state_id, best_action_id)
+                    outcome_nodes = children[best_action_id]
+                    outcome_state_ids = [self.node[node_id] for node_id in outcome_nodes]
+                    try:
+                        # if next state is already observed
+                        idx = outcome_state_ids.index(next_state_id)
+                        node_id = outcome_nodes[idx]
+                    except ValueError:
+                        # a new outcome has been observed
+                        self.node.append(next_state_id)
+                        new_node_id = len(self.node) - 1
+                        outcome_nodes.append(new_node_id)
+                        self.parent[new_node_id] = node_id
+                        self.parent_action[new_node_id] = best_action_id
+                        self.children.append({})
+                        node_id = new_node_id
+                else:
+                    outcome_n = self.count[children[best_action_id]]
+                    p = outcome_n / outcome_n.sum()
+                    node_id = np.random.choice(children[best_action_id], p=p)
+        return node_id
+
+    def _expand(self, node_id):
+        state_id = self.node[node_id]
+        action_ids = self._get_available_actions(self.id_to_state[state_id])
+        children = self.children[node_id]
+        n_children = len(children)
+        if n_children != len(action_ids):
+            for action_id in action_ids:
+                if action_id not in children:
+                    next_state_id = self._get_next_state_id(state_id, action_id)
+                    self.node.append(next_state_id)
+                    next_node_id = len(self.node) - 1
+                    self.parent[next_node_id] = node_id
+                    self.parent_action[next_node_id] = action_id
+                    children[action_id] = [next_node_id]
+                    self.children.append({})
+                    self.is_terminal[next_node_id] = self.id_to_state[next_state_id].is_terminal()
+                    return next_node_id
+        else:
+            raise ValueError("The node is already fully expanded.")
+
+    def _default_policy(self, node_id, depth_limit):
+        depth = 0
+        state_id = self.node[node_id]
+        while not self.id_to_state[state_id].is_terminal() and depth < depth_limit:
+            available_action_ids = self._get_available_actions(self.id_to_state[state_id])
+            action_id = np.random.choice(available_action_ids)
+            state_id = self._get_next_state_id(state_id, action_id)
+            depth += 1
+        return self.id_to_state[state_id].reward()
+
+    def _backup(self, node_id, reward):
+        while node_id != -1:
+            self.count[node_id] += 1
+            self.reward[node_id] += reward
+            node_id = self.parent[node_id]
+
+    def _get_next_state_id(self, state_id, action_id):
+        # mutates states and transition_table
+        if (state_id, action_id) in self.transition_table:
+            outcomes = self.transition_table[(state_id, action_id)]
+            outcome_counts = np.array([outcome[1] for outcome in outcomes])
+            total_count = outcome_counts.sum()
+            if total_count > 10:
+                p = outcome_counts / total_count
+                outcome_idx = np.random.choice(len(outcomes), p=p)
+                next_state_id = outcomes[outcome_idx][0]
+                return next_state_id
+
+        state = self.id_to_state[state_id]
+        action = self.id_to_action[action_id]
+        next_state = self.forward_fn(state, action)
+        in_array, array_idx = utils.in_array(next_state, self.id_to_state)
+        if in_array:
+            next_state_id = array_idx
+        else:
+            next_state_id = len(self.id_to_state)
+            self.id_to_state.append(next_state)
+
+        if (state_id, action_id) in self.transition_table:
+            outcomes = self.transition_table[(state_id, action_id)]
+            for outcome in outcomes:
+                if outcome[0] == next_state_id:
+                    self.transition_table[(state_id, action_id)] = [(next_state_id, outcome[1] + 1)]
+        else:
+            self.transition_table[(state_id, action_id)] = [(next_state_id, 1)]
+
+        return next_state_id
+
+    def _get_available_actions(self, state):
+        # mutates id_to_action and action_to_id
+        available_actions = state.get_available_actions()
+        actions = []
+        for action in available_actions:
+            if action not in self.action_to_id:
+                self.action_to_id[action] = len(self.id_to_action)
+                self.id_to_action.append(action)
+            actions.append(self.action_to_id[action])
+        return actions
+
+    def _tree_stats(self):
+        n_nodes = len(self.node)
+        n_states = len(self.id_to_state)
+        n_actions = len(self.id_to_action)
+        n_transitions = len(self.transition_table)
+        return (n_nodes, n_states, n_actions, n_transitions)
+
+
 class MCTSNode:
     def __init__(self, node_id, parent, state, forward_fn):
         self.node_id = node_id
@@ -21,7 +201,7 @@ class MCTSNode:
             self.children = None
         else:
             self.actions = state.get_available_actions()
-            self.children = [None] * len(self.actions)
+            self.children = {}
 
     def run(self, iter_limit, time_limit, default_depth_limit=10, default_batch_size=1):
         i = 0
@@ -51,65 +231,71 @@ class MCTSNode:
 
         return self.children_yield()
 
-    def best_child_idx(self):
-        idx = np.argmax(self.children_uct())
-        return idx
+    def best_action(self):
+        best_action = None
+        best_yield = -np.inf
+        children_uct = self.children_uct()
+        for action in children_uct:
+            if children_uct[action] > best_yield:
+                best_action = action
+                best_yield = children_uct[action]
+        return best_action
 
     def best_yield(self):
         best_yield = -1
-        for child in self.children:
-            if child is not None:
-                for outcome in child:
-                    yield_ = outcome.best_yield()
-                    if yield_ > best_yield:
-                        best_yield = yield_
+        for action in self.children:
+            for outcome in self.children[action]:
+                yield_ = outcome.best_yield()
+                if yield_ > best_yield:
+                    best_yield = yield_
         if best_yield == -1:
             best_yield = self.reward/self.count
         return best_yield
 
-    def best_child_for_plan(self):
-        idx = np.argmax(self.children_yield())
-        return idx
+    def best_action_for_plan(self):
+        best_action = None
+        best_yield = -np.inf
+        children_yield = self.children_yield()
+        for action in children_yield:
+            if children_yield[action] > best_yield:
+                best_action = action
+                best_yield = children_yield[action]
+        return best_action
 
     def children_uct(self):
         if not self.is_terminal:
-            scores = []
-            for child in self.children:
-                if child is not None:
-                    probs = []
-                    bounds = []
-                    # there may be stochastic outcomes for the same action
-                    for outcome in child:
-                        probs.append(outcome.count)
-                        bounds.append(outcome.UCT())
-                    probs = np.array(probs)
-                    bounds = np.array(bounds)
-                    probs = probs/probs.sum()
-                    scores.append((probs * bounds).sum())
-                else:
-                    scores.append(np.inf)
+            scores = {}
+            for action in self.children:
+                next_states = self.children[action]
+                probs = []
+                bounds = []
+                # there may be stochastic outcomes for the same action
+                for outcome in next_states:
+                    probs.append(outcome.count)
+                    bounds.append(outcome.UCT())
+                probs = np.array(probs)
+                bounds = np.array(bounds)
+                probs = probs/probs.sum()
+                scores[action] = (probs * bounds).sum()
             return scores
         else:
             return None
 
     def children_yield(self):
         if not self.is_terminal:
-            scores = []
-            for child in self.children:
-                if child is not None:
-                    probs = []
-                    yields = []
-                    # there may be stochastic outcomes for the same action
-                    for outcome in child:
-                        probs.append(outcome.count)
-                        yields.append(outcome.reward/outcome.count)
-                    probs = np.array(probs)
-                    yields = np.array(yields)
-                    probs = probs / probs.sum()
-                    scores.append((probs * yields).sum())
-                else:
-                    scores.append(0)
-            scores = np.array(scores)
+            scores = {}
+            for action in self.children:
+                next_states = self.children[action]
+                probs = []
+                yields = []
+                # there may be stochastic outcomes for the same action
+                for outcome in next_states:
+                    probs.append(outcome.count)
+                    yields.append(outcome.reward/outcome.count)
+                probs = np.array(probs)
+                yields = np.array(yields)
+                probs = probs / probs.sum()
+                scores[action] = (probs * yields).sum()
             return scores
         else:
             return None
@@ -122,94 +308,91 @@ class MCTSNode:
             score = self.reward/self.count + np.sqrt((2*np.log(N)) / self.count)
             return score
 
-    def plan(self):
+    def plan(self, sample=False, best_yield=False):
+        assert not (sample and best_yield)
         if self.is_terminal:
             return self.state, "", [], 1.0
-        idx = self.best_child_for_plan()
-        if self.children[idx] is None:
+        action = self.best_action_for_plan()
+        if action is None:
             print("Plan might not be successful.")
-            return self.state, "", [(idx, 0)], 1.0
-        elif len(self.children[idx]) == 1:
-            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].plan()
-            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
-                [(idx, 0)]+child_plan, child_prob
+            return self.state, "", [(action, 0)], 1.0
+        elif len(self.children[action]) == 1:
+            child_state, child_plan_txt, child_plan, child_prob = self.children[action][0].plan()
+            return child_state, "_".join(filter(None, [action, child_plan_txt])), \
+                [(action, 0)]+child_plan, child_prob
         else:
             probs = []
-            for out in self.children[idx]:
+            yields = []
+            for out in self.children[action]:
                 probs.append(out.count)
+                yields.append(out.reward/out.count)
             probs = np.array(probs)
+            yields = np.array(yields)
             probs = probs / probs.sum()
-            prob_max = np.argmax(probs)
-            p = np.max(probs)
-            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][prob_max].plan()
-            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
-                [(idx, prob_max)]+child_plan, p*child_prob
-
-    def best_reward_path(self):
-        if self.is_terminal:
-            return self.state, "", [], 1.0
-        idx = self.best_child_for_plan()
-        if self.children[idx] is None:
-            print("Plan might not be successful.")
-            return self.state, "", [(idx, 0)], 1.0
-        elif len(self.children[idx]) == 1:
-            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][0].best_reward_path()
-            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
-                [(idx, 0)]+child_plan, child_prob
-        else:
-            probs = []
-            rewards = []
-            for out in self.children[idx]:
-                probs.append(out.count)
-                rewards.append(out.reward)
-            probs = np.array(probs)
-            probs = probs / probs.sum()
-            rewards = np.array(rewards)
-            best_idx = np.argmax(rewards)
-            p = probs[best_idx]
-            child_state, child_plan_txt, child_plan, child_prob = self.children[idx][best_idx].best_reward_path()
-            return child_state, "_".join(filter(None, [self.actions[idx], child_plan_txt])), \
-                [(idx, best_idx)]+child_plan, p*child_prob
+            if sample:
+                sampled_idx = np.random.choice(len(probs), p=probs)
+            elif best_yield:
+                sampled_idx = np.argmax(yields)
+            else:
+                sampled_idx = np.argmax(probs)
+            p = probs[sampled_idx]
+            child_state, child_plan_txt, child_plan, child_prob = self.children[action][sampled_idx].plan()
+            return child_state, "_".join(filter(None, [action, child_plan_txt])), \
+                [(action, sampled_idx)]+child_plan, p*child_prob
 
     def _expand(self):
-        idx = self.children.index(None)
-        action = self.actions[idx]
+        untried_moves = []
+        for action in self.actions:
+            if action not in self.children:
+                untried_moves.append(action)
+        idx = np.random.randint(len(untried_moves))
+        action = untried_moves[idx]
         # ACT HERE #
-        next_state = self._forward_fn.forward(self.state, action)
-        self.children[idx] = [MCTSNode(node_id=self.node_id+1,
-                                       parent=self,
-                                       state=next_state,
-                                       forward_fn=self._forward_fn)]
+        next_state = self._forward_fn(self.state, action)
+        self.children[action] = [MCTSNode(node_id=self.node_id+1,
+                                          parent=self,
+                                          state=next_state,
+                                          forward_fn=self._forward_fn)]
         ############
-        return self.children[idx][0]
+        return self.children[action][0]
 
     def _tree_policy(self):
         # if there is an unexpanded node, first expand it.
         if self.is_terminal:
             return self
-        if None in self.children:
+        # if None in self.children:
+        if len(self.children) != len(self.actions):
             return self._expand()
         # else choose the best child by UCT
         else:
             # have to change here
-            idx = self.best_child_idx()
-            next_state = self._forward_fn.forward(self.state, self.actions[idx])
-            children_states = list(map(lambda x: x.state, self.children[idx]))
-            result, out_idx = utils.in_array(next_state, children_states)
-            if not result:
-                self.children[idx].append(MCTSNode(node_id=self.node_id+1,
-                                                   parent=self,
-                                                   state=next_state,
-                                                   forward_fn=self._forward_fn))
-                return self.children[idx][-1]._tree_policy()
+            action = self.best_action()
+            if np.random.rand() < 0.05:
+                next_state = self._forward_fn(self.state, action)
+                children_states = list(map(lambda x: x.state, self.children[action]))
+                result, out_idx = utils.in_array(next_state, children_states)
+                if not result:
+                    self.children[action].append(MCTSNode(node_id=self.node_id+1,
+                                                          parent=self,
+                                                          state=next_state,
+                                                          forward_fn=self._forward_fn))
+                    return self.children[action][-1]._tree_policy()
+                else:
+                    return self.children[action][out_idx]._tree_policy()
             else:
-                return self.children[idx][out_idx]._tree_policy()
+                probs = []
+                for child in self.children[action]:
+                    probs.append(child.count)
+                probs = np.array(probs)
+                probs = probs / probs.sum()
+                random_idx = np.random.choice(len(self.children[action]), p=probs)
+                return self.children[action][random_idx]._tree_policy()
 
     def _default_policy(self, depth_limit):
         if (not self.is_terminal) and (depth_limit > 0):
             random_action = np.random.choice(self.actions)
             # ACT HERE #
-            next_state = self._forward_fn.forward(self.state, random_action)
+            next_state = self._forward_fn(self.state, random_action)
             v = MCTSNode(node_id=-1, parent=None, state=next_state, forward_fn=self._forward_fn)
             ############
             return v._default_policy(depth_limit-1)
@@ -229,14 +412,14 @@ class MCTSNode:
         state = str(self.state)
         children = []
         if not self.is_terminal:
-            children_scores = list(map(lambda x: "%.2f" % x, self.children_uct()))
-            for c in self.children:
-                if c is None:
-                    children.append("None")
-                else:
-                    outcomes = list(map(lambda x: x.name, c))
-                    outcomes = "[" + ", ".join(outcomes) + "]"
-                    children.append(outcomes)
+            children_scores = []
+            children_uct = self.children_uct()
+            for action in children_uct:
+                children_scores.append(children_uct[action])
+            for action in self.children:
+                outcomes = list(map(lambda x: x.name, self.children[action]))
+                outcomes = "[" + ", ".join(outcomes) + "]"
+                children.append(outcomes)
         string = "Node id: " + self.node_id + "\n"
         if self.parent:
             string += "Parent: " + self.parent.name + "\n"
@@ -257,10 +440,9 @@ class MCTSNode:
 
         children_depths = []
         total_nodes = 1
-        for c in self.children:
-            if c is None:
-                children_depths.append(0)
-            elif len(c) == 1:
+        for action in self.children:
+            c = self.children[action]
+            if len(c) == 1:
                 nodes, depth = c[0]._tree_stats()
                 children_depths.append(depth)
                 total_nodes += nodes
@@ -271,6 +453,9 @@ class MCTSNode:
                     gchild_depths.append(depth)
                     total_nodes += nodes
                 children_depths.append(max(gchild_depths)+1)
+        if len(children_depths) == 0:
+            return total_nodes, 0
+
         return total_nodes, max(children_depths)+1
 
 
@@ -306,7 +491,7 @@ class SymbolicForwardModel(MCTSForward):
     def __init__(self, model):
         self.model = model
 
-    def forward(self, state, action):
+    def __call__(self, state, action):
         obj_symbol, rel_symbol = utils.to_tensor_state(state.state)
         action = torch.tensor([int(a_i) for a_i in action.split(",")])
         action_placeholder = torch.zeros(obj_symbol.shape[0], 8)  # (grasp_or_release, dx_loc, dy_loc, rot)
@@ -322,6 +507,14 @@ class SymbolicForwardModel(MCTSForward):
 
 
 class SymbolicState(MCTSState):
+    available_actions = []
+    n_obj = 5
+    for i in range(n_obj):
+        for iy in range(-1, 2):
+            for j in range(n_obj):
+                for jy in range(-1, 2):
+                    available_actions.append(f"{i},0,{iy},{j},0,{jy}")
+
     def __init__(self, state, goal):
         self.state = state
         self.goal = goal
@@ -331,16 +524,7 @@ class SymbolicState(MCTSState):
         return reward
 
     def get_available_actions(self):
-        o_str, _ = self.state.split("_")
-        o_arr = o_str.split("-")
-        n_obj = len(o_arr)
-        actions = []
-        for i in range(n_obj):
-            for iy in range(-1, 2):
-                for j in range(n_obj):
-                    for jy in range(-1, 2):
-                        actions.append(f"{i},0,{iy},{j},0,{jy}")
-        return actions
+        return SymbolicState.available_actions
 
     def is_terminal(self):
         return self.state == self.goal
@@ -353,7 +537,14 @@ class SymbolicState(MCTSState):
 
 
 class SubsymbolicState(MCTSState):
-    threshold = 0.03
+    threshold = 0.02
+    available_actions = []
+    n_obj = 5
+    for i in range(n_obj):
+        for iy in range(-1, 2):
+            for j in range(n_obj):
+                for jy in range(-1, 2):
+                    available_actions.append(f"{i},0,{iy},{j},0,{jy}")
 
     def __init__(self, state, goal):
         self.state = state
@@ -365,25 +556,18 @@ class SubsymbolicState(MCTSState):
         return reward
 
     def goal_diff(self):
-        diff = (self.state[:, :3] - self.goal[:, :3]).abs().sum()
+        diff = (self.state[:, :3] - self.goal[:, :3]).abs().mean(dim=0).sum()
         return diff
 
     def get_available_actions(self):
-        n_obj = self.state.shape[0]
-        actions = []
-        for i in range(n_obj):
-            for iy in range(-1, 2):
-                for j in range(n_obj):
-                    for jy in range(-1, 2):
-                        actions.append(f"{i},0,{iy},{j},0,{jy}")
-        return actions
+        return SubsymbolicState.available_actions
 
     def is_terminal(self):
         diff = self.goal_diff()
         return diff < SubsymbolicState.threshold
 
     def is_equal(self, other):
-        diff = (self.state[:, :3] - other.state[:, :3]).abs().sum()
+        diff = (self.state[:, :3] - other.state[:, :3]).abs().mean(dim=0).sum()
         return diff < SubsymbolicState.threshold
 
     def __repr__(self):
@@ -394,7 +578,7 @@ class SubsymbolicForwardModel(MCTSForward):
     def __init__(self, model):
         self.model = model
 
-    def forward(self, state, action):
+    def __call__(self, state, action):
         n_objs = state.state.shape[0]
         mask = torch.ones(1, n_objs)
         action = torch.tensor([int(a_i) for a_i in action.split(",")])
