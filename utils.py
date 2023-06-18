@@ -10,6 +10,8 @@ from torchvision import transforms
 
 import blocks
 import models
+import gc
+import pickle
 
 
 def parse_and_init(args):
@@ -470,43 +472,108 @@ def find_columns(matrix):
         column = []
     return columns
 
-def change_columns(matrix, column, index):
+def change_rows(matrix, lst):
+    temp = np.copy(matrix)
     for i in range(len(matrix)):
-        matrix[i][index] = column[i]
+        matrix[i] = temp[lst[i]]
+    del(temp)    
     return matrix
 
-def matrix_shuffler(matrix):
-    original = copy.deepcopy(matrix)
-    result = []
-
+def change_columns(matrix, lst):
+    temp = np.copy(matrix)
     for i in range(len(matrix)):
-        for j in range(len(matrix)):
-            if (i == j or i > j):
-                continue
-            matrix[i] = copy.deepcopy(original[j])
-            matrix[j] = copy.deepcopy(original[i])
-            columns = find_columns(matrix)
-            matrix = change_columns(matrix, columns[i], j)
-            matrix = change_columns(matrix, columns[j], i)
-            result.append(copy.deepcopy(matrix))
-            matrix = copy.deepcopy(original)
+        matrix[:,i] = temp[:,lst[i]]
+    del(temp)    
+    return matrix
 
-    return result
+def recurPermute(nums, freq, res, ds):
+    if len(ds) == len(nums):
+        res.append(np.copy(ds))
+        return
+    for i in range(len(nums)):
+        if not freq[i]:
+            ds.append(nums[i])
+            freq[i] = 1
+            recurPermute(nums, freq, res, ds)
+            freq[i] = 0
+            ds.pop()
+
+
+def permute( nums) :
+    res = []
+    ds = []
+    freq = [0] * len(nums)
+    recurPermute(nums, freq, res, ds)
+    return res
+
+
+def change_rows_and_cols(matrix, ary):
+    change_rows(matrix, ary)
+    change_columns(matrix, ary)
+    return matrix
     
-    
+
+def read_data(path):
+    obj_pre_path = os.path.join(path, "train_z_obj_pre.pt")
+    obj_post_path = os.path.join(path, "train_z_obj_post.pt")
+    rel_pre_path = os.path.join(path, "train_z_rel_pre.pt")
+    rel_post_path = os.path.join(path, "train_z_rel_post.pt")
+    act_path = os.path.join(path, "train_z_act.pt")
+    obj_pre = torch.load(obj_pre_path)
+    obj_post = torch.load(obj_post_path)
+    rel_pre = torch.load(rel_pre_path)
+    rel_post= torch.load(rel_post_path)
+    act = torch.load(act_path)
+    data = []
+    for i in range(len(obj_pre)):
+        temp = []
+        temp.append(obj_pre[i])
+        temp.append(act[i])
+        temp.append(rel_pre[i])
+        temp.append(obj_post[i])
+        temp.append(rel_post[i])
+        data.append(temp)
+
+    return data
 
 
-def create_dictionary(data):
+
+def create_dictionary(path):
+    data = read_data(path)
     dictionary = {}
+    ary = []
+    for i in range(len(data[0][0])):
+        ary.append(i)
+    permuted_ary = permute(ary)
     for i in range(len(data)):
-        key = []
-        key.append(data[i][0])
-        key.append(data[i][1])
-        key.append(data[i][2])
-        value = [data[i][3], data[i][4]]
-        dictionary[str(key)] = value
-        rels = matrix_shuffler(data[i][2])
-        for rel in rels:
-            key[2] = rel
-            dictionary[str(key)] = value
+        for j in range(len(permuted_ary)):
+            permutation = permuted_ary[j]
+            rel_pre = data[i][2]
+            rel_post = data[i][4]
+            rel_pre_permuted = []
+            rel_post_permuted = []
+            for k in range(len(rel_pre)):
+                rel_pre_permuted.append(change_rows_and_cols(np.copy(rel_pre[k]), permutation))
+                rel_post_permuted.append(change_rows_and_cols(np.copy(rel_post[k]), permutation))
+            
+            z_pre = change_rows(np.copy(data[i][0]),permutation)
+            act = change_rows(np.copy(data[i][1]), permutation)
+            z_post = change_rows(np.copy(data[i][3]), permutation)
+            key = []
+            key.append(z_pre)
+            key.append(act)
+            key.append(rel_pre_permuted)
+            value = [z_post, rel_post_permuted]
+            dictionary[str(key)] = copy.deepcopy(value)
+            del(z_pre)
+            del(z_post)
+            del(act)
+            del(rel_pre)
+            del(rel_post)
+        gc.collect()
+        print(i)
+    target_file = open('dictionary_summer_universe.obj', 'wb')
+    pickle.dump(dictionary, target_file, pickle.HIGHEST_PROTOCOL)
     return dictionary
+
+
