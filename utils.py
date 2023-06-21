@@ -1,6 +1,7 @@
 import os
 import zipfile
-import copy
+from itertools import permutations
+
 import wandb
 import yaml
 import numpy as np
@@ -10,8 +11,6 @@ from torchvision import transforms
 
 import blocks
 import models
-import gc
-import pickle
 
 
 def parse_and_init(args):
@@ -461,119 +460,33 @@ def get_dataset_from_wandb(name):
     os.remove(os.path.join(artifact_dir, f"{name}.zip"))
 
 
-
-def find_columns(matrix):
-    columns = []
-    for i in range(len(matrix[0])):
-        column = []
-        for j in range(len(matrix)):
-            column.append(matrix[j][i])
-        columns.append(column)
-        column = []
-    return columns
-
 def change_rows(matrix, lst):
-    temp = np.copy(matrix)
-    for i in range(len(matrix)):
-        matrix[i] = temp[lst[i]]
-    del(temp)    
-    return matrix
+    return matrix[lst, :]
+
 
 def change_columns(matrix, lst):
-    temp = np.copy(matrix)
-    for i in range(len(matrix)):
-        matrix[:,i] = temp[:,lst[i]]
-    del(temp)    
-    return matrix
-
-def recurPermute(nums, freq, res, ds):
-    if len(ds) == len(nums):
-        res.append(np.copy(ds))
-        return
-    for i in range(len(nums)):
-        if not freq[i]:
-            ds.append(nums[i])
-            freq[i] = 1
-            recurPermute(nums, freq, res, ds)
-            freq[i] = 0
-            ds.pop()
+    return matrix[:, lst]
 
 
-def permute( nums) :
-    res = []
-    ds = []
-    freq = [0] * len(nums)
-    recurPermute(nums, freq, res, ds)
-    return res
+def permute(nums):
+    return list(permutations(nums))
 
 
 def change_rows_and_cols(matrix, ary):
-    change_rows(matrix, ary)
-    change_columns(matrix, ary)
-    return matrix
-    
-
-def read_data(path):
-    obj_pre_path = os.path.join(path, "train_z_obj_pre.pt")
-    obj_post_path = os.path.join(path, "train_z_obj_post.pt")
-    rel_pre_path = os.path.join(path, "train_z_rel_pre.pt")
-    rel_post_path = os.path.join(path, "train_z_rel_post.pt")
-    act_path = os.path.join(path, "train_z_act.pt")
-    obj_pre = torch.load(obj_pre_path)
-    obj_post = torch.load(obj_post_path)
-    rel_pre = torch.load(rel_pre_path)
-    rel_post= torch.load(rel_post_path)
-    act = torch.load(act_path)
-    data = []
-    for i in range(len(obj_pre)):
-        temp = []
-        temp.append(obj_pre[i])
-        temp.append(act[i])
-        temp.append(rel_pre[i])
-        temp.append(obj_post[i])
-        temp.append(rel_post[i])
-        data.append(temp)
-
-    return data
+    new_matrix = change_rows(matrix, ary)
+    new_matrix = change_columns(new_matrix, ary)
+    return new_matrix
 
 
-
-def create_dictionary(path):
-    data = read_data(path)
-    dictionary = {}
-    ary = []
-    for i in range(len(data[0][0])):
-        ary.append(i)
-    permuted_ary = permute(ary)
-    for i in range(len(data)):
-        for j in range(len(permuted_ary)):
-            permutation = permuted_ary[j]
-            rel_pre = data[i][2]
-            rel_post = data[i][4]
-            rel_pre_permuted = []
-            rel_post_permuted = []
-            for k in range(len(rel_pre)):
-                rel_pre_permuted.append(change_rows_and_cols(np.copy(rel_pre[k]), permutation))
-                rel_post_permuted.append(change_rows_and_cols(np.copy(rel_post[k]), permutation))
-            
-            z_pre = change_rows(np.copy(data[i][0]),permutation)
-            act = change_rows(np.copy(data[i][1]), permutation)
-            z_post = change_rows(np.copy(data[i][3]), permutation)
-            key = []
-            key.append(z_pre)
-            key.append(act)
-            key.append(rel_pre_permuted)
-            value = [z_post, rel_post_permuted]
-            dictionary[str(key)] = copy.deepcopy(value)
-            del(z_pre)
-            del(z_post)
-            del(act)
-            del(rel_pre)
-            del(rel_post)
-        gc.collect()
-        print(i)
-    target_file = open('dictionary_summer_universe.obj', 'wb')
-    pickle.dump(dictionary, target_file, pickle.HIGHEST_PROTOCOL)
-    return dictionary
-
-
+def permute_symbols(obj_pre, rel_pre, action, obj_post, rel_post, perm):
+    obj_pre = tuple(binary_tensor_to_str(change_rows(obj_pre, perm)))
+    rel_pre_permuted = []
+    rel_post_permuted = []
+    for k in range(len(rel_pre)):
+        rel_pre_permuted.append(tuple(binary_tensor_to_str(change_rows_and_cols(rel_pre[k], perm))))
+        rel_post_permuted.append(tuple(binary_tensor_to_str(change_rows_and_cols(rel_post[k], perm))))
+    rel_pre_permuted = tuple(rel_pre_permuted)
+    rel_post_permuted = tuple(rel_post_permuted)
+    action = tuple(binary_tensor_to_str(change_rows(action, perm)))
+    obj_post = tuple(binary_tensor_to_str(change_rows(obj_post, perm)))
+    return obj_pre, rel_pre_permuted, action, obj_post, rel_post_permuted
