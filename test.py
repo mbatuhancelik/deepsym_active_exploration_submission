@@ -185,6 +185,11 @@ parameter_ids["perform"] = env._p.addUserDebugParameter("perform action(click tw
 eff_arrow_ids = []
 
 while True:
+    one_hot = torch.tensor([[0,0,0,0],
+                            [0,0,0,1],
+                            [0,0,1,0],
+                            [0,1,0,0],
+                            [1,0,0,0]])
     while len(eff_arrow_ids) > 0:
         arrow_id = eff_arrow_ids.pop()
         env._p.removeBody(arrow_id)
@@ -192,6 +197,7 @@ while True:
     state = torch.tensor(state)
     types = torch.tensor(types).reshape(-1, 1)
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
+    state = torch.cat([state[:,:-1], one_hot[[state[:,-1].long()]]], dim=-1)
     z = model.encode(state.unsqueeze(0), eval_mode=True)
     z = utils.binary_to_decimal(z[0, :, :].round())
     draw_single_symbols(env, z)

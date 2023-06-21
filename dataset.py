@@ -1,6 +1,7 @@
 import os
 
 import torch
+import wandb
 
 from utils import preprocess
 
@@ -182,3 +183,16 @@ class SegmentedSAEFolder(SAEFolder):
             sample["post_state"] = post_padded
             sample["post_pad_mask"] = post_pad_mask
         return sample
+
+
+def load_symbol_dataset(name, run, device):
+    z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_pre.pt")).name).to(device)
+    z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_pre.pt")).name).to(device)
+    z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_act.pt")).name).to(device)
+    z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_post.pt")).name).to(device)
+    z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_post.pt")).name).to(device)
+    mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_mask.pt")).name).to(device)
+
+    dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
+                                             z_obj_post, z_rel_post, mask)
+    return dataset

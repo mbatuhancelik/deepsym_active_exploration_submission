@@ -1,5 +1,6 @@
 import os
 import zipfile
+from itertools import permutations
 
 import wandb
 import yaml
@@ -457,3 +458,35 @@ def get_dataset_from_wandb(name):
     archive.extractall(os.path.join("data", name))
     archive.close()
     os.remove(os.path.join(artifact_dir, f"{name}.zip"))
+
+
+def change_rows(matrix, lst):
+    return matrix[lst, :]
+
+
+def change_columns(matrix, lst):
+    return matrix[:, lst]
+
+
+def permute(nums):
+    return list(permutations(nums))
+
+
+def change_rows_and_cols(matrix, ary):
+    new_matrix = change_rows(matrix, ary)
+    new_matrix = change_columns(new_matrix, ary)
+    return new_matrix
+
+
+def permute_symbols(obj_pre, rel_pre, action, obj_post, rel_post, perm):
+    obj_pre = tuple(binary_tensor_to_str(change_rows(obj_pre, perm)))
+    rel_pre_permuted = []
+    rel_post_permuted = []
+    for k in range(len(rel_pre)):
+        rel_pre_permuted.append(tuple(binary_tensor_to_str(change_rows_and_cols(rel_pre[k], perm))))
+        rel_post_permuted.append(tuple(binary_tensor_to_str(change_rows_and_cols(rel_post[k], perm))))
+    rel_pre_permuted = tuple(rel_pre_permuted)
+    rel_post_permuted = tuple(rel_post_permuted)
+    action = tuple(binary_tensor_to_str(change_rows(action, perm)))
+    obj_post = tuple(binary_tensor_to_str(change_rows(obj_post, perm)))
+    return obj_pre, rel_pre_permuted, action, obj_post, rel_post_permuted
