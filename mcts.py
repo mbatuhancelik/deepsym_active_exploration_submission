@@ -265,7 +265,7 @@ class MCTSNode:
             i += 1
             end = time.time()
             time_elapsed = end - start
-            if i % 100 == 0:
+            if i > 1:
                 node_count, depth = self._tree_stats()
                 print(f"Tree depth={depth}, node count={node_count}, "
                       f"node/sec={(node_count-start_node_count)/time_elapsed:.2f}, "
@@ -285,6 +285,9 @@ class MCTSNode:
 
     def best_yield(self):
         best_yield = -1
+        if self.children is None:
+            return self.reward/self.count
+
         for action in self.children:
             for outcome in self.children[action]:
                 yield_ = outcome.best_yield()
@@ -432,7 +435,8 @@ class MCTSNode:
 
     def _default_policy(self, depth_limit):
         if (not self.is_terminal) and (depth_limit > 0):
-            random_action = np.random.choice(self.actions)
+            random_action_idx = np.random.choice(len(self.actions))
+            random_action = self.actions[random_action_idx]
             # ACT HERE #
             next_state = self._forward_fn(self.state, random_action)
             v = MCTSNode(node_id=-1, parent=None, state=next_state, forward_fn=self._forward_fn)
