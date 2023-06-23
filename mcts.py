@@ -8,8 +8,9 @@ import utils
 
 
 class Tree:
-    def __init__(self, root_state, max_nodes=100000, forward_fn=None):
+    def __init__(self, root_state, max_nodes=100000, forward_fn=None, min_forward_count=10):
         self.max_nodes = max_nodes
+        self.min_forward_count = min_forward_count
         self.node = []  # [state_id0, state_id1, ...]
         self.id_to_state = []  # [state0, state1, ...]
         self.state_to_id = {}  # {state0: state_id0, state1: state_id1, ...}
@@ -36,7 +37,8 @@ class Tree:
         start = time.time()
         end = time.time()
         time_elapsed = end - start
-        n_nodes, n_states, n_actions, n_transitions = self._tree_stats()
+        n_nodes, _ = self._tree_stats()
+        start_node_count = n_nodes
         while (i < iter_limit) and (time_elapsed < time_limit) and (n_nodes < self.max_nodes):
             node_id = self._tree_policy()
             reward = 0.0
@@ -51,10 +53,45 @@ class Tree:
             i += 1
             end = time.time()
             time_elapsed = end - start
-            n_nodes, n_states, n_actions, n_transitions = self._tree_stats()
+            n_nodes, max_depth = self._tree_stats()
             if i % 100 == 0:
-                print('iter: {}, time: {:.3f}, nodes: {}, states: {}, actions: {}, transitions: {}, node/sec: {:.1f}'.format(
-                    i, time_elapsed, n_nodes, n_states, n_actions, n_transitions, n_nodes/time_elapsed))
+                print(f"Tree depth={max_depth}, node count={n_nodes}, "
+                      f"node/sec={(n_nodes - start_node_count)/time_elapsed:.2f}, "
+                      f"best yield={self.best_yield():.2f}")
+
+    def plan(self):
+        terminal_nodes = (self.is_terminal == True)
+        if terminal_nodes.sum() == 0:
+            return []
+        best_node_id = np.argmax(self.reward[terminal_nodes])
+        actions = []
+        while best_node_id != 0:
+            action_id = self.parent_action[best_node_id]
+            actions.insert(0, self.id_to_action[action_id])
+            best_node_id = self.parent[best_node_id]
+        return actions
+
+    def all_plans(self):
+        terminal_nodes = (self.is_terminal == True)
+        if terminal_nodes.sum() == 0:
+            return []
+        best_node_ids = np.argsort(self.reward[terminal_nodes])[::-1]
+        plans = []
+        for best_node_id in best_node_ids:
+            actions = []
+            while best_node_id != 0:
+                action_id = self.parent_action[best_node_id]
+                actions.insert(0, self.id_to_action[action_id])
+                best_node_id = self.parent[best_node_id]
+            plans.append(actions)
+        return plans
+
+    def best_yield(self):
+        terminal_nodes = (self.reward > 0)
+        if terminal_nodes.sum() == 0:
+            return 0.0
+        best_node_id = np.argmax(self.reward[terminal_nodes])
+        return self.reward[best_node_id] / self.count[best_node_id]
 
     def _tree_policy(self):
         node_id = 0
@@ -77,7 +114,7 @@ class Tree:
                     p = outcome_n / outcome_n.sum()
                     uct[i] = (p * outcome_uct).sum()
                 best_action_id = child_action_ids[np.argmax(uct)]
-                if np.random.rand() < 0.05:
+                if np.random.rand() < 1:
                     next_state_id = self._get_next_state_id(state_id, best_action_id)
                     outcome_nodes = children[best_action_id]
                     outcome_state_ids = [self.node[node_id] for node_id in outcome_nodes]
@@ -123,7 +160,7 @@ class Tree:
     def _default_policy(self, node_id, depth_limit):
         depth = 0
         state_id = self.node[node_id]
-        while not self.id_to_state[state_id].is_terminal() and depth < depth_limit:
+        while (not self.id_to_state[state_id].is_terminal()) and (depth < depth_limit):
             available_action_ids = self._get_available_actions(self.id_to_state[state_id])
             action_id = np.random.choice(available_action_ids)
             state_id = self._get_next_state_id(state_id, action_id)
@@ -142,7 +179,7 @@ class Tree:
             outcomes = self.transition_table[(state_id, action_id)]
             outcome_counts = np.array([outcome[1] for outcome in outcomes])
             total_count = outcome_counts.sum()
-            if total_count > 10:
+            if total_count > self.min_forward_count:
                 p = outcome_counts / total_count
                 outcome_idx = np.random.choice(len(outcomes), p=p)
                 next_state_id = outcomes[outcome_idx][0]
@@ -181,10 +218,15 @@ class Tree:
 
     def _tree_stats(self):
         n_nodes = len(self.node)
-        n_states = len(self.id_to_state)
-        n_actions = len(self.id_to_action)
-        n_transitions = len(self.transition_table)
-        return (n_nodes, n_states, n_actions, n_transitions)
+        max_depth = 0
+        for node_id in range(n_nodes):
+            depth = 0
+            while node_id != -1:
+                node_id = self.parent[node_id]
+                depth += 1
+            if depth > max_depth:
+                max_depth = depth
+        return n_nodes, max_depth
 
 
 class MCTSNode:
@@ -227,7 +269,7 @@ class MCTSNode:
                 node_count, depth = self._tree_stats()
                 print(f"Tree depth={depth}, node count={node_count}, "
                       f"node/sec={(node_count-start_node_count)/time_elapsed:.2f}, "
-                      f"best yield={self.best_yield():.2f}")
+                      f"best yield={self.best_yield():.5f}")
 
         return self.children_yield()
 
@@ -417,12 +459,12 @@ class MCTSNode:
             for action in children_uct:
                 children_scores.append(children_uct[action])
             for action in self.children:
-                outcomes = list(map(lambda x: x.name, self.children[action]))
+                outcomes = list(map(lambda x: str(x.id), self.children[action]))
                 outcomes = "[" + ", ".join(outcomes) + "]"
                 children.append(outcomes)
-        string = "Node id: " + self.node_id + "\n"
+        string = "Node id: " + int(self.node_id) + "\n"
         if self.parent:
-            string += "Parent: " + self.parent.name + "\n"
+            string += "Parent: " + int(self.parent.node_id) + "\n"
         else:
             string += "Parent: None\n"
         if not self.is_terminal:
@@ -537,7 +579,7 @@ class SymbolicState(MCTSState):
 
 
 class SubsymbolicState(MCTSState):
-    threshold = 0.02
+    threshold = 0.025
     available_actions = []
     n_obj = 5
     for i in range(n_obj):
@@ -551,9 +593,9 @@ class SubsymbolicState(MCTSState):
         self.goal = goal
 
     def reward(self):
-        diff = self.goal_diff()
-        reward = min(SubsymbolicState.threshold / diff, 1)
-        return reward
+        # diff = self.goal_diff()
+        # reward = min(SubsymbolicState.threshold / diff, 1)
+        return int(self.is_terminal())
 
     def goal_diff(self):
         diff = (self.state[:, :3] - self.goal[:, :3]).abs().mean(dim=0).sum()
