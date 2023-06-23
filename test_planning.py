@@ -13,9 +13,9 @@ import environment
 
 
 def random_action():
-    obj1 = np.random.randint(0, 3)
+    obj1 = np.random.randint(0, 5)
     dx1 = np.random.randint(-1, 2)
-    obj2 = np.random.randint(0, 3)
+    obj2 = np.random.randint(0, 5)
     dx2 = np.random.randint(-1, 2)
     return f"{obj1},0,{dx1},{obj2},0,{dx2}"
 
@@ -58,7 +58,7 @@ one_hot = torch.tensor([[0, 0, 0, 0],
                         [0, 0, 1, 0],
                         [0, 1, 0, 0],
                         [1, 0, 0, 0]])
-env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=3)
+env = environment.BlocksWorld_v4(gui=0, min_objects=5, max_objects=5)
 
 
 print()
@@ -115,7 +115,7 @@ for n_action in range(1, 6):
             sym_init = symbolic_forward(sym_init, action)
 
             # dict
-            act = torch.zeros(3, 8, dtype=torch.float)
+            act = torch.zeros(5, 8, dtype=torch.float)
             act_str = action.split(",")
             act[int(act_str[0]), :4] = torch.tensor([1, float(act_str[1]), float(act_str[2]), 1])
             act[int(act_str[3]), 4:] = torch.tensor([1, float(act_str[4]), float(act_str[5]), 1])
@@ -123,14 +123,38 @@ for n_action in range(1, 6):
 
             new_obj = []
             new_rel = []
+            key_found = False
             for last_obj_i, last_rel_i in zip(last_obj, last_rel):
-                key = (last_obj_i, last_rel_i)
-                if key in dict_forward:
-                    if act in dict_forward[key]:
-                        outcomes = dict_forward[key][act]
-                        for out_key in outcomes:
-                            new_obj.append(out_key[0])
-                            new_rel.append(out_key[1])
+                permuted_ary = utils.permute(list(range(len(last_obj_i))))
+                for perm in permuted_ary:
+                    last_obj_i_perm = [last_obj_i[j] for j in perm]
+                    last_rel_i_perm = []
+                    for rel in last_rel_i:
+                        row_permuted = [rel[j] for j in perm]
+                        for row in range(len(row_permuted)):
+                            row_permuted[row] = "".join([row_permuted[row][j] for j in perm])
+                        last_rel_i_perm.append(tuple(row_permuted))
+                    key = (tuple(last_obj_i_perm), tuple(last_rel_i_perm))
+                    if key in dict_forward:
+                        key_found = True
+                        act = [act[j] for j in perm]
+                        act = tuple(act)
+                        break
+
+                if key_found:
+                    if key in dict_forward:
+                        if act in dict_forward[key]:
+                            outcomes = dict_forward[key][act]
+                            for out_key in outcomes:
+                                back_perm = [perm.index(j) for j in range(len(perm))]
+                                new_obj.append(tuple([out_key[0][j] for j in back_perm]))
+                                permuted_rels = []
+                                for rel in out_key[1]:
+                                    row_permuted = [rel[j] for j in back_perm]
+                                    for row in range(len(row_permuted)):
+                                        row_permuted[row] = "".join([row_permuted[row][j] for j in back_perm])
+                                    permuted_rels.append(tuple(row_permuted))
+                                new_rel.append(tuple(permuted_rels))
 
             if len(new_obj) == 0:
                 not_found = True
