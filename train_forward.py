@@ -5,20 +5,8 @@ import torch
 import wandb
 
 from utils import get_device, get_parameter_count
+from dataset import load_symbol_dataset
 import models
-
-
-def load_dataset(name, run, device):
-    z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_pre.pt")).name).to(device)
-    z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_pre.pt")).name).to(device)
-    z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_act.pt")).name).to(device)
-    z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_post.pt")).name).to(device)
-    z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_post.pt")).name).to(device)
-    mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_mask.pt")).name).to(device)
-
-    dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
-                                             z_obj_post, z_rel_post, mask)
-    return dataset
 
 
 parser = argparse.ArgumentParser("Train symbol forward model")
@@ -52,8 +40,8 @@ if not os.path.exists(run.config["save_folder"]):
     os.makedirs(run.config["save_folder"])
 
 
-train_set = load_dataset("train", run, device)
-val_set = load_dataset("val", run, device)
+train_set = load_symbol_dataset("train", run, device)
+val_set = load_symbol_dataset("val", run, device)
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.b, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.b, shuffle=False)
 
