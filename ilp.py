@@ -204,12 +204,13 @@ class RuleForward:
         return new_rule
 
 
-rule_forward = RuleForward()
-state = Rule(variables=[],
-             obj_pre_bound={},
-             obj_post_bound={},
-             rel_post_bound={},
-             applied_actions=[])
+if __name__ == "__main__":
+    rule_forward = RuleForward()
+    state = Rule(variables=[],
+                 obj_pre_bound={},
+                 obj_post_bound={},
+                 rel_post_bound={},
+                 applied_actions=[])
 
-root = MCTSNode(node_id=0, parent=None, state=state, forward_fn=rule_forward)
-root.run(iter_limit=10000, time_limit=3600, default_depth_limit=1, default_batch_size=1)
+    root = MCTSNode(node_id=0, parent=None, state=state, forward_fn=rule_forward)
+    root.run(iter_limit=10000, time_limit=3600, default_depth_limit=1, default_batch_size=1, n_proc=8)

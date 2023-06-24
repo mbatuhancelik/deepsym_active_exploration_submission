@@ -1,5 +1,6 @@
 import time
 from copy import deepcopy
+import multiprocessing as mp
 
 import numpy as np
 import torch
@@ -230,6 +231,8 @@ class Tree:
 
 
 class MCTSNode:
+    total_nodes = 1
+
     def __init__(self, node_id, parent, state, forward_fn):
         self.node_id = node_id
         self.parent = parent
@@ -245,22 +248,23 @@ class MCTSNode:
             self.actions = state.get_available_actions()
             self.children = {}
 
-    def run(self, iter_limit, time_limit, default_depth_limit=10, default_batch_size=1):
+    def _default_policy_wrapper(self, node, default_depth_limit):
+        return node._default_policy(default_depth_limit)
+
+    def run(self, iter_limit, time_limit, default_depth_limit=10, default_batch_size=1, n_proc=1):
         i = 0
         start = time.time()
         end = time.time()
         time_elapsed = end - start
         start_node_count, _ = self._tree_stats()
         while (i < iter_limit) and (time_elapsed < time_limit):
-            v = self._tree_policy()
-            reward = 0.0
+            v_arr = self._tree_policy(n=n_proc)
+            v_arr = [(v, default_depth_limit) for v in v_arr]
+            with mp.Pool(processes=n_proc) as pool:
+                rewards = pool.starmap(self._default_policy_wrapper, v_arr)
 
-            # sequential
-            for _ in range(default_batch_size):
-                reward += v._default_policy(default_depth_limit)
-            reward /= default_batch_size
-
-            v._backup(reward)
+            for (v, _), r in zip(v_arr, rewards):
+                v._backup(r)
 
             i += 1
             end = time.time()
@@ -273,15 +277,14 @@ class MCTSNode:
 
         return self.children_yield()
 
-    def best_action(self):
-        best_action = None
-        best_yield = -np.inf
+    def best_actions(self, n=1):
         children_uct = self.children_uct()
-        for action in children_uct:
-            if children_uct[action] > best_yield:
-                best_action = action
-                best_yield = children_uct[action]
-        return best_action
+        # sort children_uct dict by value
+        children_uct = sorted(children_uct.items(), key=lambda item: item[1], reverse=True)
+        best_actions = []
+        for i in range(n):
+            best_actions.append(children_uct[i][0])
+        return best_actions
 
     def best_yield(self):
         best_yield = -1
@@ -385,53 +388,66 @@ class MCTSNode:
             return child_state, "_".join(filter(None, [action, child_plan_txt])), \
                 [(action, sampled_idx)]+child_plan, p*child_prob
 
-    def _expand(self):
+    def _expand(self, n=1):
         untried_moves = []
         for action in self.actions:
             if action not in self.children:
                 untried_moves.append(action)
-        idx = np.random.randint(len(untried_moves))
-        action = untried_moves[idx]
+        if n > len(untried_moves):
+            n = len(untried_moves)
+        indices = np.random.choice(range(len(untried_moves)), size=n, replace=False)
+        actions = [untried_moves[idx] for idx in indices]
         # ACT HERE #
-        next_state = self._forward_fn(self.state, action)
-        self.children[action] = [MCTSNode(node_id=self.node_id+1,
-                                          parent=self,
-                                          state=next_state,
-                                          forward_fn=self._forward_fn)]
+        children = []
+        for j, action in enumerate(actions):
+            next_state = self._forward_fn(self.state, action)
+            self.children[action] = [MCTSNode(node_id=MCTSNode.total_nodes,
+                                              parent=self,
+                                              state=next_state,
+                                              forward_fn=self._forward_fn)]
+            MCTSNode.total_nodes += 1
+            children.append(self.children[action][0])
         ############
-        return self.children[action][0]
+        return children
 
-    def _tree_policy(self):
-        # if there is an unexpanded node, first expand it.
+    def _tree_policy(self, n=1):
         if self.is_terminal:
-            return self
-        # if None in self.children:
+            return [self]
+        # if there is an unexpanded node, first expand it.
         if len(self.children) != len(self.actions):
-            return self._expand()
+            return self._expand(n=n)
         # else choose the best child by UCT
         else:
             # have to change here
-            action = self.best_action()
-            if np.random.rand() < 0.05:
-                next_state = self._forward_fn(self.state, action)
-                children_states = list(map(lambda x: x.state, self.children[action]))
-                result, out_idx = utils.in_array(next_state, children_states)
-                if not result:
-                    self.children[action].append(MCTSNode(node_id=self.node_id+1,
-                                                          parent=self,
-                                                          state=next_state,
-                                                          forward_fn=self._forward_fn))
-                    return self.children[action][-1]._tree_policy()
+            actions = self.best_actions(n=n)
+            selected = []
+            for action in actions:
+                if np.random.rand() < 0:  # TODO: this is only for ILP, set it to 0.05 later
+                    next_state = self._forward_fn(self.state, action)
+                    children_states = list(map(lambda x: x.state, self.children[action]))
+                    result, out_idx = utils.in_array(next_state, children_states)
+                    if not result:
+                        self.children[action].append(MCTSNode(node_id=MCTSNode.total_nodes,
+                                                              parent=self,
+                                                              state=next_state,
+                                                              forward_fn=self._forward_fn,
+                                                              n_nodes=self.n_nodes+1))
+                        MCTSNode.total_nodes += 1
+                        selected.append(self.children[action][-1]._tree_policy()[0])
+                        # return self.children[action][-1]._tree_policy()
+                    else:
+                        selected.append(self.children[action][out_idx]._tree_policy()[0])
+                        # return self.children[action][out_idx]._tree_policy()
                 else:
-                    return self.children[action][out_idx]._tree_policy()
-            else:
-                probs = []
-                for child in self.children[action]:
-                    probs.append(child.count)
-                probs = np.array(probs)
-                probs = probs / probs.sum()
-                random_idx = np.random.choice(len(self.children[action]), p=probs)
-                return self.children[action][random_idx]._tree_policy()
+                    probs = []
+                    for child in self.children[action]:
+                        probs.append(child.count)
+                    probs = np.array(probs)
+                    probs = probs / probs.sum()
+                    random_idx = np.random.choice(len(self.children[action]), p=probs)
+                    selected.append(self.children[action][random_idx]._tree_policy()[0])
+                    # return self.children[action][random_idx]._tree_policy()
+            return selected
 
     def _default_policy(self, depth_limit):
         if (not self.is_terminal) and (depth_limit > 0):
@@ -466,9 +482,9 @@ class MCTSNode:
                 outcomes = list(map(lambda x: str(x.id), self.children[action]))
                 outcomes = "[" + ", ".join(outcomes) + "]"
                 children.append(outcomes)
-        string = "Node id: " + int(self.node_id) + "\n"
+        string = "Node id: " + str(self.node_id) + "\n"
         if self.parent:
-            string += "Parent: " + int(self.parent.node_id) + "\n"
+            string += "Parent: " + str(self.parent.node_id) + "\n"
         else:
             string += "Parent: None\n"
         if not self.is_terminal:
