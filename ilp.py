@@ -72,7 +72,9 @@ class Rule:
 
             for val in self.obj_pre_bound.values():
                 # select an object that has the same symbol as another object
-                actions.append(("select_from_obj", var_name, val, "Pre"))
+                action = ("select_from_obj", var_name, val, "Pre")
+                if action not in actions:
+                    actions.append(action)
 
             # select an object that has a specific relation with another object
             for var in self.variables:
@@ -89,12 +91,16 @@ class Rule:
         # assert the post-symbol of an object to the pre-symbol of another object
         for var in self.variables:
             for val in self.obj_pre_bound.values():
-                actions.append(("select_from_obj", var, val, "Post"))
+                action = ("select_from_obj", var, val, "Post")
+                if action not in actions:
+                    actions.append(action)
 
         # assert the post-symbol of an object to the post-symbol of another object
         for var in self.variables:
             for val in self.obj_post_bound.values():
-                actions.append(("select_from_obj", var, val, "Post"))
+                action = ("select_from_obj", var, val, "Post")
+                if action not in actions:
+                    actions.append(action)
 
         # assert the post-rel of an object-object pair to a value
         for var1 in self.variables:
@@ -213,4 +219,4 @@ if __name__ == "__main__":
                  applied_actions=[])
 
     root = MCTSNode(node_id=0, parent=None, state=state, forward_fn=rule_forward)
-    root.run(iter_limit=10000, time_limit=3600, default_depth_limit=1, default_batch_size=1, n_proc=8)
+    root.run(iter_limit=1000000, time_limit=43200, default_depth_limit=1, default_batch_size=1, n_proc=24)
