@@ -260,7 +260,7 @@ class MCTSNode:
         while (i < iter_limit) and (time_elapsed < time_limit):
             v_arr = self._tree_policy(n=n_proc)
             v_arr = [(v, default_depth_limit) for v in v_arr]
-            with mp.Pool(processes=n_proc) as pool:
+            with mp.get_context('spawn').Pool(processes=n_proc) as pool:
                 rewards = pool.starmap(self._default_policy_wrapper, v_arr)
 
             for (v, _), r in zip(v_arr, rewards):
@@ -445,7 +445,8 @@ class MCTSNode:
                     probs = np.array(probs)
                     probs = probs / probs.sum()
                     random_idx = np.random.choice(len(self.children[action]), p=probs)
-                    selected.append(self.children[action][random_idx]._tree_policy()[0])
+                    v = self.children[action][random_idx]._tree_policy()
+                    selected.append(v[0])
                     # return self.children[action][random_idx]._tree_policy()
             return selected
 
@@ -479,7 +480,7 @@ class MCTSNode:
             for action in children_uct:
                 children_scores.append(children_uct[action])
             for action in self.children:
-                outcomes = list(map(lambda x: str(x.id), self.children[action]))
+                outcomes = list(map(lambda x: str(x.node_id), self.children[action]))
                 outcomes = "[" + ", ".join(outcomes) + "]"
                 children.append(outcomes)
         string = "Node id: " + str(self.node_id) + "\n"
@@ -489,7 +490,7 @@ class MCTSNode:
             string += "Parent: None\n"
         if not self.is_terminal:
             string += "Children: [" + ", ".join(children) + "]\n"
-            string += "Children UCT: [" + ", ".join(children_scores) + "]\n"
+            string += "Children UCT: [" + ", ".join([str(s) for s in children_scores]) + "]\n"
         string += "State:\n" + state + "\n"
         string += "Reward: " + str(self.reward) + "\n"
         string += "Count: " + str(self.count) + "\n"
