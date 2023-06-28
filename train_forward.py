@@ -68,6 +68,7 @@ for e in range(args.e):
 
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         optimizer.step()
 
         train_obj_loss += obj_loss.item()
