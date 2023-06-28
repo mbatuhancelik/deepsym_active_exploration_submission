@@ -70,11 +70,12 @@ class Rule:
             #     for i in range(self.num_relations):
             #         actions.append(("select_from_rel", i, var_name, "all", val, "Pre"))
 
-            for val in self.obj_pre_bound.values():
-                # select an object that has the same symbol as another object
-                action = ("select_from_obj", var_name, val, "Pre")
-                if action not in actions:
-                    actions.append(action)
+            # select an object that has the same symbol as another object
+            # might be unnecessary
+            # for val in self.obj_pre_bound.values():
+            #     action = ("select_from_obj", var_name, val, "Pre")
+            #     if action not in actions:
+            #         actions.append(action)
 
             # select an object that has a specific relation with another object
             for var in self.variables:
@@ -89,18 +90,19 @@ class Rule:
                 actions.append(("select_from_obj", var, val, "Post"))
 
         # assert the post-symbol of an object to the pre-symbol of another object
-        for var in self.variables:
-            for val in self.obj_pre_bound.values():
-                action = ("select_from_obj", var, val, "Post")
-                if action not in actions:
-                    actions.append(action)
+        # for var in self.variables:
+        #     for val in self.obj_pre_bound.values():
+        #         action = ("select_from_obj", var, val, "Post")
+        #         if action not in actions:
+        #             actions.append(action)
 
         # assert the post-symbol of an object to the post-symbol of another object
-        for var in self.variables:
-            for val in self.obj_post_bound.values():
-                action = ("select_from_obj", var, val, "Post")
-                if action not in actions:
-                    actions.append(action)
+        # might be unnecessary
+        # for var in self.variables:
+        #     for val in self.obj_post_bound.values():
+        #         action = ("select_from_obj", var, val, "Post")
+        #         if action not in actions:
+        #             actions.append(action)
 
         # assert the post-rel of an object-object pair to a value
         for var1 in self.variables:
