@@ -52,6 +52,12 @@ for e in range(args.e):
     train_obj_loss = 0.0
     train_rel_loss = 0.0
     for zo_i, zr_i, a, zo_f, zr_f, m in train_loader:
+        zo_i = zo_i.float()
+        zr_i = zr_i.float()
+        a = a.float()
+        zo_f = zo_f.float()
+        zr_f = zr_f.float()
+        m = m.float()
         zi_cat = torch.cat([zo_i, a], dim=-1)
         zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
         m = m.unsqueeze(2)
@@ -74,6 +80,12 @@ for e in range(args.e):
     val_rel_loss = 0.0
     with torch.no_grad():
         for zo_i, zr_i, a, zo_f, zr_f, m in val_loader:
+            zo_i = zo_i.float()
+            zr_i = zr_i.float()
+            a = a.float()
+            zo_f = zo_f.float()
+            zr_f = zr_f.float()
+            m = m.float()
             zi_cat = torch.cat([zo_i, a], dim=-1)
             zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
             m = m.unsqueeze(2)
