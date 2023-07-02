@@ -19,22 +19,28 @@ class Node:
         return f"Node({self.object_bindings}, {self.action_bindings}, {self.relation_bindings}, {self.gating.sum()})"
 
 
-def create_effect_classes(loader):
-    # changed_vars = []
-    effect_to_class = {}
+def create_effect_classes(loader, given_effect_to_class=None):
+    if given_effect_to_class is None:
+        effect_to_class = {}
     class_idx = 0
     effects = []
+    changed_indices = []
     for i, (obj_pre, rel_pre, _, obj_post, rel_post, mask) in enumerate(loader):
         obj_pre = obj_pre[0, mask[0]]
         obj_post = obj_post[0, mask[0]]
         obj_diff_idx = torch.where(obj_pre != obj_post)[0]
         obj_diff_idx = torch.unique(obj_diff_idx)
         obj_effects = []
-        var_list = []
+        obj_indices = []
         for idx in obj_diff_idx:
             obj_effects.append(tuple(obj_post[idx].int().tolist()))
-            var_list.append(idx.item())
-        obj_effects = sorted(obj_effects)
+            obj_indices.append(idx.item())
+        # sort obj_effects together with obj_indices
+        if len(obj_effects) > 0:
+            obj_effects, obj_indices = zip(*sorted(zip(obj_effects, obj_indices)))
+        else:
+            obj_effects = ()
+            obj_indices = ()
 
         mm = (mask.T.float() @ mask.float()).bool()
         c = mask.sum()
@@ -42,25 +48,39 @@ def create_effect_classes(loader):
         rel_post = rel_post[0, :, mm].reshape(4, c, c)
         rel_diffs = torch.where(rel_pre != rel_post)
         rel_effects = [[], [], [], []]  # for four relations
+        rel_indices = [[], [], [], []]
         for rel, obj1, obj2 in zip(*rel_diffs):
             rel_value = rel_post[rel, obj1, obj2]
             tup = (rel_value.int().item(),)
-            if tup not in rel_effects[rel.item()]:
-                rel_effects[rel.item()].append(tup)
-            if obj1.item() not in var_list:
-                var_list.append(obj1.item())
-            if obj2.item() not in var_list:
-                var_list.append(obj2.item())
-        rel_effects = [sorted(x) for x in rel_effects]
-        # changed_vars.append(var_list)
+            rel_effects[rel.item()].append(tup)
+            rel_indices[rel.item()].append((obj1.item(), obj2.item()))
 
-        key = (tuple(obj_effects),) + tuple(tuple(x) for x in rel_effects)
-        if key not in effect_to_class:
+        # sort rel_effects together with rel_indices
+        for i in range(4):
+            if len(rel_effects[i]) == 0:
+                rel_effects[i] = ()
+                rel_indices[i] = ()
+                continue
+            rel_effects[i], rel_indices[i] = zip(*sorted(zip(rel_effects[i], rel_indices[i])))
+        rel_indices = tuple(rel_indices)
+
+        key = (obj_effects,) + tuple(rel_effects)
+        if given_effect_to_class is not None:
+            if key not in given_effect_to_class:
+                effects.append(-1)
+            else:
+                effects.append(given_effect_to_class[key])
+        elif key not in effect_to_class:
             effect_to_class[key] = class_idx
             class_idx += 1
-        effects.append(effect_to_class[key])
+            effects.append(effect_to_class[key])
+        else:
+            effects.append(effect_to_class[key])
+        changed_indices.append((obj_indices, rel_indices))
 
-    return effects, effect_to_class
+    if given_effect_to_class is not None:
+        return effects, changed_indices
+    return effects, changed_indices, effect_to_class
 
 
 def get_top_classes(sorted_effect_counts, perc, dataset_size):
@@ -195,7 +215,7 @@ def is_satisfied(sample, object_bindings, action_bindings, relation_bindings):
         if binding_valid:
             rel_filtered_bindings.append(binding)
     rel_exists = len(rel_filtered_bindings) > 0
-            # TODO: check bindings in rel_filtered_bindings with the effect indices
+    satisfied = obj_exists and act_exists and obj_act_binded and rel_exists
 
     return satisfied, rel_filtered_bindings
 
