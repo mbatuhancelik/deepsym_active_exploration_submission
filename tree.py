@@ -164,7 +164,8 @@ def check_rule(object_bindings, action_bindings, relation_bindings, loader, effe
                 elif act_indices is None:
                     filtered_possible_indices[name] = obj_indices
                 else:
-                    filtered_possible_indices[name] = torch.tensor(np.intersect1d(obj_indices.numpy(), act_indices.numpy()),
+                    filtered_possible_indices[name] = torch.tensor(np.intersect1d(obj_indices.numpy(),
+                                                                                  act_indices.numpy()),
                                                                    dtype=torch.long)
 
                 if len(filtered_possible_indices[name]) == 0:
