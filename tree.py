@@ -385,3 +385,48 @@ def learn_tree(loader, effects, unique_object_values, unique_action_values, min_
                   f"Num nodes: {num_nodes}")
 
     return root_node
+
+
+def print_tree(node, negatives):
+    if node.left is None and node.right is None:
+        print("Rule:")
+        if len(negatives) > 0:
+            print("\t(negations:")
+            for neg in negatives:
+                print("\t\t(")
+                if len(neg[0]) > 0:
+                    print("\t\t\t(objects: ", end="")
+                    print(" AND ".join([f"{obj}!={tuple(vals.tolist())}" for obj, vals in neg[0].items()]), end="")
+                    print(")")
+                if len(neg[1]) > 0:
+                    print("\t\t\t(actions: ", end="")
+                    print(" AND ".join([f"{act}!={tuple(vals.tolist())}" for act, vals in neg[1].items()]), end="")
+                    print(")")
+                if len(neg[2]) > 0:
+                    print("\t\t\t(relations: ", end="")
+                    print(" AND ".join([f"rel({rel[0]}, {rel[1]}, {rel[2]})!={vals}" for rel, vals in neg[2].items()]), end="")
+                    print(")")
+                print("\t\t)")
+            print("\t)")
+
+        if len(node.object_bindings) > 0:
+            # e.g., obj0=(0, 1, 1, 1)
+            print("\t(objects: ", end="")
+            print(" AND ".join([f"{obj}={tuple(vals.tolist())}" for obj, vals in node.object_bindings.items()]), end="")
+            print(")")
+        if len(node.action_bindings) > 0:
+            print("\t(actions: ", end="")
+            print(" AND ".join([f"{act}={tuple(vals.tolist())}" for act, vals in node.action_bindings.items()]), end="")
+            print(")")
+        if len(node.relation_bindings) > 0:
+            print("\t(relations: ", end="")
+            print(" AND ".join([f"rel({rel[0]}, {rel[1]}, {rel[2]})={vals}" for rel, vals in node.relation_bindings.items()]), end="")
+            print(")")
+        print("\tTHEN")
+        print(f"\t{node.counts}")
+    else:
+        print_tree(node.left, negatives)
+        if len(node.object_bindings) > 0 or len(node.action_bindings) > 0 or len(node.relation_bindings) > 0:
+            print_tree(node.right, negatives + [(node.object_bindings, node.action_bindings, node.relation_bindings)])
+        else:
+            print_tree(node.right, negatives)
