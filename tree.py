@@ -1,12 +1,22 @@
-from collections import namedtuple
+from multiprocessing import Pool
 
 
 import torch
 import numpy as np
 
 
-Node = namedtuple("Node", ["left", "right", "object_bindings", "action_bindings", "relation_bindings",
-                           "counts", "dataset_mask"])
+class Node:
+    def __init__(self, left, right, object_bindings, action_bindings, relation_bindings, counts, gating) -> None:
+        self.left = left
+        self.right = right
+        self.object_bindings = object_bindings
+        self.action_bindings = action_bindings
+        self.relation_bindings = relation_bindings
+        self.counts = counts
+        self.gating = gating
+
+    def __repr__(self) -> str:
+        return f"Node({self.object_bindings}, {self.action_bindings}, {self.relation_bindings}, {self.gating.sum()})"
 
 
 def create_effect_classes(loader):
@@ -65,10 +75,10 @@ def get_top_classes(sorted_effect_counts, perc, dataset_size):
     return selected_keys
 
 
-def get_effect_counts(effects, mask):
+def get_effect_counts(effects, gating):
     effect_counts = {}
     for i, e in enumerate(effects):
-        if not mask[i]:
+        if gating[i]:
             if e not in effect_counts:
                 effect_counts[e] = 0
             effect_counts[e] += 1
@@ -101,11 +111,12 @@ def preprocess_data(o_i, r_i, a, o_f, r_f, m):
     return o_i, r_i, a, o_f, r_f
 
 
-def check_rule(object_bindings, action_bindings, relation_bindings, loader, effects, dataset_mask):
+def check_rule(object_bindings, action_bindings, relation_bindings, loader, effects, gating):
     class_counts = {}
-    classified_mask = np.zeros(len(dataset_mask), dtype=bool)
+    left_gating = np.zeros(len(gating), dtype=bool)
+    right_gating = np.zeros(len(gating), dtype=bool)
     for i, (o_i, r_i, a, o_f, r_f, m) in enumerate(loader):
-        if not dataset_mask[i]:
+        if gating[i]:
             o_i, r_i, a, _, _ = preprocess_data(o_i, r_i, a, o_f, r_f, m)
 
             # get possible object indices
@@ -153,7 +164,8 @@ def check_rule(object_bindings, action_bindings, relation_bindings, loader, effe
                 elif act_indices is None:
                     filtered_possible_indices[name] = obj_indices
                 else:
-                    filtered_possible_indices[name] = np.intersect1d(obj_indices.numpy(), act_indices.numpy())
+                    filtered_possible_indices[name] = torch.tensor(np.intersect1d(obj_indices.numpy(), act_indices.numpy()),
+                                                                   dtype=torch.long)
 
                 if len(filtered_possible_indices[name]) == 0:
                     obj_act_binded = False
@@ -193,10 +205,10 @@ def check_rule(object_bindings, action_bindings, relation_bindings, loader, effe
                 if effects[i] not in class_counts:
                     class_counts[effects[i]] = 0
                 class_counts[effects[i]] += 1
-                classified_mask[i] = True
-        else:
-            classified_mask[i] = True
-    return class_counts, classified_mask
+                left_gating[i] = True
+            else:
+                right_gating[i] = True
+    return class_counts, left_gating, right_gating
 
 
 def calculate_entropy(counts):
@@ -205,7 +217,7 @@ def calculate_entropy(counts):
     return entropy
 
 
-def expand_best_node(node, loader, effects, unique_object_values, unique_action_values, min_samples_split):
+def expand_best_node(node, loader, effects, unique_object_values, unique_action_values, min_samples_split, num_procs=1):
     """
     Expands the best node by binding variables to new values and creating new nodes.
 
@@ -219,7 +231,10 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
         Tuple[float, Node]: The entropy and the best node.
     """
     best_node = None
+    r_gating = None
     best_entropy = 1e10
+    if node.gating.sum() < min_samples_split:
+        return best_entropy, best_node, r_gating
 
     obj_var_list = list(node.object_bindings.keys())
     act_var_list = list(node.action_bindings.keys())
@@ -229,6 +244,9 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
     max_act_idx = max([int(act_var[3:]) for act_var in act_var_list]) if len(act_var_list) > 0 else -1
     new_obj_idx = max(max_obj_idx, max_act_idx) + 1
     new_obj_name = "obj" + str(new_obj_idx)
+
+    # process argument list
+    proc_args = []
 
     # bind a variable in action list to a new object value
     for act_var in act_var_list:
@@ -240,41 +258,15 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
         for obj_val in unique_object_values:
             object_bindings = node.object_bindings.copy()
             object_bindings[act_var] = obj_val
-            counts, classified = check_rule(object_bindings=object_bindings,
-                                            action_bindings=node.action_bindings,
-                                            relation_bindings=node.relation_bindings,
-                                            loader=loader,
-                                            effects=effects,
-                                            dataset_mask=node.dataset_mask)
-            entropy = calculate_entropy(counts)
-            if entropy < best_entropy and np.sum(classified) >= min_samples_split:
-                best_node = Node(left=None, right=None,
-                                 object_bindings=object_bindings,
-                                 action_bindings=node.action_bindings.copy(),
-                                 relation_bindings=node.relation_bindings.copy(),
-                                 counts=counts,
-                                 dataset_mask=classified)
-                best_entropy = entropy
+            proc_args.append((object_bindings, node.action_bindings, node.relation_bindings,
+                             loader, effects, node.gating))
 
     # bind a new variable to a new object value
     for obj_val in unique_object_values:
         object_bindings = node.object_bindings.copy()
         object_bindings[new_obj_name] = obj_val
-        counts, classified = check_rule(object_bindings=object_bindings,
-                                        action_bindings=node.action_bindings,
-                                        relation_bindings=node.relation_bindings,
-                                        loader=loader,
-                                        effects=effects,
-                                        dataset_mask=node.dataset_mask)
-        entropy = calculate_entropy(counts)
-        if entropy < best_entropy and np.sum(classified) >= min_samples_split:
-            best_node = Node(left=None, right=None,
-                             object_bindings=object_bindings,
-                             action_bindings=node.action_bindings.copy(),
-                             relation_bindings=node.relation_bindings.copy(),
-                             counts=counts,
-                             dataset_mask=classified)
-            best_entropy = entropy
+        proc_args.append((object_bindings, node.action_bindings, node.relation_bindings,
+                          loader, effects, node.gating))
 
     # bind a variable in object list to a new action value
     for obj_var in obj_var_list:
@@ -286,41 +278,15 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
         for act_val in unique_action_values:
             action_bindings = node.action_bindings.copy()
             action_bindings[obj_var] = act_val
-            counts, classified = check_rule(object_bindings=node.object_bindings,
-                                            action_bindings=action_bindings,
-                                            relation_bindings=node.relation_bindings,
-                                            loader=loader,
-                                            effects=effects,
-                                            dataset_mask=node.dataset_mask)
-            entropy = calculate_entropy(counts)
-            if entropy < best_entropy and np.sum(classified) >= min_samples_split:
-                best_node = Node(left=None, right=None,
-                                 object_bindings=node.object_bindings.copy(),
-                                 action_bindings=action_bindings,
-                                 relation_bindings=node.relation_bindings.copy(),
-                                 counts=counts,
-                                 dataset_mask=classified)
-                best_entropy = entropy
+            proc_args.append((node.object_bindings, action_bindings, node.relation_bindings,
+                              loader, effects, node.gating))
 
     # bind a new variable to a new action value
     for act_val in unique_action_values:
         action_bindings = node.action_bindings.copy()
         action_bindings[new_obj_name] = act_val
-        counts, classified = check_rule(object_bindings=node.object_bindings,
-                                        action_bindings=action_bindings,
-                                        relation_bindings=node.relation_bindings,
-                                        loader=loader,
-                                        effects=effects,
-                                        dataset_mask=node.dataset_mask)
-        entropy = calculate_entropy(counts)
-        if entropy < best_entropy and np.sum(classified) >= min_samples_split:
-            best_node = Node(left=None, right=None,
-                             object_bindings=node.object_bindings.copy(),
-                             action_bindings=action_bindings,
-                             relation_bindings=node.relation_bindings.copy(),
-                             counts=counts,
-                             dataset_mask=classified)
-            best_entropy = entropy
+        proc_args.append((node.object_bindings, action_bindings, node.relation_bindings,
+                          loader, effects, node.gating))
 
     # bind two variables in either object list or action list to a new relation value
     all_vars = list(set(obj_var_list + act_var_list))
@@ -337,44 +303,50 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
                     # bind the relation to each value
                     relation_bindings = node.relation_bindings.copy()
                     relation_bindings[key] = val
-                    counts, classified = check_rule(object_bindings=node.object_bindings,
-                                                    action_bindings=node.action_bindings,
-                                                    relation_bindings=relation_bindings,
-                                                    loader=loader,
-                                                    effects=effects,
-                                                    dataset_mask=node.dataset_mask)
-                    entropy = calculate_entropy(counts)
-                    if entropy < best_entropy and np.sum(classified) >= min_samples_split:
-                        best_node = Node(left=None, right=None,
-                                         object_bindings=node.object_bindings.copy(),
-                                         action_bindings=node.action_bindings.copy(),
-                                         relation_bindings=relation_bindings,
-                                         counts=counts,
-                                         dataset_mask=classified)
-                        best_entropy = entropy
+                    proc_args.append((node.object_bindings, node.action_bindings, relation_bindings,
+                                      loader, effects, node.gating))
 
-    return best_entropy, best_node
+    with Pool(num_procs) as pool:
+        results = pool.starmap(check_rule, proc_args)
+
+    for (counts, left_gating, right_gating), (args) in zip(results, proc_args):
+        entropy = calculate_entropy(counts)
+        if (1e-8 < entropy < best_entropy) and \
+           (np.sum(left_gating) >= min_samples_split) and \
+           (np.sum(right_gating) >= min_samples_split):
+            best_node = Node(left=None, right=None,
+                             object_bindings=args[0].copy(),
+                             action_bindings=args[1].copy(),
+                             relation_bindings=args[2].copy(),
+                             counts=counts,
+                             gating=left_gating)
+            best_entropy = entropy
+            r_gating = right_gating
+
+    return best_entropy, best_node, r_gating
 
 
-def learn_tree(loader, effects, min_samples_split=100):
+def learn_tree(loader, effects, unique_object_values, unique_action_values, min_samples_split=100, num_procs=1):
     """Learn a decision tree from the given dataset.
 
     Args:
         loader (DataLoader): the dataset loader
         effects (np.ndarray): the effects of the dataset
+        unique_object_values (torch.Tensor): the unique object values in the dataset
+        unique_action_values (torch.Tensor): the unique action values in the dataset
         min_samples_split (int): the minimum number of samples required to split a node
 
     Returns:
         Node: the root node of the decision tree
     """
     # initialize the root node
-    mask = np.zeros(len(loader), dtype=bool)
+    gating = np.ones(len(loader), dtype=bool)
     root_node = Node(left=None, right=None,
                      object_bindings={},
                      action_bindings={},
                      relation_bindings={},
-                     counts=get_effect_counts(effects, mask),
-                     dataset_mask=mask)
+                     counts=get_effect_counts(effects, gating),
+                     gating=gating)
 
     # learn the tree
     queue = [root_node]
@@ -382,20 +354,26 @@ def learn_tree(loader, effects, min_samples_split=100):
     while len(queue) > 0:
         node = queue.pop(0)
         num_nodes += 1
-        _, best_node = expand_best_node(node, loader, effects, min_samples_split)
+        _, best_node, right_gating = expand_best_node(node, loader, effects, unique_object_values,
+                                                      unique_action_values, min_samples_split, num_procs)
         if best_node is not None:
             print(f"Rule:\n"
                   f"  object bindings={best_node.object_bindings},\n"
                   f"  action bindings={best_node.action_bindings},\n"
                   f"  relation bindings={best_node.relation_bindings},\n"
                   f"  entropy={calculate_entropy(best_node.counts)},\n"
+                  f"  count={best_node.gating.sum()},\n"
                   f"Num nodes: {num_nodes}")
-            node = node._replace(left=best_node)
-            right_mask = best_node.dataset_mask.copy()
-            right_node = Node(left=None, right=None, object_bindings={}, action_bindings={}, relation_bindings={}, counts=get_effect_counts(effects, right_mask), dataset_mask=right_mask)
-            node = node._replace(right=right_node)
+
+            right_node = Node(left=None, right=None, object_bindings={}, action_bindings={}, relation_bindings={},
+                              counts=get_effect_counts(effects, right_gating), gating=right_gating)
+            node.left = best_node
+            node.right = right_node
             queue.append(node.left)
             queue.append(node.right)
+            if num_nodes == 1:
+                # keep the root node pointer
+                root_node = node
         else:
             print(f"Terminal rule: \n"
                   f"  object bindings={node.object_bindings},\n"
