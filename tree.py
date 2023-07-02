@@ -111,105 +111,115 @@ def preprocess_data(o_i, r_i, a, o_f, r_f, m):
     return o_i, r_i, a, o_f, r_f
 
 
-def check_rule(object_bindings, action_bindings, relation_bindings, loader, effects, gating):
-    class_counts = {}
-    left_gating = np.zeros(len(gating), dtype=bool)
-    right_gating = np.zeros(len(gating), dtype=bool)
-    for i, (o_i, r_i, a, o_f, r_f, m) in enumerate(loader):
-        if gating[i]:
-            o_i, r_i, a, _, _ = preprocess_data(o_i, r_i, a, o_f, r_f, m)
+def is_satisfied(sample, object_bindings, action_bindings, relation_bindings):
+    o_i, r_i, a, _, _ = preprocess_data(*sample)
 
-            # get possible object indices
-            obj_exists = True
-            obj_possible_indices = {}
-            for name in object_bindings:
-                indices = torch.where((o_i == object_bindings[name]).all(dim=1))[0]
-                if len(indices) > 0:
-                    obj_possible_indices[name] = indices
-                else:
-                    obj_exists = False
-                    break
+    # get possible object indices
+    obj_exists = True
+    obj_possible_indices = {}
+    for name in object_bindings:
+        indices = torch.where((o_i == object_bindings[name]).all(dim=1))[0]
+        if len(indices) > 0:
+            obj_possible_indices[name] = indices
+        else:
+            obj_exists = False
+            break
 
-            # get possible action indices
-            act_exists = True
-            act_possible_indices = {}
-            for name in action_bindings:
-                indices = torch.where((a == action_bindings[name]).all(dim=1))[0]
-                if len(indices) > 0:
-                    act_possible_indices[name] = indices
-                else:
-                    act_exists = False
-                    break
+    # get possible action indices
+    act_exists = True
+    act_possible_indices = {}
+    for name in action_bindings:
+        indices = torch.where((a == action_bindings[name]).all(dim=1))[0]
+        if len(indices) > 0:
+            act_possible_indices[name] = indices
+        else:
+            act_exists = False
+            break
 
-            # constraints
-            obj_act_binded = True
-            all_names = list(set(list(object_bindings.keys()) + list(action_bindings.keys())))
-            filtered_possible_indices = {}
-            for name in all_names:
-                if name in obj_possible_indices:
-                    obj_indices = obj_possible_indices[name]
-                else:
-                    obj_indices = None
+    # constraints
+    obj_act_binded = True
+    all_names = list(set(list(object_bindings.keys()) + list(action_bindings.keys())))
+    filtered_possible_indices = {}
+    for name in all_names:
+        if name in obj_possible_indices:
+            obj_indices = obj_possible_indices[name]
+        else:
+            obj_indices = None
 
-                if name in act_possible_indices:
-                    act_indices = act_possible_indices[name]
-                else:
-                    act_indices = None
+        if name in act_possible_indices:
+            act_indices = act_possible_indices[name]
+        else:
+            act_indices = None
 
-                if obj_indices is None and act_indices is None:
-                    obj_act_binded = False
-                    break
-                elif obj_indices is None:
-                    filtered_possible_indices[name] = act_indices
-                elif act_indices is None:
-                    filtered_possible_indices[name] = obj_indices
-                else:
-                    filtered_possible_indices[name] = torch.tensor(np.intersect1d(obj_indices.numpy(),
-                                                                                  act_indices.numpy()),
-                                                                   dtype=torch.long)
+        if obj_indices is None and act_indices is None:
+            obj_act_binded = False
+            break
+        elif obj_indices is None:
+            filtered_possible_indices[name] = act_indices
+        elif act_indices is None:
+            filtered_possible_indices[name] = obj_indices
+        else:
+            filtered_possible_indices[name] = torch.tensor(np.intersect1d(obj_indices.numpy(),
+                                                                          act_indices.numpy()),
+                                                           dtype=torch.long)
 
-                if len(filtered_possible_indices[name]) == 0:
-                    obj_act_binded = False
-                    break
+        if len(filtered_possible_indices[name]) == 0:
+            obj_act_binded = False
+            break
 
-            possible_bindings = []
-            if obj_act_binded:
-                tensors = []
-                for name in all_names:
-                    tensors.append(filtered_possible_indices[name])
-                bindings = torch.cartesian_prod(*tensors)
-                if bindings.ndim == 1:
-                    bindings = bindings.unsqueeze(1)
-                num_vars = len(all_names)
-                for binding in bindings:
-                    if torch.unique(binding).shape[0] == num_vars:
-                        possible_bindings.append({all_names[i]: binding[i] for i in range(num_vars)})
-                if len(possible_bindings) == 0:
-                    obj_act_binded = False
+    possible_bindings = []
+    if obj_act_binded:
+        tensors = []
+        for name in all_names:
+            tensors.append(filtered_possible_indices[name])
+        bindings = torch.cartesian_prod(*tensors)
+        if bindings.ndim == 1:
+            bindings = bindings.unsqueeze(1)
+        num_vars = len(all_names)
+        for binding in bindings:
+            if torch.unique(binding).shape[0] == num_vars:
+                possible_bindings.append({all_names[i]: binding[i] for i in range(num_vars)})
+        if len(possible_bindings) == 0:
+            obj_act_binded = False
 
-            rel_filtered_bindings = []
-            for binding in possible_bindings:
-                binding_valid = True
-                for (rel_idx, name1, name2) in relation_bindings:
-                    val = relation_bindings[(rel_idx, name1, name2)]
-                    name1_idx = binding[name1]
-                    name2_idx = binding[name2]
-                    if r_i[rel_idx, name1_idx, name2_idx] != val:
-                        binding_valid = False
-                        break
-                if binding_valid:
-                    rel_filtered_bindings.append(binding)
-            rel_exists = len(rel_filtered_bindings) > 0
+    rel_filtered_bindings = []
+    for binding in possible_bindings:
+        binding_valid = True
+        for (rel_idx, name1, name2) in relation_bindings:
+            val = relation_bindings[(rel_idx, name1, name2)]
+            name1_idx = binding[name1]
+            name2_idx = binding[name2]
+            if r_i[rel_idx, name1_idx, name2_idx] != val:
+                binding_valid = False
+                break
+        if binding_valid:
+            rel_filtered_bindings.append(binding)
+    rel_exists = len(rel_filtered_bindings) > 0
             # TODO: check bindings in rel_filtered_bindings with the effect indices
 
-            if obj_exists and act_exists and obj_act_binded and rel_exists:
-                if effects[i] not in class_counts:
-                    class_counts[effects[i]] = 0
-                class_counts[effects[i]] += 1
+    return satisfied, rel_filtered_bindings
+
+
+def check_rule(object_bindings, action_bindings, relation_bindings, loader, effects, gating):
+    left_counts = {}
+    right_counts = {}
+    left_gating = np.zeros(len(gating), dtype=bool)
+    right_gating = np.zeros(len(gating), dtype=bool)
+    for i, sample in enumerate(loader):
+        if gating[i]:
+            satisfied, bindings = is_satisfied(sample, object_bindings, action_bindings, relation_bindings)
+            print(bindings)
+            if satisfied:
+                if effects[i] not in left_counts:
+                    left_counts[effects[i]] = 0
+                left_counts[effects[i]] += 1
                 left_gating[i] = True
             else:
+                if effects[i] not in right_counts:
+                    right_counts[effects[i]] = 0
+                right_counts[effects[i]] += 1
                 right_gating[i] = True
-    return class_counts, left_gating, right_gating
+    return left_counts, left_gating, right_counts, right_gating
 
 
 def calculate_entropy(counts):
@@ -218,24 +228,27 @@ def calculate_entropy(counts):
     return entropy
 
 
-def expand_best_node(node, loader, effects, unique_object_values, unique_action_values, min_samples_split, num_procs=1):
+def calculate_best_split(node, loader, effects, unique_object_values, unique_action_values, min_samples_split, num_procs=1):
     """
-    Expands the best node by binding variables to new values and creating new nodes.
+    Calculate the best split for the given node.
 
     Args:
         node (Node): The node to expand.
         loader (torch.utils.data.DataLoader): The data loader.
         effects (List[int]): The effects.
+        unique_object_values (torch.Tensor): The unique object values.
+        unique_action_values (torch.Tensor): The unique action values.
         min_samples_split (int): The minimum number of samples required to split a node.
+        num_procs (int): The number of processes to use.
 
     Returns:
         Tuple[float, Node]: The entropy and the best node.
     """
-    best_node = None
-    r_gating = None
-    best_entropy = 1e10
+    left_node = None
+    right_node = None
+    best_impurity = 1e10
     if node.gating.sum() < min_samples_split:
-        return best_entropy, best_node, r_gating
+        return best_impurity, left_node, right_node
 
     obj_var_list = list(node.object_bindings.keys())
     act_var_list = list(node.action_bindings.keys())
@@ -310,21 +323,28 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
     with mp.get_context("spawn").Pool(num_procs) as pool:
         results = pool.starmap(check_rule, proc_args)
 
-    for (counts, left_gating, right_gating), (args) in zip(results, proc_args):
-        entropy = calculate_entropy(counts)
-        if (1e-8 < entropy < best_entropy) and \
+    for (left_counts, left_gating, right_counts, right_gating), (args) in zip(results, proc_args):
+        left_entropy = calculate_entropy(left_counts)
+        right_entropy = calculate_entropy(right_counts)
+        impurity = (left_entropy * np.sum(left_gating) + right_entropy * np.sum(right_gating)) / node.gating.sum()
+        if (1e-8 < impurity < best_impurity) and \
            (np.sum(left_gating) >= min_samples_split) and \
            (np.sum(right_gating) >= min_samples_split):
-            best_node = Node(left=None, right=None,
+            left_node = Node(left=None, right=None,
                              object_bindings=args[0].copy(),
                              action_bindings=args[1].copy(),
                              relation_bindings=args[2].copy(),
-                             counts=counts,
+                             counts=left_counts,
                              gating=left_gating)
-            best_entropy = entropy
-            r_gating = right_gating
+            right_node = Node(left=None, right=None,
+                              object_bindings={},
+                              action_bindings={},
+                              relation_bindings={},
+                              counts=right_counts,
+                              gating=right_gating)
+            best_impurity = impurity
 
-    return best_entropy, best_node, r_gating
+    return best_impurity, left_node, right_node
 
 
 def learn_tree(loader, effects, unique_object_values, unique_action_values, min_samples_split=100, num_procs=1):
@@ -355,20 +375,24 @@ def learn_tree(loader, effects, unique_object_values, unique_action_values, min_
     while len(queue) > 0:
         node = queue.pop(0)
         num_nodes += 1
-        _, best_node, right_gating = expand_best_node(node, loader, effects, unique_object_values,
-                                                      unique_action_values, min_samples_split, num_procs)
-        if best_node is not None:
-            print(f"Rule:\n"
-                  f"  object bindings={best_node.object_bindings},\n"
-                  f"  action bindings={best_node.action_bindings},\n"
-                  f"  relation bindings={best_node.relation_bindings},\n"
-                  f"  entropy={calculate_entropy(best_node.counts)},\n"
-                  f"  count={best_node.gating.sum()},\n"
+        _, left_node, right_node = calculate_best_split(node, loader, effects, unique_object_values,
+                                                        unique_action_values, min_samples_split, num_procs)
+        if left_node is not None:
+            print(f"Left node:\n"
+                  f"  object bindings={left_node.object_bindings},\n"
+                  f"  action bindings={left_node.action_bindings},\n"
+                  f"  relation bindings={left_node.relation_bindings},\n"
+                  f"  entropy={calculate_entropy(left_node.counts)},\n"
+                  f"  count={left_node.gating.sum()},\n"
+                  f"Right node:\n"
+                  f"  object bindings={right_node.object_bindings},\n"
+                  f"  action bindings={right_node.action_bindings},\n"
+                  f"  relation bindings={right_node.relation_bindings},\n"
+                  f"  entropy={calculate_entropy(right_node.counts)},\n"
+                  f"  count={right_node.gating.sum()},\n"
                   f"Num nodes: {num_nodes}")
 
-            right_node = Node(left=None, right=None, object_bindings={}, action_bindings={}, relation_bindings={},
-                              counts=get_effect_counts(effects, right_gating), gating=right_gating)
-            node.left = best_node
+            node.left = left_node
             node.right = right_node
             queue.append(node.left)
             queue.append(node.right)
@@ -376,7 +400,7 @@ def learn_tree(loader, effects, unique_object_values, unique_action_values, min_
                 # keep the root node pointer
                 root_node = node
         else:
-            print(f"Terminal rule: \n"
+            print(f"Terminal node: \n"
                   f"  object bindings={node.object_bindings},\n"
                   f"  action bindings={node.action_bindings},\n"
                   f"  relation bindings={node.relation_bindings},\n"
