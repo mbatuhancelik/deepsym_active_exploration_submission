@@ -1,4 +1,4 @@
-from multiprocessing import Pool
+import multiprocessing as mp
 
 
 import torch
@@ -306,7 +306,7 @@ def expand_best_node(node, loader, effects, unique_object_values, unique_action_
                     proc_args.append((node.object_bindings, node.action_bindings, relation_bindings,
                                       loader, effects, node.gating))
 
-    with Pool(num_procs) as pool:
+    with mp.get_context("spawn").Pool(num_procs) as pool:
         results = pool.starmap(check_rule, proc_args)
 
     for (counts, left_gating, right_gating), (args) in zip(results, proc_args):
