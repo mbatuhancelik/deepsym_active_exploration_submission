@@ -474,3 +474,23 @@ def print_tree(node, negatives):
             print_tree(node.right, negatives + [(node.object_bindings, node.action_bindings, node.relation_bindings)])
         else:
             print_tree(node.right, negatives)
+
+
+def flatten_tuple(nested_tuple):
+    flattened = []
+    for item in nested_tuple:
+        if isinstance(item, tuple):
+            flattened.extend(flatten_tuple(item))
+        else:
+            flattened.append(item)
+    return tuple(flattened)
+
+
+def transform_tuple(nested_tuple, mapping):
+    transformed = []
+    for item in nested_tuple:
+        if isinstance(item, tuple):
+            transformed.append(transform_tuple(item, mapping))
+        else:
+            transformed.append(mapping[item])
+    return tuple(transformed)
