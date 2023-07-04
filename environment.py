@@ -480,7 +480,14 @@ class BlocksWorld_v4(BlocksWorld):
             self.debug_items.append(id1)
             self.debug_items.append(id2)
 
-    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False):
+    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False, get_images=False):
+        eye_position = [1.75, 0.0, 2.0]
+        target_position = [1.0, 0.0, 0.4]
+        up_vector = [0, 0, 1]
+        images = []
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
         obj1_loc, quat = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
         obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
 
@@ -519,19 +526,31 @@ class BlocksWorld_v4(BlocksWorld):
 
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
         self.agent.close_gripper(sleep=sleep)
         self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
         state2, _ = self.state_obj_poses_and_types()
         # if approach_angle1 != approach_angle2:
         self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
         state3, _ = self.state_obj_poses_and_types()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
         self.agent.open_gripper()
         self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
         state4, _ = self.state_obj_poses_and_types()
         effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
         self.init_agent_pose(1)
+        if get_images:
+            return state1, effect, types, images
+
         return state1, effect, types
 
     def state_obj_poses_and_types(self):
