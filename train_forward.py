@@ -5,20 +5,8 @@ import torch
 import wandb
 
 from utils import get_device, get_parameter_count
+from dataset import load_symbol_dataset
 import models
-
-
-def load_dataset(name, run, device):
-    z_obj_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_pre.pt")).name).to(device)
-    z_rel_pre = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_pre.pt")).name).to(device)
-    z_act = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_act.pt")).name).to(device)
-    z_obj_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_obj_post.pt")).name).to(device)
-    z_rel_post = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_z_rel_post.pt")).name).to(device)
-    mask = torch.load(wandb.restore(os.path.join(run.config["save_folder"], f"{name}_mask.pt")).name).to(device)
-
-    dataset = torch.utils.data.TensorDataset(z_obj_pre, z_rel_pre, z_act,
-                                             z_obj_post, z_rel_post, mask)
-    return dataset
 
 
 parser = argparse.ArgumentParser("Train symbol forward model")
@@ -52,8 +40,8 @@ if not os.path.exists(run.config["save_folder"]):
     os.makedirs(run.config["save_folder"])
 
 
-train_set = load_dataset("train", run, device)
-val_set = load_dataset("val", run, device)
+train_set = load_symbol_dataset("train", run, device)
+val_set = load_symbol_dataset("val", run, device)
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.b, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.b, shuffle=False)
 
@@ -64,6 +52,12 @@ for e in range(args.e):
     train_obj_loss = 0.0
     train_rel_loss = 0.0
     for zo_i, zr_i, a, zo_f, zr_f, m in train_loader:
+        zo_i = zo_i.float()
+        zr_i = zr_i.float()
+        a = a.float()
+        zo_f = zo_f.float()
+        zr_f = zr_f.float()
+        m = m.float()
         zi_cat = torch.cat([zo_i, a], dim=-1)
         zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
         m = m.unsqueeze(2)
@@ -74,6 +68,7 @@ for e in range(args.e):
 
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         optimizer.step()
 
         train_obj_loss += obj_loss.item()
@@ -86,6 +81,12 @@ for e in range(args.e):
     val_rel_loss = 0.0
     with torch.no_grad():
         for zo_i, zr_i, a, zo_f, zr_f, m in val_loader:
+            zo_i = zo_i.float()
+            zr_i = zr_i.float()
+            a = a.float()
+            zo_f = zo_f.float()
+            zr_f = zr_f.float()
+            m = m.float()
             zi_cat = torch.cat([zo_i, a], dim=-1)
             zo_f_bar, zo_r_bar = model(zi_cat, zr_i)
             m = m.unsqueeze(2)

@@ -14,18 +14,20 @@ def encode_dataset(loader, model):
     z_obj_post = []
     z_rel_post = []
     mask = []
-    for sample in loader:
+    for i, sample in enumerate(loader):
         with torch.no_grad():
             z_i = model.encode(sample["state"], eval_mode=True)
             zr_i = model.attn_weights(sample["state"], sample["pad_mask"], eval_mode=True)
             z_f = model.encode(sample["post_state"], eval_mode=True)
             zr_f = model.attn_weights(sample["post_state"], sample["pad_mask"], eval_mode=True)
-            z_obj_pre.append(z_i.cpu())
-            z_rel_pre.append(zr_i.cpu())
-            z_act.append(sample["action"].cpu())
-            z_obj_post.append(z_f.cpu())
-            z_rel_post.append(zr_f.cpu())
-            mask.append(sample["pad_mask"].cpu())
+            z_obj_pre.append(z_i.cpu().bool())
+            z_rel_pre.append(zr_i.cpu().bool())
+            z_act.append(sample["action"].cpu().char())
+            z_obj_post.append(z_f.cpu().bool())
+            z_rel_post.append(zr_f.cpu().bool())
+            mask.append(sample["pad_mask"].cpu().bool())
+        if i % 100 == 0:
+            print(f"Encoded {i} samples out of {len(loader.dataset)}")
 
     z_obj_pre = torch.cat(z_obj_pre, axis=0)
     z_rel_pre = torch.cat(z_rel_pre, axis=0)
@@ -54,6 +56,7 @@ def save_and_upload(z_obj_pre, z_rel_pre, z_act, z_obj_post, z_rel_post, mask, r
 
 run_id = sys.argv[1]
 run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
+wandb.config.update({"device": "cuda" if torch.cuda.is_available() else "cpu"}, allow_val_change=True)
 model = utils.create_model_from_config(run.config)
 model.load("_best", from_wandb=True)
 model.print_model()

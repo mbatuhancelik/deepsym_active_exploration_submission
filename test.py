@@ -2,10 +2,11 @@ import sys
 
 import torch
 import wandb
-import threading
+import numpy as np
+
 import environment
-import time
 import utils
+
 text_items = {}
 state_debug_texts = []
 parameter_ids = {}
@@ -20,26 +21,31 @@ colors = [
     [0.7, 0.0, 0.7, 0.75],
     [0.7, 0.7, 0.0, 0.75],
 ]
+
+
 def remove_attention_arrows(env):
     while len(attention_arrow_ids) > 0:
         arrow_id = attention_arrow_ids.pop()
         env._p.removeBody(arrow_id)
-def draw_attention(env: environment.BlocksWorld_v4,attention, head, active_selector, obj):
+
+
+def draw_attention(env, attention, head, active_selector, obj):
     remove_attention_arrows(env)
-    #object range
+    # object range
     min = 0
     max = env.num_objects
     global colors
     if obj != -1:
         min = obj
         max = obj+1
-    
-    attention= attention[head]
+
+    attention = attention[head]
     for i in range(min, max):
         for k in range(0, env.num_objects):
             if attention[i, k] == active_selector:
                 attention_arrow_ids.append(utils.create_arrow(env._p, env.get_obj_location(i), env.get_obj_location(k), color=colors[i % len(colors)]))
-    
+
+
 def draw_attention_loop(env, attention_maps):
     global head_pre, active_selector_pre, obj_pre
     print("===== ATTENTION VISUALIZER ======")
@@ -47,7 +53,6 @@ def draw_attention_loop(env, attention_maps):
     print("selec y : which element from attention will be visualized(0 or 1)")
     print("obj z : focus on obj z, -1 for all objects")
     print("act  : perform action")
-
 
     head = head_pre
     active_selector = active_selector_pre
@@ -60,24 +65,26 @@ def draw_attention_loop(env, attention_maps):
         if com[0] == "head":
             head = int(com[1])
             print(attention_maps[head])
-        elif com[0] == "selec" : 
+        elif com[0] == "selec":
             active_selector = int(com[1])
         elif com[0] == "obj":
             obj = int(com[1])
-            obj = min(obj, env.num_objects -1)
+            obj = min(obj, env.num_objects-1)
         elif com[0] == "act":
             break
         if not (
-        head == head_pre and 
-        active_selector == active_selector_pre and
-        obj == obj_pre
+            head == head_pre and
+            active_selector == active_selector_pre and
+            obj == obj_pre
         ):
-        
-            draw_attention(env , attention_maps, head, active_selector, obj)
+
+            draw_attention(env, attention_maps, head, active_selector, obj)
             head_pre = head
             active_selector_pre = active_selector
             obj_pre = obj
     remove_attention_arrows(env)
+
+
 def draw_single_symbols(env, z):
     global text_items
     global state_debug_texts
@@ -87,6 +94,8 @@ def draw_single_symbols(env, z):
                                                    parentObjectUniqueId=env.obj_dict[o_id],
                                                    textSize=1)
         state_debug_texts.append(text_items[o_id])
+
+
 def draw_action(env, z=None):
 
     from_obj = int(input("From: "))
@@ -178,13 +187,20 @@ for name in model.module_names:
 
 
 env = environment.BlocksWorld_v4(gui=1, min_objects=5, max_objects=5)
-parameter_ids["head"] =  env._p.addUserDebugParameter("attention_heads", 0 , config["n_attention_heads"] -1 , 0)
-parameter_ids["01"] = env._p.addUserDebugParameter("0/1 selector", 0 , -1 , 0)
-parameter_ids["obj"] =env._p.addUserDebugParameter("object selector", -1 , env.max_objects, -1)
-parameter_ids["perform"] = env._p.addUserDebugParameter("perform action(click twice)", 0 , -1 , 0)
+np.random.seed(200 + int(sys.argv[2]))
+env.reset()
+parameter_ids["head"] = env._p.addUserDebugParameter("attention_heads", 0, config["n_attention_heads"]-1, 0)
+parameter_ids["01"] = env._p.addUserDebugParameter("0/1 selector", 0, -1, 0)
+parameter_ids["obj"] = env._p.addUserDebugParameter("object selector", -1, env.max_objects, -1)
+parameter_ids["perform"] = env._p.addUserDebugParameter("perform action(click twice)", 0, -1, 0)
 eff_arrow_ids = []
 
 while True:
+    one_hot = torch.tensor([[0, 0, 0, 0],
+                            [0, 0, 0, 1],
+                            [0, 0, 1, 0],
+                            [0, 1, 0, 0],
+                            [1, 0, 0, 0]])
     while len(eff_arrow_ids) > 0:
         arrow_id = eff_arrow_ids.pop()
         env._p.removeBody(arrow_id)
@@ -192,6 +208,7 @@ while True:
     state = torch.tensor(state)
     types = torch.tensor(types).reshape(-1, 1)
     state = torch.cat([torch.tensor(state), torch.tensor(types)], dim=-1)
+    state = torch.cat([state[:, :-1], one_hot[[state[:, -1].long()]]], dim=-1)
     z = model.encode(state.unsqueeze(0), eval_mode=True)
     z = utils.binary_to_decimal(z[0, :, :].round())
     draw_single_symbols(env, z)
@@ -204,7 +221,7 @@ while True:
     sample = {"state": state.unsqueeze(0),
               "action": action_vector.unsqueeze(0),
               "pad_mask": torch.ones(1, state.shape[0])}
-    z,_ ,e_pred = model.forward(sample, eval_mode=True)
+    z, _, e_pred = model.forward(sample, eval_mode=True)
     print(e_pred[0, :, 2])
     e_pred = e_pred.detach()
     e_pred = e_pred.reshape(-1, 2, 3)
