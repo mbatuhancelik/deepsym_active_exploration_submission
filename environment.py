@@ -1,4 +1,3 @@
-import copy
 import pybullet
 import pybullet_data
 import numpy as np
@@ -238,25 +237,17 @@ class BlocksWorld_v2(BlocksWorld):
 
 
 class BlocksWorld_v4(BlocksWorld):
-    def __init__(self, segments=6, x_area=0.5, y_area=1.0, **kwargs):
+    def __init__(self, x_area=0.5, y_area=1.0, **kwargs):
         self.traj_t = 1.5
 
-        print(kwargs)
         self.x_init = 0.5
         self.y_init = -0.5
         self.x_final = self.x_init + x_area
         self.y_final = self.y_init + y_area
 
-        self.x_area = x_area
-        self.y_area = y_area
-
         ds = 0.075
         self.ds = ds
-        self.del_x = ds
-        self.del_y = ds
 
-        # for i, y in enumerate([ -0.28, -0.16, -0.04, 0.08, 0.2, 0.32]):
-        #     self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
         if 'min_objects' not in kwargs:
@@ -279,7 +270,7 @@ class BlocksWorld_v4(BlocksWorld):
         rotation = [state_row[3], state_row[4], state_row[5]]
         if obj_type == 0:
             return
-        size = copy.deepcopy(self.sizes[0])
+        size = self.sizes[0].copy()
         if obj_type == 4:
             size = self.sizes[1]
         elif obj_type == 5:
@@ -311,7 +302,6 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
-        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
@@ -324,7 +314,7 @@ class BlocksWorld_v4(BlocksWorld):
 
         position = [x, y, z]
 
-        size = copy.deepcopy(self.sizes[0])
+        size = self.sizes[0].copy()
         if obj_type == 4:
             size = self.sizes[1]
         elif obj_type == 5:
@@ -360,7 +350,6 @@ class BlocksWorld_v4(BlocksWorld):
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=[0, 0, np.pi],
                                         mass=0.1, color="random"))
-        # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
 
@@ -378,82 +367,42 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_types = {}
         obj_ids = []
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
-        # self.num_objects = 1
-        # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = [4]
-        obj_types += np.random.randint(1, 4, (self.num_objects - 1,)).tolist()
-        obj_types = list(reversed(sorted(obj_types)))
-        np.random.shuffle(obj_types)
-        # obj_types = np.concatenate(([i for i in range(1, 5)], obj_types))
+        obj_types = np.random.choice([1, 4], size=(self.num_objects,), replace=True)
 
         i = 0
-        positions = np.array([[0, 0]])
+        positions = []
         trials = 0
         while i < self.num_objects:
             obj_type = obj_types[i]
-            x = 0.75
             x = np.random.uniform(self.x_init, self.x_final)
             y = np.random.uniform(self.y_init, self.y_final)
             z = 0.43
-            pos = np.array([[x, y]])
-            if np.sqrt(np.sum(pos ** 2)) > 1.2:
-                trials += 1
-                continue
-            if np.any(np.sum(np.abs(positions**2 - pos ** 2), axis=-1) < 2.5 * self.ds):
-                trials += 1
-                if trials > 10:
-                    z = 0.57
-                else:
-                    continue
+            pos = np.array([x, y])
+            positions = []
+            if len(positions) > 0:
+                distances = np.linalg.norm(np.stack(positions) - pos, axis=-1)
+                if np.any(distances < 0.15):
+                    trials += 1
+                    if trials > 10:
+                        z = 0.57
+                    else:
+                        continue
+
             trials = 0
-            obj_id = self.create_object(obj_type, x, y, z=z)
+            obj_id = self.create_object(obj_type, x, y, z)
             if obj_id == -1:
                 continue
 
-            positions = np.concatenate([positions, pos])
+            positions.append(pos)
             obj_ids.append(obj_id)
             self._p.addUserDebugText(str(i), [0, 0, 0.1], [0, 0, 0], 1, 0, parentObjectUniqueId=obj_id)
-
             i += 1
+
         self.cluster_centers = []
         for i in range(np.random.randint(1, 3)):
             self.cluster_centers.append(np.random.randint(0, self.num_objects))
-        # TODO: prevent rolling on x y axises
-        self.update_contact_graph()
         for i, o_id in enumerate(sorted(obj_ids)):
             self.obj_dict[i] = o_id
-
-    def update_contact_graph(self):
-        return
-        positions, obj_types = self.state_obj_poses_and_types()
-        num_objects = len(self.obj_dict)
-
-        clusters = []
-        for i in range(num_objects):
-            clusters.append(i)
-
-        self.contact_graph = [[0 for i in range(num_objects)] for k in range(num_objects)]
-        for i in range(num_objects):
-            for k in range(i+1, num_objects):
-                if self.contact_graph[i][k] == 1:
-                    continue
-
-                contact_points = self._p.getContactPoints(bodyA=self.obj_dict[i], bodyB=self.obj_dict[k])
-                if not len(contact_points) == 0:
-                    self.contact_graph[i][k] = 1
-                    self.contact_graph[k][i] = 1
-                    clusters[k] = clusters[i]
-        self.clusters = clusters
-
-        return self.contact_graph, self.clusters
-
-    def get_pos(self):
-        return [self.x_locs[self.x_loc], self.y_locs[self.y_loc], 1]
-
-    def get_ground_pos(self):
-        pos = self.get_pos()
-        pos[2] = 0.41
-        return pos
 
     def remove_grid(self):
         for line in self.debug_items:
@@ -480,7 +429,8 @@ class BlocksWorld_v4(BlocksWorld):
             self.debug_items.append(id1)
             self.debug_items.append(id2)
 
-    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False, get_images=False):
+    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, rotated_grasp,
+             rotated_release, sleep=False, get_images=False):
         eye_position = [1.75, 0.0, 2.0]
         target_position = [1.0, 0.0, 0.4]
         up_vector = [0, 0, 1]
@@ -488,21 +438,18 @@ class BlocksWorld_v4(BlocksWorld):
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
-        obj1_loc, quat = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
+
+        obj1_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
         obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
 
-        # use these if you want to ensure grapping
-        # euler_rot = self._p.getEulerFromQuaternion(quat)
-        # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
-
-        approach_angle1 = [np.pi, 0, 0]
-        approach_angle2 = [np.pi, 0, 0]
-        if grap_angle:
-            approach_angle1 = [np.pi, 0, np.pi/2]
-        if put_angle:
-            approach_angle2 = [np.pi, 0, np.pi/2]
-        quat1 = self._p.getQuaternionFromEuler(approach_angle1)
-        quat2 = self._p.getQuaternionFromEuler(approach_angle2)
+        grasp_angle1 = [np.pi, 0, 0]
+        grasp_angle2 = [np.pi, 0, 0]
+        if rotated_grasp:
+            grasp_angle1[2] = np.pi/2
+        if rotated_release:
+            grasp_angle2[2] = np.pi/2
+        quat1 = self._p.getQuaternionFromEuler(grasp_angle1)
+        quat2 = self._p.getQuaternionFromEuler(grasp_angle2)
 
         obj1_loc = list(obj1_loc)
         obj2_loc = list(obj2_loc)
@@ -514,46 +461,47 @@ class BlocksWorld_v4(BlocksWorld):
         obj2_loc[0] += dx2 * self.ds
         obj1_loc[1] += dy1 * self.ds
         obj2_loc[1] += dy2 * self.ds
-        obj1_loc[2] -= 0.01
-        obj2_loc[2] -= 0.01
+        # obj1_loc[2] -= 0.01
+        # obj2_loc[2] -= 0.01
 
-        up_pos_1 = copy.deepcopy(obj1_loc)
-        up_pos_1[2] = 0.9
+        from_top_pos = obj1_loc.copy()
+        from_top_pos[2] = 0.9
 
-        up_pos_2 = copy.deepcopy(obj2_loc)
-        up_pos_2[2] = 0.9
-        state1, types = self.state_obj_poses_and_types()
+        to_top_pos = obj2_loc.copy()
+        to_top_pos[2] = 0.9
+        state1, types = self.state()
 
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.set_cartesian_position(from_top_pos, orientation=quat1, t=self.traj_t, traj=True, sleep=sleep)
         self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
-        self.agent.close_gripper(sleep=sleep)
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
-        state2, _ = self.state_obj_poses_and_types()
-        # if approach_angle1 != approach_angle2:
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.close_gripper(self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(from_top_pos, orientation=quat1, t=self.traj_t, sleep=sleep)
+        state2, _ = self.state()
+        # self.agent.move_in_cartesian(from_top_pos, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=quat2, t=self.traj_t, sleep=sleep, ignore_force=True)
+        self.agent._waitsleep(0.3, sleep=sleep)
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
-        state3, _ = self.state_obj_poses_and_types()
+        state3, _ = self.state()
         self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent._waitsleep(0.5, sleep=sleep)
         self.agent.open_gripper()
-        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(to_top_pos, orientation=quat2, t=self.traj_t, sleep=sleep)
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
-        state4, _ = self.state_obj_poses_and_types()
+        state4, _ = self.state()
         effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
-        self.init_agent_pose(1)
+        self.init_agent_pose(t=1.0, sleep=sleep)
         if get_images:
             return state1, effect, types, images
 
         return state1, effect, types
 
-    def state_obj_poses_and_types(self):
+    def _state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
         pose = np.zeros((N_obj, 9), dtype=np.float32)
         obj_types = np.zeros((N_obj), dtype=np.int8)
@@ -568,16 +516,19 @@ class BlocksWorld_v4(BlocksWorld):
 
         return pose, obj_types
 
-    def get_obj_location(self, obj_id):
-
-        position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[obj_id])
-
-        return position
-
     def state(self):
-        return self.state_obj_poses_and_types()
+        return self._state_obj_poses_and_types()
 
-    def sample_random_action(self, p1 = None, p2 = None):
+    def full_random_action(self):
+        obj1_id, obj2_id = np.random.choice(list(self.obj_dict.keys()), size=(2,), replace=False)
+        if self.obj_types[self.obj_dict[obj1_id]] == 4:
+            dy1 = np.random.choice([-1, 0, 1])
+        else:
+            dy1 = 0
+        dy2 = np.random.choice([-1, 0, 1])
+        return [obj1_id, obj2_id, 0, dy1, 0, dy2, 1, 1]
+
+    def sample_random_action(self, p1=None, p2=None):
         obj1 = np.random.randint(self.num_objects)
         obj2 = np.random.choice(self.num_objects)
 
@@ -587,25 +538,19 @@ class BlocksWorld_v4(BlocksWorld):
         dxdy_pairs = [[0, 0], [0, 1], [1, 0],
                       [-1, 0], [0, -1], [-1, 1],
                       [-1, -1], [1, 1], [1, -1]]
-        if p1 == None:
+        if p1 is None:
             p1 = [0.6] + [0.075] * 4 + [0.025] * 4
-        if p2 == None:
+        if p2 is None:
             p2 = [0.4] + [0.125] * 4 + [0.025] * 4
-        dxdy1 = np.random.choice(
-            np.arange(len(dxdy_pairs)),
-            p= p1
-        )
-        dxdy2 = np.random.choice(
-            np.arange(len(dxdy_pairs)),
-            p=p2
-        )
+        dxdy1 = np.random.choice(np.arange(len(dxdy_pairs)), p=p1)
+        dxdy2 = np.random.choice(np.arange(len(dxdy_pairs)), p=p2)
 
         [dx1, dy1] = dxdy_pairs[dxdy1]
         [dx2, dy2] = dxdy_pairs[dxdy2]
         dx1 = 0
         dx2 = 0
-        #rot_before, rot_after = np.random.randint(0, 2, (2))
-        rot_before, rot_after = (1,1)
+        # rot_before, rot_after = np.random.randint(0, 2, (2))
+        rot_before, rot_after = (1, 1)
         return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
 
     def sample_3_objects_moving_together(self):
@@ -625,27 +570,19 @@ class BlocksWorld_v4(BlocksWorld):
 
         act = self.sample_random_action()
         if long_object == 4:
-            self.obj_buffer.append(
-                [small1, long_object, 0, 0, 1, 0, 1, 1]
-            )
-            self.obj_buffer.append(
-                [small2, long_object, 0, 0, -1, 0, 1, 1]
-            )
+            self.obj_buffer.append([small1, long_object, 0, 0, 1, 0, 1, 1])
+            self.obj_buffer.append([small2, long_object, 0, 0, -1, 0, 1, 1])
             act[6] = 0
         else:
-            self.obj_buffer.append(
-                [small1, long_object, 0, 0, 0, 1, 1, 1]
-            )
-            self.obj_buffer.append(
-                [small2, long_object, 0, 0, 0, -1, 1, 1]
-            )
+            self.obj_buffer.append([small1, long_object, 0, 0, 0, 1, 1, 1])
+            self.obj_buffer.append([small2, long_object, 0, 0, 0, -1, 1, 1])
         act[6] = 1
         act[2] = 0
         act[3] = 0
         act[0] = long_object
-
         self.obj_buffer.append(act)
         return self.obj_buffer
+
     def sample_mistarget(self):
         obj1 = np.random.randint(self.num_objects)
         obj2 = np.random.choice(self.num_objects)
@@ -664,8 +601,9 @@ class BlocksWorld_v4(BlocksWorld):
                 [obj2, obj3, 0, 0, 0, 0, 1, 1]
             )
         return self.obj_buffer
+
     def sample_both(self):
-        #TODO: introduce clustering
+        # TODO: introduce clustering
         long_objects = []
         smalls = []
 
@@ -674,51 +612,40 @@ class BlocksWorld_v4(BlocksWorld):
                 long_objects.append(i)
             else:
                 smalls.append(i)
-        
+
         long_object = long_objects.pop(0)
         smalls += long_objects
-        self.obj_buffer.append(
-                [smalls[0], long_object, 0, 0, 0, 1, 1, 1]
-            )
-        self.obj_buffer.append(
-            [smalls[1], long_object, 0, 0, 0, -1, 1, 1]
-        )
-        self.obj_buffer.append(
-                [smalls[2], smalls[3], 0, 0, 0, 0, 1, 1]
-            )
+        self.obj_buffer.append([smalls[0], long_object, 0, 0, 0, 1, 1, 1])
+        self.obj_buffer.append([smalls[1], long_object, 0, 0, 0, -1, 1, 1])
+        self.obj_buffer.append([smalls[2], smalls[3], 0, 0, 0, 0, 1, 1])
         return self.obj_buffer
 
     def sample_proximity(self):
-        while len(self.obj_buffer)< 8:
-            act = self.sample_random_action(p1 = [1] + [0] * 4 + [0] * 4, p2 = [0] + [1/8] * 8)
+        while len(self.obj_buffer) < 8:
+            act = self.sample_random_action(p1=[1] + [0] * 4 + [0] * 4, p2=[0] + [1/8] * 8)
             if act[0] != act[1]:
                 self.obj_buffer.append(act)
         return self.obj_buffer
+
     def sample_long_rotation(self):
         long_objects = []
         smalls = []
-
         for i in self.obj_dict.keys():
             if self.obj_types[self.obj_dict[i]] == 4:
                 long_objects.append(i)
             else:
                 smalls.append(i)
-        
+
         long = long_objects.pop(0)
         small = smalls[0]
-        locs = [-1,0,1]
-        locs.remove(np.random.randint(-1,2))
-        loc1 , loc2 = locs
+        locs = [-1, 0, 1]
+        locs.remove(np.random.randint(-1, 2))
+        loc1, loc2 = locs
 
-        self.obj_buffer.append(
-                [small, long, 0, 0, 0, loc1, 1, 1]
-            )
-        self.obj_buffer.append(
-                [long, long, 0, loc1, 0, loc2, 1, 1]
-            )
-        self.obj_buffer.append(
-                [long, np.random.randint(0,self.num_objects), 0 , loc1, 0, np.random.randint(-1,2), 1 , 1]  
-            )
+        self.obj_buffer.append([small, long, 0, 0, 0, loc1, 1, 1])
+        self.obj_buffer.append([long, long, 0, loc1, 0, loc2, 1, 1])
+        self.obj_buffer.append([long, np.random.randint(0, self.num_objects), 0,
+                                loc1, 0, np.random.randint(-1, 2), 1, 1])
         return self.obj_buffer
 
     def sample_ungrappable(self):
