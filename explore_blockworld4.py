@@ -50,8 +50,11 @@ if __name__ == "__main__":
     i = 0
 
     while i < args.N:
-        env_it += 1
         position_pre, obj_types, action, effect, position_post = collect_rollout(env)
+        if effect[action[0], 2] < 0.1:
+            env_it += 1
+            continue
+        env_it += 1
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
         states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
         actions[i] = torch.tensor(action, dtype=torch.int)
