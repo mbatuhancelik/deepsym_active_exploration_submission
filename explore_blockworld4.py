@@ -11,9 +11,9 @@ buffer = []
 
 
 def collect_rollout(env):
-    action = env.sample_random_action()
+    action = env.full_random_action()
     position, effect, types = env.step(*action)
-    post_position, _ = env.state_obj_poses_and_types()
+    post_position, _ = env.state()
     return position, types, action, effect, post_position
 
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-    env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=5)
+    env = environment.BlocksWorld_v4(gui=1, min_objects=3, max_objects=5)
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
