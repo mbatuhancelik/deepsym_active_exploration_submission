@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-    env = environment.BlocksWorld_v4(gui=1, min_objects=3, max_objects=5)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=2, max_objects=2)
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
@@ -44,12 +44,15 @@ if __name__ == "__main__":
     effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
     post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
 
-    prog_it = args.N
     start = time.time()
     env_it = 0
     i = 0
 
     while i < args.N:
+        if (env_it) == args.T:
+            env_it = 0
+            env.reset_objects()
+
         position_pre, obj_types, action, effect, position_post = collect_rollout(env)
         if effect[action[0], 2] < 0.1:
             env_it += 1
@@ -63,12 +66,8 @@ if __name__ == "__main__":
         post_states[i, :env.num_objects, :-1] = torch.tensor(position_post, dtype=torch.float)
         post_states[i, :env.num_objects, -1] = torch.tensor(obj_types, dtype=torch.float)
 
-        if (env_it) == args.T:
-            env_it = 0
-            env.reset_objects()
-
         i += 1
-        if i % prog_it == 0:
+        if i % (args.N // 20) == 0:
             print(f"Proc {args.i}: {100*i/args.N}% completed.")
 
     torch.save(states, os.path.join(args.o, f"state_{args.i}.pt"))
