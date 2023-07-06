@@ -372,7 +372,13 @@ class BlocksWorld_v4(BlocksWorld):
         i = 0
         positions = []
         trials = 0
+        total_trials = 0
         while i < self.num_objects:
+            total_trials += 1
+            if total_trials > 100:
+                print("Could not place all objects, retrying...")
+                return self.init_objects()
+
             obj_type = obj_types[i]
             x = np.random.uniform(self.x_init, self.x_final)
             y = np.random.uniform(self.y_init, self.y_final)
