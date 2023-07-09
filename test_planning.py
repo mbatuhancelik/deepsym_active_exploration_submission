@@ -1,41 +1,57 @@
 import os
-import pickle
 import argparse
 
 import torch
 import wandb
 import numpy as np
 import matplotlib.pyplot as plt
+import yaml
 
-import models
 import utils
 import mcts
 import environment
 
 
 def random_action():
-    obj1 = np.random.randint(0, 5)
+    obj1 = np.random.randint(0, 2)
     dx1 = np.random.randint(-1, 2)
-    obj2 = np.random.randint(0, 5)
+    obj2 = np.random.randint(0, 2)
     dx2 = np.random.randint(-1, 2)
     return f"{obj1},0,{dx1},{obj2},0,{dx2}"
 
 
 parser = argparse.ArgumentParser("Test planning")
 parser.add_argument("-i", help="Wandb run id", type=str)
+parser.add_argument("-p", help="Path to model folder", type=str)
 args = parser.parse_args()
 
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
-wandb.config.update({"device": "cpu"})
+assert (args.i is None) != (args.p is None), "Either run id or path to model folder must be specified"
 
-model = utils.create_model_from_config(dict(run.config))
-model.load("_best", from_wandb=True)
-model.print_model()
-for name in model.module_names:
-    module = getattr(model, name)
-    for p in module.parameters():
-        p.requires_grad = False
-    module.eval()
+if args.i is not None:
+    run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+    wandb.config.update({"device": "cpu"}, allow_val_change=True)
+
+    model = utils.create_model_from_config(dict(run.config))
+    model.load("_best", from_wandb=True)
+    model.print_model()
+    for name in model.module_names:
+        module = getattr(model, name)
+        for p in module.parameters():
+            p.requires_grad = False
+        module.eval()
+else:
+    with open(os.path.join(args.p, "config.yaml"), "r") as f:
+        config = yaml.safe_load(f)
+    config["device"] = "cpu"
+    model = utils.create_model_from_config(config)
+    model.load("_best", from_wandb=False)
+    model.print_model()
+    for name in model.module_names:
+        module = getattr(model, name)
+        for p in module.parameters():
+            p.requires_grad = False
+        module.eval()
+
 subsymbolic_forward = mcts.SubsymbolicForwardModel(model)
 
 # sym_model = models.SymbolForward(input_dim=run.config["latent_dim"]+run.config["action_dim"],
@@ -43,8 +59,8 @@ subsymbolic_forward = mcts.SubsymbolicForwardModel(model)
 #                                  output_dim=run.config["latent_dim"],
 #                                  num_layers=run.config["forward_model"]["layer"],
 #                                  num_heads=run.config["n_attention_heads"])
-path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
-module_dict = torch.load(wandb.restore(path).name)
+# path = os.path.join(run.config["save_folder"], "symbol_forward.pt")
+# module_dict = torch.load(wandb.restore(path).name)
 # sym_model.load_state_dict(module_dict)
 # for p in sym_model.parameters():
 #     p.requires_grad = False
@@ -59,7 +75,7 @@ one_hot = torch.tensor([[0, 0, 0, 0],
                         [0, 0, 1, 0],
                         [0, 1, 0, 0],
                         [1, 0, 0, 0]])
-env = environment.BlocksWorld_v4(gui=0, min_objects=5, max_objects=5)
+env = environment.BlocksWorld_v4(gui=0, min_objects=2, max_objects=2)
 
 img_out_path = "out/imgs"
 if not os.path.exists(img_out_path):
@@ -71,7 +87,9 @@ for n_action in range(1, 6):
     symbolic_success = 0
     dict_success = 0
     dict_found = 0
-    for i in range(100):
+    i = 0
+    while i < 100:
+        skip = False
         if not os.path.exists(os.path.join(img_out_path, str(n_action), str(i))):
             os.makedirs(os.path.join(img_out_path, str(n_action), str(i)))
 
@@ -80,7 +98,8 @@ for n_action in range(1, 6):
 
         actions = []
         for _ in range(n_action):
-            actions.append(random_action())
+            a = env.full_random_action()
+            actions.append(f"{a[0]},0,{a[3]},{a[1]},0,{a[5]}")
 
         # initial state
         poses, types = env.state()
@@ -97,11 +116,22 @@ for n_action in range(1, 6):
         for j, action in enumerate(actions):
             print(action, file=open(os.path.join(img_out_path, str(n_action), str(i), "actions.txt"), "a"))
             action = [int(x) for x in action.split(",")]
-            _, _, _, images = env.step(action[0], action[3], action[1], action[2], action[4], action[5],
-                                       grap_angle=1, put_angle=1, get_images=True)
+            _, effect, _, images = env.step(action[0], action[3], action[1], action[2], action[4], action[5],
+                                            rotated_grasp=1, rotated_release=1, get_images=True)
+
+            poses, types = env.state()
+            state = torch.tensor(np.hstack([poses, types.reshape(-1, 1)]))
+            state = torch.cat([state[:, :-1], one_hot[[state[:, -1].long()]]], dim=-1)
+            if effect[action[0], 2] < 0.1:
+                skip = True
+                break
+
             for k, img in enumerate(images):
                 plt.imshow(img)
                 plt.savefig(os.path.join(img_out_path, str(n_action), str(i), f"{j}_{k}.png"))
+
+        if skip:
+            continue
 
         # final state
         poses, types = env.state()
@@ -201,4 +231,5 @@ for n_action in range(1, 6):
 
         print(f"n_action: {n_action}, i: {i+1}, subsym: {subsymbolic_success}, sym: {symbolic_success}, "
               f"dict: {dict_success}, dict found: {dict_found}", end="\r")
+        i += 1
     print()
