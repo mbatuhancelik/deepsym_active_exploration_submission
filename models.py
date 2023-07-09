@@ -123,11 +123,20 @@ class DeepSymbolGenerator:
             self.optimizer.zero_grad()
             L = self.loss(sample)
             L.backward()
+            torch.nn.utils.clip_grad_norm_(self._model_parameters, 1)
             self.optimizer.step()
             avg_loss += L.item()
             self.iteration += 1
         avg_loss /= (i+1)
         return avg_loss
+
+    def _model_parameters(self):
+        params = []
+        for name in self.module_names:
+            module = getattr(self, name)
+            for p in module.parameters():
+                params.append(p)
+        return params
 
     def train(self, epoch, loader, val_loader=None):
         for e in range(epoch):
