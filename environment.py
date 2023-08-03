@@ -250,7 +250,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.x_area = x_area
         self.y_area = y_area
 
-        ds = 0.075
+        ds = 0.15
         self.ds = ds
         self.del_x = ds
         self.del_y = ds
@@ -333,17 +333,17 @@ class BlocksWorld_v4(BlocksWorld):
             size[2] = self.sizes[2][2]
         elif obj_type == 2:
             size[1] = 0.05
-
+        colors = [(0.9, 0 , 0 , 0.9) , (0, 0.9, 0 , 0.9) , (0 , 0,0.9 , 100), (0.9, 0 , 0.9, 0.9) , (0.01,0.01,0.01,0.9) , "white" , "pink", "cyan", "brown", "gray",  "orange", "beige"]
         o_id = -1
         # obj type is never 0
         if obj_type == 0:
             o_id = utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
                                        size=size, position=position, rotation=[0, 0, 0],
-                                       mass=0.1, color="random")
+                                       mass=0.1, color=colors[len(self.obj_types)])
         elif obj_type == 1:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
                                         size=size, position=position, rotation=[0, 0, 0],
-                                        mass=0.1, color="random"))
+                                        mass=0.1, color=colors[len(self.obj_types)]))
         elif obj_type == 2:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
                                         size=size, position=position, rotation=[0, 0, 0],
@@ -380,13 +380,14 @@ class BlocksWorld_v4(BlocksWorld):
         self.num_objects = np.random.randint(self.min_objects, self.max_objects+1)
         # self.num_objects = 1
         # obj_types = [4 for i in range(self.num_objects)]
-        obj_types = [4]
-        obj_types += np.random.randint(1, 4, (self.num_objects - 1,)).tolist()
+        obj_types = [0 ,1]
+        obj_types += np.random.randint(0, 2, (self.num_objects -2 ,)).tolist()
         obj_types = list(reversed(sorted(obj_types)))
+        obj_types = np.ones(self.num_objects)
         np.random.shuffle(obj_types)
-        # obj_types = np.concatenate(([i for i in range(1, 5)], obj_types))
-
+        obj_types[np.random.randint(self.num_objects)] = 0
         i = 0
+        obj_types = np.ones((self.num_objects, ))
         positions = np.array([[0, 0]])
         trials = 0
         while i < self.num_objects:
@@ -423,19 +424,16 @@ class BlocksWorld_v4(BlocksWorld):
             self.obj_dict[i] = o_id
 
     def update_contact_graph(self):
-        return
         positions, obj_types = self.state_obj_poses_and_types()
         num_objects = len(self.obj_dict)
 
         clusters = []
-        for i in range(num_objects):
+        for i in range(1, num_objects+1):
             clusters.append(i)
 
         self.contact_graph = [[0 for i in range(num_objects)] for k in range(num_objects)]
         for i in range(num_objects):
             for k in range(i+1, num_objects):
-                if self.contact_graph[i][k] == 1:
-                    continue
 
                 contact_points = self._p.getContactPoints(bodyA=self.obj_dict[i], bodyB=self.obj_dict[k])
                 if not len(contact_points) == 0:
@@ -557,35 +555,45 @@ class BlocksWorld_v4(BlocksWorld):
     def state(self):
         return self.state_obj_poses_and_types()
 
-    def sample_random_action(self, p1 = None, p2 = None):
-        obj1 = np.random.randint(self.num_objects)
-        obj2 = np.random.choice(self.num_objects)
-
-        while obj1 in self.cluster_centers:
-            obj1 = np.random.randint(self.num_objects)
+    def sample_random_action(self, p1 = None, p2 = None, objects = None):
+        if objects is not None:
+            [obj1, obj2] = objects
+            if obj1 >= self.num_objects or obj2 >= self.num_objects:
+                [obj1, obj2] = (np.random.rand(2) * 1253720).astype(int) % self.num_objects
+        else:    
+            [obj1, obj2] = (np.random.rand(2) * 125372100).astype(int) % self.num_objects
+        if obj1 == obj2:
+            obj2 = (obj2 +1 + int(np.random.rand() * 125372100) % (self.num_objects-1))% self.num_objects
+        # while obj1 in self.cluster_centers:
+        #     obj1 = np.random.randint(self.num_objects)
         dx1, dy1, dx2, dy2 = 0, 0, 0, 0
-        dxdy_pairs = [[0, 0], [0, 1], [1, 0],
+        dxdy_pairs = [[0, 0], [0, 1],
                       [-1, 0], [0, -1], [-1, 1],
                       [-1, -1], [1, 1], [1, -1]]
+        dxdy_pairs = [[0, 0], [0, 1], [1,0]]
         if p1 == None:
             p1 = [0.6] + [0.075] * 4 + [0.025] * 4
         if p2 == None:
             p2 = [0.4] + [0.125] * 4 + [0.025] * 4
         dxdy1 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p= p1
+            # p= p1
         )
         dxdy2 = np.random.choice(
             np.arange(len(dxdy_pairs)),
-            p=p2
+            # p=p2
         )
 
         [dx1, dy1] = dxdy_pairs[dxdy1]
         [dx2, dy2] = dxdy_pairs[dxdy2]
         dx1 = 0
         dx2 = 0
+        dy1 = 0
+        rot_before, rot_after = [1,1]
+        if dx2 == 1: 
+            rot_after = 0
+            
         #rot_before, rot_after = np.random.randint(0, 2, (2))
-        rot_before, rot_after = (1,1)
         return [obj1, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
 
     def sample_3_objects_moving_together(self):

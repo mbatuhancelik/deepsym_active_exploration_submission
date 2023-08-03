@@ -21,7 +21,7 @@ def metrics_by_name(dataset_name):
     f = open(os.path.join(path, "metrics.txt"), "w+")
     f.write(mtext)
     f.close()
-def metrics(dataset):
+def metrics(dataset: StateActionEffectDataset):
     metrics = ""
     metrics += (f"{len(dataset)} samples \n")
     count = 0
@@ -63,7 +63,9 @@ def metrics(dataset):
             num_objects[mask] += 1
         else:
             num_objects[mask] = 1
-    metrics += str(num_objects)
+    metrics += str(num_objects) + '\n'
+    max_z = torch.max(dataset.state[:, : ,2])
+    metrics += f"Maximum z = {max_z}"
     return metrics
 def merge_datasets(args):
 
@@ -102,11 +104,11 @@ def merge_datasets(args):
 
     shuffle = torch.randperm(action.size()[0])
 
-    action=action[shuffle]
-    state=state[shuffle]
-    effect=effect[shuffle]
-    mask=mask[shuffle]
-    post_state=post_state[shuffle]
+    # action=action[shuffle]
+    # state=state[shuffle]
+    # effect=effect[shuffle]
+    # mask=mask[shuffle]
+    # post_state=post_state[shuffle]
     args.o = os.path.join("./data", args.o)
     if not os.path.exists(args.o):
             os.makedirs(args.o)
@@ -118,7 +120,7 @@ def merge_datasets(args):
     torch.save(post_state, os.path.join(args.o, f"post_state.pt"))
 
 def merge_rolls(args):
-    keys = ["action", "effect", "mask", "state", "post_state"]
+    keys = ["action", "effect", "mask", "state", "post_state", "contact", "clusters"]
 
     output_folder = os.path.join("./data", args.o)
     for key in keys:

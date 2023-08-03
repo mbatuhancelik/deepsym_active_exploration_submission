@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-    env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=5)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=5, max_objects=5)
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
@@ -43,6 +43,8 @@ if __name__ == "__main__":
     # for before picking and after releasing
     effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
     post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
+    contact = torch.zeros(args.N, env.max_objects, env.max_objects, dtype=torch.float)
+    clusters = torch.zeros(args.N, env.max_objects, dtype=torch.float)
 
     prog_it = args.N
     start = time.time()
@@ -50,6 +52,9 @@ if __name__ == "__main__":
     i = 0
 
     while i < args.N:
+        cont , cl = env.update_contact_graph()
+        contact[i, :env.num_objects, :env.num_objects] = torch.tensor(cont)
+        clusters[i, :env.num_objects] = torch.tensor(cl)
         env_it += 1
         position_pre, obj_types, action, effect, position_post = collect_rollout(env)
         states[i, :env.num_objects, :-1] = torch.tensor(position_pre, dtype=torch.float)
@@ -73,6 +78,8 @@ if __name__ == "__main__":
     torch.save(masks, os.path.join(args.o, f"mask_{args.i}.pt"))
     torch.save(effects, os.path.join(args.o, f"effect_{args.i}.pt"))
     torch.save(post_states, os.path.join(args.o, f"post_state_{args.i}.pt"))
+    torch.save(contact, os.path.join(args.o, f"contact_{args.i}.pt"))
+    torch.save(clusters, os.path.join(args.o, f"clusters_{args.i}.pt"))
     end = time.time()
     del env
     print(f"Completed in {end-start:.2f} seconds.")

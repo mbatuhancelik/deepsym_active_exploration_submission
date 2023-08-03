@@ -32,6 +32,8 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         self.effect = torch.load(os.path.join(path, "effect.pt"))
         self.mask = torch.load(os.path.join(path, "mask.pt"))
         self.post_state = torch.load(os.path.join(path, "post_state.pt"))
+        self.contact_graph = torch.load(os.path.join(path, "contact.pt"))
+        self.clusters = torch.load(os.path.join(path, "clusters.pt"))
         n_train = int(len(self.state) * 0.8)
         n_val = int(len(self.state) * 0.1)
         self.binary = torch.tensor([[0, 0, 0, 0],
