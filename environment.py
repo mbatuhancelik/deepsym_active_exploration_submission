@@ -747,7 +747,7 @@ class BlocksworldLightning(BlocksWorld_v4):
         self.mock_obj_dict = {}
         super(BlocksworldLightning, self).__init__(self, **kwargs)
     def teleport_object(self, obj_id, position, rotation = None):
-
+        #TODO: teleport objects on top of teleported object
         pb_id = self.obj_dict[obj_id]
         if rotation == None:
             _ , orientation = self._p.getBasePositionAndOrientation(pb_id)
@@ -764,6 +764,13 @@ class BlocksworldLightning(BlocksWorld_v4):
         if new_pb_id != pb_id:
             self.obj_types[new_pb_id] = self.obj_types[pb_id]
             del self.obj_types[pb_id]
+    def raytrace_to_table(self, x , y):
+        k = self._p.rayTest(rayFromPosition= [x, y, 0.9],
+                        rayToPosition = [x, y, 0.43] 
+                        )
+        if k[0][0] == -1:
+            return -1
+        return self.reverse_obj_dict[k[0][0]]
     def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False, get_images=False):
         eye_position = [1.75, 0.0, 2.0]
         target_position = [1.0, 0.0, 0.4]
@@ -791,40 +798,34 @@ class BlocksworldLightning(BlocksWorld_v4):
         # if dx1 != 0 or dx2 != 0:
         grasp_loc[0] += dx1 * self.ds
         grasp_loc[1] += dy1 * self.ds
-        k = self._p.rayTest(rayFromPosition= [grasp_loc[0], grasp_loc[1], 0.9],
-                        rayToPosition = [grasp_loc[0], grasp_loc[1], 0.4]
-                        )
+        grasp_obj_id = self.raytrace_to_table(grasp_loc[0] , grasp_loc[1])
+        grasp_obj_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[grasp_obj_id])
+        grasp_displacement = np.array(grasp_obj_loc) - np.array(grasp_loc)
 
-        up_pos_1 = copy.deepcopy(obj1_loc)
-        up_pos_1[2] = 0.9
+        placement_location = copy.deepcopy(obj2_loc) 
+        placement_location[0] += dx2 * self.ds
+        placement_location[1] += dy2 * self.ds
 
-        up_pos_2 = copy.deepcopy(obj2_loc)
-        up_pos_2[2] = 0.9
+        place_obj_id = self.raytrace_to_table(placement_location[0] , placement_location[1])
+        if place_obj_id == -1:
+            place_obj_id = obj2_id
+        place_obj_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[place_obj_id])
+        placement_location[:2] = grasp_displacement[:2] + placement_location[:2]
+        placement_location[2] = place_obj_loc[2] + 0.15
+
+        self.teleport_object(grasp_obj_id, placement_location)
         state1, types = self.state_obj_poses_and_types()
 
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
-        if get_images:
-            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
-                                          up_vector=up_vector, height=256, width=256)[0])
-        self.agent.close_gripper(sleep=sleep)
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        for i in range(120):
+            self._p.stepSimulation()
         state2, _ = self.state_obj_poses_and_types()
         # if approach_angle1 != approach_angle2:
-        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
-        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
-        if get_images:
-            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
-                                          up_vector=up_vector, height=256, width=256)[0])
-        state3, _ = self.state_obj_poses_and_types()
-        self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
-        self.agent.open_gripper()
-        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
         state4, _ = self.state_obj_poses_and_types()
-        effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
+        effect = state2 - state1
         self.init_agent_pose(1)
         if get_images:
             return state1, effect, types, images
