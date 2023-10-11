@@ -315,7 +315,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_types[o_id] = obj_type
         return o_id
 
-    def create_object(self, obj_type, x, y, z=0.5):
+    def create_object(self, obj_type, x, y, z=0.5, rotation = [0, 0, 0]):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
@@ -338,27 +338,29 @@ class BlocksWorld_v4(BlocksWorld):
         # obj type is never 0
         if obj_type == 0:
             o_id = utils.create_object(p=self._p, obj_type=self._p.GEOM_SPHERE,
-                                       size=size, position=position, rotation=[0, 0, 0],
+                                       size=size, position=position, rotation=rotation,
                                        mass=0.1, color="random")
         elif obj_type == 1:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=[0, 0, 0],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 2:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_CYLINDER,
-                                        size=size, position=position, rotation=[0, 0, 0],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 3:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=[0, 0, 0],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 4:
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=[0, 0, 0],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         elif obj_type == 5:
+            if rotation == [0,0,0]:
+                rotation = [0, 0, np.pi]
             o_id = (utils.create_object(p=self._p, obj_type=self._p.GEOM_BOX,
-                                        size=size, position=position, rotation=[0, 0, np.pi],
+                                        size=size, position=position, rotation=rotation,
                                         mass=0.1, color="random"))
         # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
@@ -740,7 +742,23 @@ class BlocksWorld_v4(BlocksWorld):
             self.obj_buffer.append([small, np.random.randint(0, self.num_objects), 0, 0, 0, 0, 0, 0])
         return self.obj_buffer
 
+class BlocksworldLightning(BlocksWorld_v4):
+    def __init__(self,  **kwargs):
+        super(BlocksworldLightning, self).__init__(self, **kwargs)
+    def teleport_object(self, obj_id, position, orientation= None):
 
+        pb_id = self.obj_dict[obj_id]
+        if orientation == None:
+            _ , orientation = self._p.getBasePositionAndOrientation(pb_id)
+        
+        self._p.removeBody(pb_id)
+
+        pb_id = self.create_object(obj_type=self.obj_types[obj_id], 
+                           x = position[0], 
+                           y = position[1],
+                           z = position[2], 
+                           orientation = orientation)
+        self.obj_dict[obj_id] = pb_id
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
         super(PushEnv, self).__init__(gui=gui, seed=seed)
