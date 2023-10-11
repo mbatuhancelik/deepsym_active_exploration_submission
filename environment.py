@@ -259,6 +259,7 @@ class BlocksWorld_v4(BlocksWorld):
         #     self.y_locs[i] = y
         # TODO: ADD GRAPH
         self.obj_types = {}
+        self.reverse_obj_dict = {}
         if 'min_objects' not in kwargs:
             kwargs["min_objects"] = 8
         if 'max_objects' not in kwargs:
@@ -315,7 +316,7 @@ class BlocksWorld_v4(BlocksWorld):
         self.obj_types[o_id] = obj_type
         return o_id
 
-    def create_object(self, obj_type, x, y, z=0.5, rotation = [0, 0, 0]):
+    def create_object(self, obj_type, x, y, z=0.5, rotation = [0, 0, 0], obj_id = None):
         """
         Add an object ot the world, without collusions
         return -1 if it is not possible
@@ -364,6 +365,10 @@ class BlocksWorld_v4(BlocksWorld):
                                         mass=0.1, color="random"))
         # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
+        if obj_id == None:
+            obj_id = len(self.obj_dict)
+        self.obj_dict[obj_id] = o_id 
+        self.reverse_obj_dict[o_id] = obj_id
         return o_id
 
     def init_objects(self):
@@ -413,18 +418,13 @@ class BlocksWorld_v4(BlocksWorld):
                 continue
 
             positions = np.concatenate([positions, pos])
-            obj_ids.append(obj_id)
+            # obj_ids.append(obj_id)
             self._p.addUserDebugText(str(i), [0, 0, 0.1], [0, 0, 0], 1, 0, parentObjectUniqueId=obj_id)
 
             i += 1
-        self.cluster_centers = []
-        for i in range(np.random.randint(1, 3)):
-            self.cluster_centers.append(np.random.randint(0, self.num_objects))
-        # TODO: prevent rolling on x y axises
-        self.update_contact_graph()
-        for i, o_id in enumerate(sorted(obj_ids)):
-            self.obj_dict[i] = o_id
 
+        # for i, o_id in enumerate(sorted(obj_ids)):
+        #     self.obj_dict[i] = o_id
     def update_contact_graph(self):
         return
         positions, obj_types = self.state_obj_poses_and_types()
@@ -744,21 +744,92 @@ class BlocksWorld_v4(BlocksWorld):
 
 class BlocksworldLightning(BlocksWorld_v4):
     def __init__(self,  **kwargs):
+        self.mock_obj_dict = {}
         super(BlocksworldLightning, self).__init__(self, **kwargs)
-    def teleport_object(self, obj_id, position, orientation= None):
+    def teleport_object(self, obj_id, position, rotation = None):
 
         pb_id = self.obj_dict[obj_id]
-        if orientation == None:
+        if rotation == None:
             _ , orientation = self._p.getBasePositionAndOrientation(pb_id)
+            rotation = self._p.getEulerFromQuaternion(orientation)
         
         self._p.removeBody(pb_id)
 
-        pb_id = self.create_object(obj_type=self.obj_types[obj_id], 
+        new_pb_id = self.create_object(obj_type=self.obj_types[pb_id], 
                            x = position[0], 
                            y = position[1],
                            z = position[2], 
-                           orientation = orientation)
-        self.obj_dict[obj_id] = pb_id
+                           rotation = rotation, obj_id=obj_id)
+        
+        if new_pb_id != pb_id:
+            self.obj_types[new_pb_id] = self.obj_types[pb_id]
+            del self.obj_types[pb_id]
+    def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False, get_images=False):
+        eye_position = [1.75, 0.0, 2.0]
+        target_position = [1.0, 0.0, 0.4]
+        up_vector = [0, 0, 1]
+        images = []
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
+        obj1_loc, quat = self._p.getBasePositionAndOrientation(self.obj_dict[obj1_id])
+        obj2_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[obj2_id])
+
+        # use these if you want to ensure grapping
+        # euler_rot = self._p.getEulerFromQuaternion(quat)
+        # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
+
+        obj1_loc = list(obj1_loc)
+        obj2_loc = list(obj2_loc)
+        
+        if sleep:
+            self.remove_grid()
+            self.print_grid(obj1_loc)
+            self.print_grid(obj2_loc)
+        
+        grasp_loc = copy.deepcopy(obj1_loc)
+        # if dx1 != 0 or dx2 != 0:
+        grasp_loc[0] += dx1 * self.ds
+        grasp_loc[1] += dy1 * self.ds
+        k = self._p.rayTest(rayFromPosition= [grasp_loc[0], grasp_loc[1], 0.9],
+                        rayToPosition = [grasp_loc[0], grasp_loc[1], 0.4]
+                        )
+
+        up_pos_1 = copy.deepcopy(obj1_loc)
+        up_pos_1[2] = 0.9
+
+        up_pos_2 = copy.deepcopy(obj2_loc)
+        up_pos_2[2] = 0.9
+        state1, types = self.state_obj_poses_and_types()
+
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(obj1_loc, orientation=quat1, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
+        self.agent.close_gripper(sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat1, t=self.traj_t, sleep=sleep)
+        state2, _ = self.state_obj_poses_and_types()
+        # if approach_angle1 != approach_angle2:
+        self.agent.move_in_cartesian(up_pos_1, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
+        state3, _ = self.state_obj_poses_and_types()
+        self.agent.move_in_cartesian(obj2_loc, orientation=quat2, t=self.traj_t, sleep=sleep)
+        self.agent.open_gripper()
+        self.agent.move_in_cartesian(up_pos_2, orientation=quat2, t=self.traj_t, sleep=sleep)
+        if get_images:
+            images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
+        state4, _ = self.state_obj_poses_and_types()
+        effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
+        self.init_agent_pose(1)
+        if get_images:
+            return state1, effect, types, images
+
+        return state1, effect, types
 class PushEnv(GenericEnv):
     def __init__(self, gui=0, seed=None):
         super(PushEnv, self).__init__(gui=gui, seed=seed)
