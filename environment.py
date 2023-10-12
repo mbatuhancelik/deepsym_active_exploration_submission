@@ -583,8 +583,8 @@ class BlocksWorld_v4(BlocksWorld):
         obj1 = np.random.randint(self.num_objects)
         obj2 = np.random.choice(self.num_objects)
 
-        while obj1 in self.cluster_centers:
-            obj1 = np.random.randint(self.num_objects)
+        # while obj1 in self.cluster_centers:
+        #     obj1 = np.random.randint(self.num_objects)
         dx1, dy1, dx2, dy2 = 0, 0, 0, 0
         dxdy_pairs = [[0, 0], [0, 1], [1, 0],
                       [-1, 0], [0, -1], [-1, 1],
@@ -766,9 +766,9 @@ class BlocksworldLightning(BlocksWorld_v4):
             del self.obj_types[pb_id]
     def raytrace_to_table(self, x , y):
         k = self._p.rayTest(rayFromPosition= [x, y, 0.9],
-                        rayToPosition = [x, y, 0.43] 
+                        rayToPosition = [x, y, 0.42] 
                         )
-        if k[0][0] == -1:
+        if k[0][0] not in self.reverse_obj_dict.keys():
             return -1
         return self.reverse_obj_dict[k[0][0]]
     def step(self, obj1_id, obj2_id, dx1, dy1, dx2, dy2, grap_angle, put_angle, sleep=False, get_images=False):
@@ -785,7 +785,6 @@ class BlocksworldLightning(BlocksWorld_v4):
         # use these if you want to ensure grapping
         # euler_rot = self._p.getEulerFromQuaternion(quat)
         # quat = self._p.getQuaternionFromEuler([np.pi,0.0,euler_rot[0] + np.pi/2])
-
         obj1_loc = list(obj1_loc)
         obj2_loc = list(obj2_loc)
         
@@ -799,12 +798,14 @@ class BlocksworldLightning(BlocksWorld_v4):
         grasp_loc[0] += dx1 * self.ds
         grasp_loc[1] += dy1 * self.ds
         grasp_obj_id = self.raytrace_to_table(grasp_loc[0] , grasp_loc[1])
+        if grasp_obj_id == -1:
+            return ##TODO: return empty effect
         grasp_obj_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[grasp_obj_id])
         grasp_displacement = np.array(grasp_obj_loc) - np.array(grasp_loc)
 
         placement_location = copy.deepcopy(obj2_loc) 
-        placement_location[0] += dx2 * self.ds
-        placement_location[1] += dy2 * self.ds
+        # placement_location[0] += dx2 * self.ds
+        # placement_location[1] += dy2 * self.ds
 
         place_obj_id = self.raytrace_to_table(placement_location[0] , placement_location[1])
         if place_obj_id == -1:
