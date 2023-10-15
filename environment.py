@@ -315,7 +315,11 @@ class BlocksWorld_v4(BlocksWorld):
         # self.obj_dict[len(self.obj_dict)] = o_id
         self.obj_types[o_id] = obj_type
         return o_id
-
+    
+    def delete_objects(self):
+        self.reverse_obj_dict = {}
+        self.delete_debug_items()
+        super(BlocksWorld_v4, self).delete_objects()
     def create_object(self, obj_type, x, y, z=0.5, rotation = [0, 0, 0], obj_id = None):
         """
         Add an object ot the world, without collusions
@@ -419,8 +423,9 @@ class BlocksWorld_v4(BlocksWorld):
 
             positions = np.concatenate([positions, pos])
             # obj_ids.append(obj_id)
-            self._p.addUserDebugText(str(i), [0, 0, 0.1], [0, 0, 0], 1, 0, parentObjectUniqueId=obj_id)
-
+            if self.gui == 1:
+                debug_id = self._p.addUserDebugText(str(i), [0, 0, 0.1], [0, 0, 0], 1, 0, parentObjectUniqueId=obj_id)
+                self.debug_items.append(debug_id)
             i += 1
 
         # for i, o_id in enumerate(sorted(obj_ids)):
@@ -457,9 +462,9 @@ class BlocksWorld_v4(BlocksWorld):
         pos[2] = 0.41
         return pos
 
-    def remove_grid(self):
-        for line in self.debug_items:
-            self._p.removeUserDebugItem(line)
+    def delete_debug_items(self):
+        for item in self.debug_items:
+            self._p.removeUserDebugItem(item)
         self.debug_items = []
 
     def print_grid(self, location):
@@ -509,7 +514,7 @@ class BlocksWorld_v4(BlocksWorld):
         obj1_loc = list(obj1_loc)
         obj2_loc = list(obj2_loc)
         if sleep:
-            self.remove_grid()
+            self.delete_debug_items()
             self.print_grid(obj1_loc)
             self.print_grid(obj2_loc)
         obj1_loc[0] += dx1 * self.ds
@@ -746,9 +751,29 @@ class BlocksworldLightning(BlocksWorld_v4):
     def __init__(self,  **kwargs):
         self.mock_obj_dict = {}
         super(BlocksworldLightning, self).__init__(self, **kwargs)
+    def get_objs_on_top(self, obj_id):
+        contact_points = self._p.getContactPoints(bodyA=self.obj_dict[obj_id])
+        objs_on_top = set()
+        poses = self.state_obj_poses()[:, :3]
+        for cp in contact_points:
+            if cp[2] in self.reverse_obj_dict:
+                cp_id = self.reverse_obj_dict[cp[2]]
+                if poses[cp_id,2] > poses[obj_id, 2]:
+                    objs_on_top.add(self.reverse_obj_dict[cp[2]])
+        return list(objs_on_top)
+    def teleport_upper_objects(self, obj_id, position, rotation):
+        ##TODO handle relative rotation
+        ##TODO dont use self method to get obj poses, get them directly from simulation
+        upper_objects = self.get_objs_on_top(obj_id)
+        obj_pos = self.state_obj_poses()[:, :3]
+        for obj in upper_objects:
+            vec = obj_pos[obj] - obj_pos[obj_id]
+            vec[2] += 0.005
+            self.teleport_object(obj, position + vec, rotation)
     def teleport_object(self, obj_id, position, rotation = None):
         #TODO: teleport objects on top of teleported object
         pb_id = self.obj_dict[obj_id]
+        self.teleport_upper_objects(obj_id,position,rotation)
         if rotation == None:
             _ , orientation = self._p.getBasePositionAndOrientation(pb_id)
             rotation = self._p.getEulerFromQuaternion(orientation)
@@ -789,7 +814,7 @@ class BlocksworldLightning(BlocksWorld_v4):
         obj2_loc = list(obj2_loc)
         
         if sleep:
-            self.remove_grid()
+            self.delete_debug_items()
             self.print_grid(obj1_loc)
             self.print_grid(obj2_loc)
         
@@ -804,8 +829,8 @@ class BlocksworldLightning(BlocksWorld_v4):
         grasp_displacement = np.array(grasp_obj_loc) - np.array(grasp_loc)
 
         placement_location = copy.deepcopy(obj2_loc) 
-        # placement_location[0] += dx2 * self.ds
-        # placement_location[1] += dy2 * self.ds
+        placement_location[0] += dx2 * self.ds
+        placement_location[1] += dy2 * self.ds
 
         place_obj_id = self.raytrace_to_table(placement_location[0] , placement_location[1])
         if place_obj_id == -1:
@@ -817,7 +842,7 @@ class BlocksworldLightning(BlocksWorld_v4):
         self.teleport_object(grasp_obj_id, placement_location)
         state1, types = self.state_obj_poses_and_types()
 
-        for i in range(120):
+        for i in range(240):
             self._p.stepSimulation()
         state2, _ = self.state_obj_poses_and_types()
         # if approach_angle1 != approach_angle2:
