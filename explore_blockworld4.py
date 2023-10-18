@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.o):
         os.makedirs(args.o)
-    env = environment.BlocksWorld_v4(gui=0, min_objects=3, max_objects=5)
+    env = environment.BlocksworldLightning(gui=0, min_objects=5, max_objects=8)
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     #  cos_ry_f-cos_ry_i, sin_ry_f-sin_ry_i,
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
-    effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
+    effects = torch.zeros(args.N, env.max_objects, 9, dtype=torch.float)
     post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
 
     prog_it = args.N
