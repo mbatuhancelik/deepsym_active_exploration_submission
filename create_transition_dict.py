@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", help="Wandb run id", type=str)
 args = parser.parse_args()
 
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.i)
 device = utils.get_device()
 wandb.config.update({"device": device}, allow_val_change=True)
 

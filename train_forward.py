@@ -18,7 +18,7 @@ parser.add_argument("-b", help="Batch size", type=int)
 parser.add_argument("-lr", help="Learning rate", type=float)
 args = parser.parse_args()
 
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.i)
 device = get_device()
 wandb.config.update({"device": device}, allow_val_change=True)
 

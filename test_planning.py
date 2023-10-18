@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser("Test planning")
 parser.add_argument("-i", help="Wandb run id", type=str)
 args = parser.parse_args()
 
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.i)
 wandb.config.update({"device": "cpu"})
 
 model = utils.create_model_from_config(dict(run.config))

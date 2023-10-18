@@ -17,7 +17,7 @@ def parse_and_init(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
     # init run
-    run = wandb.init(project="multideepsym", entity="colorslab", config=config)
+    run = wandb.init(project="active_exploration", entity="colorslab", config=config)
     # create a save folder if not exists
     save_folder = run.config["save_folder"]
     os.makedirs(save_folder, exist_ok=True)
@@ -443,7 +443,7 @@ def upload_dataset_to_wandb(name, path):
         for file in os.listdir(path):
             if file != ".DS_Store":
                 zipf.write(os.path.join(path, file), arcname=file)
-    wandb.init(project="multideepsym", entity="colorslab")
+    wandb.init(project="active_exploration", entity="colorslab")
     artifact = wandb.Artifact(name, type="dataset")
     artifact.add_file(f"{name}.zip")
     wandb.log_artifact(artifact)

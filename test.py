@@ -175,7 +175,7 @@ def draw_action(env, z=None):
 
 
 run_id = sys.argv[1]
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=run_id)
 config = (dict(run.config))
 config["device"] = "cpu"
 model = utils.create_model_from_config(config)

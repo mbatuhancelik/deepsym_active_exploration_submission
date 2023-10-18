@@ -55,7 +55,7 @@ def save_and_upload(z_obj_pre, z_rel_pre, z_act, z_obj_post, z_rel_post, mask, r
 
 
 run_id = sys.argv[1]
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=run_id)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=run_id)
 wandb.config.update({"device": "cuda" if torch.cuda.is_available() else "cpu"}, allow_val_change=True)
 model = utils.create_model_from_config(run.config)
 model.load("_best", from_wandb=True)

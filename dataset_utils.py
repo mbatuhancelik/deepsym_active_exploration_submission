@@ -134,7 +134,7 @@ def upload_dataset_to_wandb(name, path):
         for file in os.listdir(path):
             if file != ".DS_Store":
                 zipf.write(os.path.join(path, file), arcname=file)
-    wandb.init(project="multideepsym", entity="colorslab")
+    wandb.init(project="acvite_exploration", entity="colorslab")
     artifact = wandb.Artifact(name, type="dataset")
     artifact.add_file(f"{name}.zip")
     wandb.log_artifact(artifact)
@@ -172,5 +172,5 @@ if __name__ == "__main__":
         path = os.path.join("./data", name)
         upload_dataset_to_wandb(name, path)
     if args.action == "download":
-        wandb.init(project="multideepsym", entity="colorslab")
+        wandb.init(project="active_exploration", entity="colorslab")
         get_dataset_from_wandb(args.o)

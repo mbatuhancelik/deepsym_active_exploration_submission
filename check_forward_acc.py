@@ -23,7 +23,7 @@ def load_dataset(name, run, device):
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--run-id", type=str)
 args = parser.parse_args()
-run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.run_id)
+run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.run_id)
 wandb.config.update({"device": "cpu"}, allow_val_change=True)
 config = dict(run.config)
 

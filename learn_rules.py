@@ -551,7 +551,7 @@ if __name__ == "__main__":
     args.add_argument("-p", type=int, default=1, help="Number of processes")
     args = args.parse_args()
 
-    run = wandb.init(entity="colorslab", project="multideepsym", resume="must", id=args.i)
+    run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.i)
 
     # load the dataset
     trainset = dataset.load_symbol_dataset("train", run, "cpu")
