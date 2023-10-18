@@ -824,7 +824,15 @@ class BlocksworldLightning(BlocksWorld_v4):
         grasp_loc[1] += dy1 * self.ds
         grasp_obj_id = self.raytrace_to_table(grasp_loc[0] , grasp_loc[1])
         if grasp_obj_id == -1:
-            return ##TODO: return empty effect
+            state1, types = self.state_obj_poses_and_types()
+            effect = state1 - state1
+            effect[:,:] = 0.0
+            if get_images:
+                images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
+                                          up_vector=up_vector, height=256, width=256)[0])
+                return state1, effect, types, images
+            return state1, effect, types
+            
         grasp_obj_loc, _ = self._p.getBasePositionAndOrientation(self.obj_dict[grasp_obj_id])
         grasp_displacement = np.array(grasp_obj_loc) - np.array(grasp_loc)
 
