@@ -25,8 +25,8 @@ if __name__ == "__main__":
     parser.add_argument("-hs", help="hidden size", type=int, default=128)
     args = parser.parse_args()
 
-    run = wandb.init(entity="colorslab",project="multideepsym", resume="must", id=args.id)
-    run = wandb.Api().run("colorslab/multideepsym/" + args.id)
+    run = wandb.init(entity="colorslab",project="active_exploration", resume="must", id=args.id)
+    run = wandb.Api().run("colorslab/active_exploration/" + args.id)
 
     print(run.config)
 

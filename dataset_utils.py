@@ -142,7 +142,7 @@ def upload_dataset_to_wandb(name, path):
 
 
 def get_dataset_from_wandb(name):
-    artifact = wandb.use_artifact(f"colorslab/multideepsym/{name}:latest", type="dataset")
+    artifact = wandb.use_artifact(f"colorslab/active_exploration/{name}:latest", type="dataset")
     artifact_dir = artifact.download()
     archive = zipfile.ZipFile(os.path.join(artifact_dir, f"{name}.zip"), "r")
     archive.extractall(os.path.join("data", name))

@@ -165,7 +165,7 @@ class DeepSymbolGenerator:
         for name in self.module_names:
             if from_wandb:
                 module_path = os.path.join(self.path, wandb.run.id + "_"+name+ext+".pt")
-                module_dict = wandb.restore(module_path, run_path=f"colorslab/multideepsym/{wandb.run.id}").name
+                module_dict = wandb.restore(module_path, run_path=f"colorslab/active_exploration/{wandb.run.id}").name
                 module_dict = torch.load(module_dict)
             else:
                 module_path = os.path.join(self.path, name+ext+".pt")
@@ -201,9 +201,9 @@ class DeepSymbolGenerator:
             module.train()
 
 
-class MultiDeepSym(DeepSymbolGenerator):
+class active_exploration(DeepSymbolGenerator):
     def __init__(self, **kwargs):
-        super(MultiDeepSym, self).__init__(**kwargs)
+        super(active_exploration, self).__init__(**kwargs)
         self._append_module("feedforward", kwargs.get("feedforward"))
         self._append_module("attention", kwargs.get("attention"))
         self._append_module("pre_attention_mlp", kwargs.get("pre_attention_mlp"))
@@ -279,9 +279,9 @@ class MultiDeepSym(DeepSymbolGenerator):
         return L, e_pred
 
 
-class MultiDeepSymMLP(MultiDeepSym):
+class active_explorationMLP(active_exploration):
     def __init__(self, **kwargs):
-        super(MultiDeepSymMLP, self).__init__(**kwargs)
+        super(active_explorationMLP, self).__init__(**kwargs)
 
     def encode(self, x, eval_mode=False):
         n_sample, n_seg, n_feat = x.shape
