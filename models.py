@@ -201,9 +201,9 @@ class DeepSymbolGenerator:
             module.train()
 
 
-class active_exploration(DeepSymbolGenerator):
+class MultiDeepSym(DeepSymbolGenerator):
     def __init__(self, **kwargs):
-        super(active_exploration, self).__init__(**kwargs)
+        super(MultiDeepSym, self).__init__(**kwargs)
         self._append_module("feedforward", kwargs.get("feedforward"))
         self._append_module("attention", kwargs.get("attention"))
         self._append_module("pre_attention_mlp", kwargs.get("pre_attention_mlp"))
@@ -279,9 +279,9 @@ class active_exploration(DeepSymbolGenerator):
         return L, e_pred
 
 
-class active_explorationMLP(active_exploration):
+class MultiDeepSymMLP(MultiDeepSym):
     def __init__(self, **kwargs):
-        super(active_explorationMLP, self).__init__(**kwargs)
+        super(MultiDeepSymMLP, self).__init__(**kwargs)
 
     def encode(self, x, eval_mode=False):
         n_sample, n_seg, n_feat = x.shape
