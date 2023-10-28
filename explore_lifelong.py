@@ -10,6 +10,7 @@ import copy
 from dataset import StateActionEffectDataset
 import wandb
 import utils
+import yaml
 buffer = []
 
 
@@ -39,19 +40,19 @@ def current_encodings(env, model):
 def collect_rollout(env, model, action_history):
     obj_encodings = current_encodings(env,model)
     interaction_map = {}
-    for i, obj in enumerate(obj_encodings):
-        if obj not in action_history.keys():
-            action_history[obj] = 0
-        interaction_map[action_history[obj]] = i
+    for i, obj1 in enumerate(obj_encodings):
+        for k, obj2 in enumerate(obj_encodings):
+            obj = (obj1 , obj2)
+            if obj not in action_history.keys():
+                action_history[obj] = 0
+            interaction_map[action_history[obj]] = (i,k)
     int_list = list(interaction_map.keys())
     int_list.sort()
 
 
     
-    obj_1 = interaction_map[int_list[0]]
-    obj_2 = interaction_map[int_list[1]]
-    action_history[obj_encodings[obj_1]] += 1
-    action_history[obj_encodings[obj_2]] += 1
+    obj_1, obj_2 = interaction_map[int_list[0]]
+    action_history[(obj_encodings[obj_1], obj_encodings[obj_2])] += 1
     
     action = env.sample_random_action()
     action[0] = obj_1
@@ -125,12 +126,10 @@ def get_dataset_action_set(model):
             source = act[0]
             target = act[1]
             action = act[2]
-            if source not in action_set.keys():
-                action_set[source] = 0
-            if target not in action_set.keys():
-                action_set[target] = 0
-            action_set[source] += 1
-            action_set[target] += 1
+            key = (act[0], act[1])
+            if key not in action_set.keys():
+                action_set[key] = 0
+            action_set[key] += 1
     return action_set
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Explore environment.")
@@ -138,14 +137,13 @@ if __name__ == "__main__":
     parser.add_argument("-T", help="interaction per episode", type=int, required=True)
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
-    parser.add_argument("-id", help="model_id", type=str, required=True)
+    parser.add_argument("-id", help="model id", type=str, required=True)
     args = parser.parse_args()
 
-    run = wandb.init(entity="colorslab", project="active_exploration", resume="must", id=args.id)
-    config = run.config
-    model = utils.create_model_from_config(config)
-    model.load("_best", from_wandb=True)
-    model.eval_mode()
+    with open("config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    model = torch.load("model.pt")
+    
     dataset = StateActionEffectDataset(config["dataset_name"], split="")
     if not os.path.exists(args.o):
         os.makedirs(args.o)
@@ -153,10 +151,8 @@ if __name__ == "__main__":
 
     env = environment.BlocksworldLightning(gui=0, min_objects=5, max_objects=8)
     np.random.seed()
-    import pickle 
-    with open('action_set.pickle', 'rb') as handle:
-        action_set = pickle.load(handle)
-    # action_set = get_dataset_action_set(model)
+    
+    action_set = get_dataset_action_set(model)
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
     states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
     # (obj_i, obj_j, from_x, from_y, to_x, to_y, rot_init, rot_final)

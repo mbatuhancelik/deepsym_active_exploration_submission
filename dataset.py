@@ -26,6 +26,11 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
 
 
 class StateActionEffectDataset(torch.utils.data.Dataset):
+    binary = torch.tensor([[0, 0, 0, 0],
+                                    [0, 0, 0, 1],
+                                    [0, 0, 1, 0],
+                                    [0, 1, 0, 0],
+                                    [1, 0, 0, 0]])
     def __init__(self, name, split="train"):
         path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
@@ -81,6 +86,10 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         mask = torch.zeros(n_objects, dtype=torch.float, device=dv)
         mask[:self.mask[idx]] = 1.0
         sample["pad_mask"] = mask
+        # permutation = torch.randperm(sample["state"].shape[0])
+        # for k in sample.keys():
+        #     if k!= "mask":
+        #         sample[k] = sample[k][permutation]
         return sample
 
 
