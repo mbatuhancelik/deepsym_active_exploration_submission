@@ -171,7 +171,11 @@ class DeepSymbolGenerator:
                 module_path = os.path.join(self.path, name+ext+".pt")
                 module_dict = torch.load(module_path)
             getattr(self, name).load_state_dict(module_dict)
-
+            
+    def to(self, device):
+        for name in self.module_names:
+            getattr(self, name).to(device)
+        self.device = device
     def save(self, ext):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
