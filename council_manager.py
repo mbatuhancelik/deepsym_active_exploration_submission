@@ -16,6 +16,4 @@ def save(council ,path=PATH):
         torch.save(m, f"{PATH}/{i}.pt")
 
 
-c = load()
-save(c)
         

@@ -168,6 +168,7 @@ class DeepSymbolGenerator:
                 module_dict = wandb.restore(module_path, run_path=f"colorslab/active_exploration/{wandb.run.id}").name
                 module_dict = torch.load(module_dict)
             else:
+                #TODO: this aint working, you need wandb id to load
                 module_path = os.path.join(self.path, name+ext+".pt")
                 module_dict = torch.load(module_path)
             getattr(self, name).load_state_dict(module_dict)
