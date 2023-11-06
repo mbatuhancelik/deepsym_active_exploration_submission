@@ -11,12 +11,12 @@ echo "collecting dataset $1 "
 # Start processes in the background
 mkdir ./data/$1
 for ((i=0; i<num_data_collectors; i++)); do
-  nohup python explore_council.py -N 20 -T 10 -i $i -o ./data/$1 -d cuda:0 &
+  nohup python explore_council.py -N 1000 -T 10 -i $i -o ./data/$1 -d cuda:0 &
   pids+=($!)  # Store the PID of the background process
 done
 
 for ((i=0; i<num_data_collectors; i++)); do
-  nohup python explore_council.py -N 20 -T 10 -i $((i + num_data_collectors)) -o ./data/$1 -d cuda:1&
+  nohup python explore_council.py -N 1000 -T 10 -i $((i + num_data_collectors)) -o ./data/$1 -d cuda:1&
   pids+=($!)  # Store the PID of the background process
 done
 
