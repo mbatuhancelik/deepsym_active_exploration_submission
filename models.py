@@ -128,7 +128,14 @@ class DeepSymbolGenerator:
             self.iteration += 1
         avg_loss /= (i+1)
         return avg_loss
-
+    def one_pass_loss(self, loader):
+        avg_loss = 0.0
+        for i, sample in enumerate(loader):
+            with torch.no_grad():
+                L = self.loss(sample)
+                avg_loss += L.item()
+        avg_loss /= (i+1)
+        return avg_loss
     def train(self, epoch, loader, val_loader=None):
         for e in range(epoch):
             # one epoch training over the train set
@@ -161,11 +168,13 @@ class DeepSymbolGenerator:
         self.save_wandb("_last")
         self.save_wandb("_best")
 
-    def load(self, ext, from_wandb=False):
+    def load(self, ext, from_wandb=False, run= None):
         for name in self.module_names:
             if from_wandb:
-                module_path = os.path.join(self.path, wandb.run.id + "_"+name+ext+".pt")
-                module_dict = wandb.restore(module_path, run_path=f"colorslab/active_exploration/{wandb.run.id}").name
+                if run == None:
+                    run = wandb.run
+                module_path = os.path.join(self.path, run.id + "_"+name+ext+".pt")
+                module_dict = wandb.restore(module_path, run_path=f"colorslab/active_exploration/{run.id}").name
                 module_dict = torch.load(module_dict)
             else:
                 #TODO: this aint working, you need wandb id to load
