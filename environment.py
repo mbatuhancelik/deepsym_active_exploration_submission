@@ -850,7 +850,7 @@ class BlocksworldLightning(BlocksWorld_v4):
         self.teleport_object(grasp_obj_id, placement_location)
         state1, types = self.state_obj_poses_and_types()
 
-        for i in range(240):
+        for i in range(480):
             self._p.stepSimulation()
         state2, _ = self.state_obj_poses_and_types()
         # if approach_angle1 != approach_angle2:

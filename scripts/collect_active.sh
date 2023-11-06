@@ -1,7 +1,7 @@
 #!/usr/bin/zsh
 
 # Number of processes to run
-num_data_collectors=3
+num_data_collectors=5
 
 # Your command to run (replace with your actual command)
 
@@ -9,6 +9,7 @@ num_data_collectors=3
 pids=()
 echo "collecting dataset $1 "
 # Start processes in the background
+mkdir ./data/$1
 for ((i=0; i<num_data_collectors; i++)); do
   nohup python explore_council.py -N 20 -T 10 -i $i -o ./data/$1 -d cuda:0 &
   pids+=($!)  # Store the PID of the background process

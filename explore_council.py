@@ -49,6 +49,7 @@ def get_action(env: environment.BlocksworldLightning, council, horizon = 0, samp
     e = torch.cat(e, dim=0)
     e = e.var(dim=0)
     act = torch.vmap(torch.trace)(e.permute(0,2,1)@e).argmax().item()
+    del e
     return action_env_space[act]
 
     
@@ -74,7 +75,10 @@ if __name__ == "__main__":
     for m in council:
         m.to(args.d)
     if not os.path.exists(args.o):
-        os.makedirs(args.o)
+        try:
+            os.makedirs(args.o)
+        finally:
+            pass
 
 
     env = environment.BlocksworldLightning(gui=0, min_objects=5, max_objects=8)

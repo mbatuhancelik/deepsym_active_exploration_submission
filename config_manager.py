@@ -35,7 +35,7 @@ if __name__ == "__main__":
     config = load(args.c)
 
     args = parser.parse_args()
-    if args.action == "increment_generation":
+    if args.action == "set_generation":
         config = set_generation(config, args.g)
     if args.action == "set_dataset":
         config = set_dataset(config, args.d)
