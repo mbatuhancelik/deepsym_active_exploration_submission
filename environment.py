@@ -847,19 +847,22 @@ class BlocksworldLightning(BlocksWorld_v4):
         placement_location[:2] = grasp_displacement[:2] + placement_location[:2]
         placement_location[2] = place_obj_loc[2] + 0.15
 
-        self.teleport_object(grasp_obj_id, placement_location)
         state1, types = self.state_obj_poses_and_types()
+        self.teleport_object(grasp_obj_id, placement_location)
+        state2, types = self.state_obj_poses_and_types()
 
         for i in range(480):
             self._p.stepSimulation()
-        state2, _ = self.state_obj_poses_and_types()
+        state3, _ = self.state_obj_poses_and_types()
         # if approach_angle1 != approach_angle2:
         
         if get_images:
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
-        state4, _ = self.state_obj_poses_and_types()
-        effect = state2 - state1
+        
+        effect = state3 - state1
+        effect[:, :2] = effect[:, :2] - (state2[:, :2] - state1[:,:2])
+        effect = (effect * (np.abs(effect) >1e-2).astype(int))
         self.init_agent_pose(1)
         if get_images:
             return state1, effect, types, images
