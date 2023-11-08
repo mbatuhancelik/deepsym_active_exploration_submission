@@ -8,7 +8,7 @@ from dataset import StateActionEffectDataset
 
 parser = argparse.ArgumentParser("Train DeepSym.")
 parser.add_argument("-c", "--config", help="config file", type=str, required=True)
-parser.add_argument("-cid", help="council_id", type=str, required=True)
+parser.add_argument("-cid", help="council_id", type=str, required=False)
 args = parser.parse_args()
 
 config = utils.parse_and_init(args)

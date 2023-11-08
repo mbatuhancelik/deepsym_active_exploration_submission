@@ -26,11 +26,11 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
 
 
 class StateActionEffectDataset(torch.utils.data.Dataset):
-    binary = torch.tensor([[0, 0, 0, 0],
-                                    [0, 0, 0, 1],
-                                    [0, 0, 1, 0],
-                                    [0, 1, 0, 0],
-                                    [1, 0, 0, 0]])
+    binary = torch.tensor([ [0, 0, 0, 0],
+                            [0, 0, 0, 1],
+                            [0, 0, 1, 0],
+                            [0, 1, 0, 0],
+                            [1, 0, 0, 0]])
     def __init__(self, name, split="train"):
         path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
