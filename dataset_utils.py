@@ -66,7 +66,7 @@ def metrics(dataset):
     metrics += str(num_objects)
     return metrics
 def merge_datasets(args):
-
+    
     path = os.path.join("data", args.large)
     l_state = torch.load(os.path.join(path, "state.pt"))
     l_action = torch.load(os.path.join(path, "action.pt"))
@@ -100,7 +100,18 @@ def merge_datasets(args):
     mask = torch.concat([s_mask, l_mask], dim=0)
     post_state = torch.concat([s_post_state, l_post_state], dim=0)
 
-    shuffle = torch.randperm(action.size()[0])
+    n_train_large = int(len(l_state) * 0.8)
+    n_train_small = int(len(s_state) * 0.8)
+    n_val_large = int(len(l_state) * 0.1)
+    n_val_small = int(len(s_state) * 0.1)
+    shuffle = torch.cat([
+        torch.arange(n_train_small),
+        torch.arange(n_train_large) + len(s_state),
+        torch.arange(n_val_small) + (n_train_small),
+        torch.arange(n_val_large) + (n_train_large)+ len(s_state),
+        torch.arange(n_val_small) + (n_train_small+n_val_small), 
+        torch.arange(n_val_large) + (n_train_large+n_val_large)+ len(s_state)
+    ])
 
     action=action[shuffle]
     state=state[shuffle]
