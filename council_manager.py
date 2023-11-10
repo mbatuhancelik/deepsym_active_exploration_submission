@@ -29,23 +29,26 @@ def load_experiment(num_generations, experiment):
             model = utils.create_model_from_config(run.config)
             model.load("_best", from_wandb=True, run=run)
             torch.save(model, f"./experiments/{experiment}/generation_{i}_model{k}.pt")
-def load_generation(experiment, generation, folder):
+def load_generation(experiment, generation, folder, take_half=False):
         api = wandb.Api()
         runs = api.runs(path= "colorslab/active_exploration",
                         filters= {"$and": [{"config.experiment": experiment}, {"config.generation": f"{generation}"}]}, 
                         per_page=100, 
                         order="+summary_metrics.best_val_loss")
+        if take_half:
+            runs = runs[:len(runs)]
         for k, run in enumerate(runs):
             model = utils.create_model_from_config(run.config)
             model.load("_best", from_wandb=True, run=run)
             model.to("cpu")
-            torch.save(model, f"{folder}/generation_{generation}_model_{k}.pt")
+            torch.save(model, f"{folder}/generation_{generation}_model_{k}_{run.id}.pt")
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Load Council.")
     parser.add_argument("experiment", type=str)
     parser.add_argument("generation", type=str)
     parser.add_argument("folder", type=str)
+    parser.add_argument("take_half", type=bool)
 
     args = parser.parse_args()
     load_generation(args.experiment, args.generation, args.folder)
