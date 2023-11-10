@@ -111,9 +111,9 @@ class DeepSymbolGenerator:
         e = self.decode(z)
         return z, e
 
-    def loss(self, sample):
+    def loss(self, sample, eval_mode=False):
         e_truth = sample["effect"].to(self.device)
-        _, e_pred = self.forward(sample)
+        _, e_pred = self.forward(sample, eval_mode=eval_mode)
         L = self.criterion(e_pred, e_truth)*self.coeff
         return L
 
@@ -128,11 +128,11 @@ class DeepSymbolGenerator:
             self.iteration += 1
         avg_loss /= (i+1)
         return avg_loss
-    def one_pass_loss(self, loader):
+    def one_pass_loss(self, loader,eval_mode=False):
         avg_loss = 0.0
         for i, sample in enumerate(loader):
             with torch.no_grad():
-                L = self.loss(sample)
+                L = self.loss(sample,eval_mode)
                 avg_loss += L.item()
         avg_loss /= (i+1)
         return avg_loss
@@ -278,9 +278,9 @@ class MultiDeepSym(DeepSymbolGenerator):
         e = self.decode(z_att, sample["pad_mask"])
         return z, attn_weights, e
 
-    def loss(self, sample):
+    def loss(self, sample,eval_mode=False):
         e_truth = sample["effect"].to(self.device)
-        _, _, e_pred = self.forward(sample)
+        _, _, e_pred = self.forward(sample,eval_mode)
         mask = sample["pad_mask"].to(self.device).unsqueeze(2)
         L = (((e_truth - e_pred) ** 2) * mask).sum(dim=[1, 2]).mean() * self.coeff
         return L
