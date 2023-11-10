@@ -36,7 +36,9 @@ def load_generation(experiment, generation, folder, take_half=False):
                         per_page=100, 
                         order="+summary_metrics.best_val_loss")
         if take_half:
-            runs = runs[:len(runs)]
+            runs = runs[:int(len(runs)//2)]
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         for k, run in enumerate(runs):
             model = utils.create_model_from_config(run.config)
             model.load("_best", from_wandb=True, run=run)
@@ -51,6 +53,6 @@ if __name__ == "__main__":
     parser.add_argument("take_half", type=bool)
 
     args = parser.parse_args()
-    load_generation(args.experiment, args.generation, args.folder)
+    load_generation(args.experiment, args.generation, args.folder, args.take_half)
 
         
