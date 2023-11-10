@@ -48,14 +48,14 @@ def get_action(env: environment.BlocksWorld_v4, council, horizon = 0, sample_siz
             _,_, e_pred = model.forward(sample, eval_mode=True)
         e.append(e_pred.unsqueeze(0))
     e = torch.cat(e, dim=0)
-    e = e.var(dim=0)
-    e = torch.vmap(torch.trace)(e.permute(0,2,1)@e)
-    act = e.argmax().item()
-    while act == previous_action:
-        e[act] = -1
-        act = e.argmax().item()
-    previous_action = act    
-    del e
+    e = e.flatten(2, 3)  # nasil olsa her model ayni sirayla bakiyor, effectleri her obje icin flattenlayabiliriz (n_ensemble, n_batch, n_object*effect_dim)
+    e = e.permute(1, 0, 2)  # (n_batch, n_ensemble, n_object*effect_dim)
+    e_n = e - e.mean(dim=1, keepdim=True)  # her ensemble'a bir sample gibi davranip onlar uzerinden normalization ikinci momenti hesaplamadan once
+    cov = (e_n.transpose(1, 2) @ e_n) / (e_n.shape[1] - 1)
+    rng = torch.arange(cov.shape[1])
+    disagreement = cov[:, rng, rng].sum(dim=1)
+    _, top_acts = disagreement.topk(k=10, largest=True)
+    act = top_acts[torch.randint(0, len(top_acts), (1,))]
     return action_env_space[act]
 
     
