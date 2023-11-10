@@ -90,7 +90,7 @@ class Linear(torch.nn.Module):
 
 class MLP(torch.nn.Module):
     """ multi-layer perceptron with batch norm option """
-    def __init__(self, layer_info, activation=torch.nn.ReLU(), std=None, batch_norm=False, indrop=None, hiddrop=None):
+    def __init__(self, layer_info, activation=torch.nn.ReLU(), std=None, batch_norm=False, indrop=None, hiddrop=None, last_layer_norm=False):
         super(MLP, self).__init__()
         layers = []
         in_dim = layer_info[0]
@@ -102,7 +102,10 @@ class MLP(torch.nn.Module):
             layers.append(Linear(in_features=in_dim, out_features=unit, std=std, batch_norm=batch_norm, gain=2))
             layers.append(activation)
             in_dim = unit
-        layers.append(Linear(in_features=in_dim, out_features=layer_info[-1], batch_norm=False))
+        if last_layer_norm:
+            layers.append(NormedLinear(in_features=in_dim, out_features=layer_info[-1]))
+        else:
+            layers.append(Linear(in_features=in_dim, out_features=layer_info[-1]))
         self.layers = torch.nn.Sequential(*layers)
 
     def forward(self, x):
@@ -324,3 +327,20 @@ class STSigmoidAttention(torch.nn.Module):
         pad_mask = src_key_mask.reshape(batch, token, 1) @ src_key_mask.reshape(batch, 1, token)
         binarized_attn = binarized_attn * pad_mask.unsqueeze(1)
         return binarized_attn
+class NormedLinear(torch.nn.Module):
+    def __init__(self, in_features, out_features):
+        super(NormedLinear, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = torch.nn.Parameter(torch.Tensor(out_features, in_features))
+        stdv = math.sqrt(1 / self.weight.size(1))
+        self.weight.data.normal_(0., stdv)
+
+    def forward(self, x):
+        x = 3 * torch.nn.functional.normalize(x, dim=-1)
+        wn = 3 * torch.nn.functional.normalize(self.weight, dim=-1)
+        x = torch.nn.functional.linear(x, wn)
+        return x
+
+    def extra_repr(self):
+        return "in_features={}, out_features={}".format(self.in_features, self.out_features)

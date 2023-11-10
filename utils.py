@@ -38,7 +38,7 @@ def create_model_from_config(config):
     enc_layers = [config["state_dim"]] + \
                  [config["hidden_dim"]]*config["n_hidden_layers"] + \
                  [config["latent_dim"]]
-    enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"])
+    enc_mlp = blocks.MLP(enc_layers, batch_norm=config["batch_norm"], last_layer_norm=True)
     encoder = torch.nn.Sequential(
         enc_mlp,
         blocks.GumbelSigmoidLayer(hard=config["gumbel_hard"],
