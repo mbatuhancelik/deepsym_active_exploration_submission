@@ -19,7 +19,7 @@ action_seperators = []
 action_env_space = []
 
 
-def current_state_batch(env: environment.BlocksworldLightning):
+def current_state_batch(env: environment.BlocksWorld_v4):
     state , types = env.state_obj_poses_and_types()
     sample = {}
     state = torch.tensor(state)
@@ -31,24 +31,30 @@ def current_state_batch(env: environment.BlocksworldLightning):
     sample["pad_mask"] = mask
     return sample
 
-def get_action(env: environment.BlocksworldLightning, council, horizon = 0, sample_size = 100):
+previous_action = 0
+def get_action(env: environment.BlocksWorld_v4, council, horizon = 0, sample_size = 100):
+    global previous_action
     sample = current_state_batch(env)
     actions = action_set[:action_seperators[env.num_objects-1], :env.num_objects]
     batch_size = actions.shape[0]
     sample["state"] = sample["state"].repeat((batch_size,1,1))
-    sample["pad_mask"] = sample["pad_mask"].repeat((batch_size,1,1))
+    sample["pad_mask"] = sample["pad_mask"].repeat((batch_size,1))
     sample["action"] = actions
     e = []
     
     for model in council:
     #TODO: BATCH THIS SHIT
         with torch.no_grad():
-            _,_, e_pred = model.forward(sample)
+            _,_, e_pred = model.forward(sample, eval_mode=True)
         e.append(e_pred.unsqueeze(0))
-    
     e = torch.cat(e, dim=0)
     e = e.var(dim=0)
-    act = torch.vmap(torch.trace)(e.permute(0,2,1)@e).argmax().item()
+    e = torch.vmap(torch.trace)(e.permute(0,2,1)@e)
+    act = e.argmax().item()
+    while act == previous_action:
+        e[act] = -1
+        act = e.argmax().item()
+    previous_action = act    
     del e
     return action_env_space[act]
 
@@ -74,6 +80,7 @@ if __name__ == "__main__":
     council = council_manager.load()
     for m in council:
         m.to(args.d)
+        m.eval_mode()
     if not os.path.exists(args.o):
         try:
             os.makedirs(args.o)
@@ -81,7 +88,7 @@ if __name__ == "__main__":
             pass
 
 
-    env = environment.BlocksworldLightning(gui=0, min_objects=5, max_objects=8)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=5, max_objects=8)
     np.random.seed()
     
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
@@ -95,7 +102,7 @@ if __name__ == "__main__":
     #  cos_ry_f-cos_ry_i, sin_ry_f-sin_ry_i,
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
-    effects = torch.zeros(args.N, env.max_objects, 9, dtype=torch.float)
+    effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
     post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
 
     prog_it = args.N
