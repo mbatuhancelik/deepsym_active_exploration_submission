@@ -178,7 +178,7 @@ class DeepSymbolGenerator:
                 module_dict = torch.load(module_dict)
             else:
                 #TODO: this aint working, you need wandb id to load
-                module_path = os.path.join(self.path, name+ext+".pt")
+                module_path = os.path.join(self.path, wandb.run.id + "_"+name+ext+".pt")
                 module_dict = torch.load(module_path)
             getattr(self, name).load_state_dict(module_dict)
             
