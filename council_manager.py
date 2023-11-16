@@ -13,6 +13,12 @@ def load(path=PATH):
         council.append(torch.load(f"./council/{m}"))
         council[-1].to("cpu")
     return council
+def get_avg_loss(experiment, generation):
+    api = wandb.Api()
+    runs = api.runs(path= "colorslab/active_exploration",filters= {"$and": [{"config.experiment": experiment}, {"config.generation": generation}]}, per_page=100)
+    run_ids = [run.id for run in runs[:max(4, int((len(runs)+1)//2))]]
+    print(len(runs), runs[:int((len(runs)+1)//2)])
+    return wandb.run.id in run_ids
 def save(council ,path=PATH):
     for i, m in enumerate(council):
         torch.save(m, f"{PATH}/{i}.pt")
@@ -48,11 +54,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Load Council.")
     parser.add_argument("experiment", type=str)
-    parser.add_argument("generation", type=str)
+    parser.add_argument("generation", type=int)
     parser.add_argument("folder", type=str)
     parser.add_argument("take_half", type=bool)
 
     args = parser.parse_args()
-    load_generation(args.experiment, args.generation, args.folder, args.take_half)
+    for i in range(args.generation):
+        load_generation(args.experiment, str(i), args.folder, args.take_half)
 
         
