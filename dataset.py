@@ -31,7 +31,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
                             [0, 0, 1, 0],
                             [0, 1, 0, 0],
                             [1, 0, 0, 0]])
-    def __init__(self, name, split="train"):
+    def __init__(self, name, split="train", sample_subset=False):
         path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
         self.action = torch.load(os.path.join(path, "action.pt"))
@@ -63,6 +63,13 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
             self.effect = self.effect[n_train+n_val:]
             self.mask = self.mask[n_train+n_val:]
             self.post_state = self.post_state[n_train+n_val:]
+        if sample_subset:
+            shuffle = torch.randperm(self.action.size()[0])[:int (self.action.shape[0] * 0.8)]
+            self.state = self.state[shuffle]
+            self.action = self.action[shuffle]
+            self.effect = self.effect[shuffle]
+            self.mask = self.mask[shuffle]
+            self.post_state = self.post_state[shuffle]
 
     def __len__(self):
         return len(self.state)
