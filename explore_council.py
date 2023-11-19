@@ -17,7 +17,43 @@ import council_manager
 action_set = []
 action_seperators = []
 action_env_space = []
-
+def get_action_set(num_objects):
+    action_set = []
+    action_seperators = []
+    action_env_space = []
+    counter = 0
+    for incoming in range(num_objects):
+        for obj1 in range(incoming+1):
+            for dy1 in [-1,0,1]:
+                for dy2 in [-1,0,1]:
+                    dx1 = 0
+                    dx2 = 0
+                    rot_before = 1
+                    rot_after = 1
+                    a = [obj1, incoming, dx1, dy1, dx2, dy2, rot_before, rot_after]
+                    action = torch.zeros(num_objects, 8, dtype=torch.float)
+                    action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
+                    action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
+                    action_set.append(action.unsqueeze(0))
+                    action_env_space.append(a)
+                    counter += 1
+        for obj2 in range(incoming):
+            for dy1 in [-1,0,1]:
+                    for dy2 in [-1,0,1]:
+                        dx1 = 0
+                        dx2 = 0
+                        rot_before = 1
+                        rot_after = 1
+                        a = [incoming, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
+                        action = torch.zeros(num_objects, 8, dtype=torch.float)
+                        action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
+                        action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
+                        action_set.append(action.unsqueeze(0))
+                        action_env_space.append(a)
+                        counter += 1
+        action_seperators.append(counter)
+    action_set = torch.cat(action_set, dim=0)
+    return action_set, action_seperators, action_env_space
 
 def current_state_batch(env: environment.BlocksWorld_v4):
     state , types = env.state_obj_poses_and_types()
@@ -88,9 +124,9 @@ if __name__ == "__main__":
             pass
 
 
-    env = environment.BlocksWorld_v4(gui=0, min_objects=5, max_objects=8)
+    env = environment.BlocksWorld_v4(gui=1, min_objects=8, max_objects=12)
     np.random.seed()
-    
+    action_set = get_action_set(env.max_objects)    
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
     states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
     # (obj_i, obj_j, from_x, from_y, to_x, to_y, rot_init, rot_final)
@@ -110,37 +146,37 @@ if __name__ == "__main__":
     env_it = 0
     i = 0
     counter = 0
-    for incoming in range(env.max_objects):
-        for obj1 in range(incoming+1):
-            for dy1 in [-1,0,1]:
-                for dy2 in [-1,0,1]:
-                    dx1 = 0
-                    dx2 = 0
-                    rot_before = 1
-                    rot_after = 1
-                    a = [obj1, incoming, dx1, dy1, dx2, dy2, rot_before, rot_after]
-                    action = torch.zeros(env.max_objects, 8, dtype=torch.float)
-                    action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
-                    action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
-                    action_set.append(action.unsqueeze(0))
-                    action_env_space.append(a)
-                    counter += 1
-        for obj2 in range(incoming):
-            for dy1 in [-1,0,1]:
-                    for dy2 in [-1,0,1]:
-                        dx1 = 0
-                        dx2 = 0
-                        rot_before = 1
-                        rot_after = 1
-                        a = [incoming, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
-                        action = torch.zeros(env.max_objects, 8, dtype=torch.float)
-                        action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
-                        action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
-                        action_set.append(action.unsqueeze(0))
-                        action_env_space.append(a)
-                        counter += 1
-        action_seperators.append(counter)
-    action_set = torch.cat(action_set, dim=0)
+    # for incoming in range(env.max_objects):
+    #     for obj1 in range(incoming+1):
+    #         for dy1 in [-1,0,1]:
+    #             for dy2 in [-1,0,1]:
+    #                 dx1 = 0
+    #                 dx2 = 0
+    #                 rot_before = 1
+    #                 rot_after = 1
+    #                 a = [obj1, incoming, dx1, dy1, dx2, dy2, rot_before, rot_after]
+    #                 action = torch.zeros(env.max_objects, 8, dtype=torch.float)
+    #                 action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
+    #                 action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
+    #                 action_set.append(action.unsqueeze(0))
+    #                 action_env_space.append(a)
+    #                 counter += 1
+    #     for obj2 in range(incoming):
+    #         for dy1 in [-1,0,1]:
+    #                 for dy2 in [-1,0,1]:
+    #                     dx1 = 0
+    #                     dx2 = 0
+    #                     rot_before = 1
+    #                     rot_after = 1
+    #                     a = [incoming, obj2, dx1, dy1, dx2, dy2, rot_before, rot_after]
+    #                     action = torch.zeros(env.max_objects, 8, dtype=torch.float)
+    #                     action[a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float)
+    #                     action[a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float)
+    #                     action_set.append(action.unsqueeze(0))
+    #                     action_env_space.append(a)
+    #                     counter += 1
+    #     action_seperators.append(counter)
+    action_set, action_seperators, action_env_space = torch.cat(action_set, dim=0)
 
 
     while i < args.N:
