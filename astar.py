@@ -5,7 +5,7 @@ import tqdm
 from explore_council import get_action_set
 from dataset import StateActionEffectDataset
 action_set = []
-
+action_set_main,seperators,_ = get_action_set(8)
 class Node:
     def __init__(self, state, cost, heuristic, parent, action):
         self.state = state
@@ -69,7 +69,7 @@ def predict(state, action):
     sample["pad_mask"] = torch.ones((1,state.shape[0]))
     with torch.no_grad():
         _,_,e = model.forward(sample,eval_mode = True)
-    e = e[0]
+    e = e[0].cpu()
     obj1 = action[:,0].argmax()
     obj2 = action[:, 4].argmax()
 
@@ -82,15 +82,10 @@ def predict(state, action):
     next_state[:,:2] += travel_distance.repeat(state.shape[0],1) * is_above
     return next_state
 
-if __name__ == "__main__":
-
-    action_set_main,seperators,_ = get_action_set(8) #TODO: set this according to dataset
-
-    model = torch.load("./experiments/pls_work2/generation_1_model_0_407o0mr3.pt")
-    model.eval_mode()
-    dataset = StateActionEffectDataset("pls_work2_collection_5", "test")
-    
+def evaluate_dataset(model, dset): 
     counter = 0
+    global action_set
+    global target
     for i in tqdm.tqdm(range(len(dataset))):
         s = dataset[i]
         mask = dataset.mask[i]
@@ -101,4 +96,17 @@ if __name__ == "__main__":
         x = astar(state[:mask], post_state[ :mask], predict, heuristic, is_equal)
         if x:
             counter += 1
-    print(f"1 step training accuracy: {counter/len(dataset)}")
+    return counter / len(dataset)
+if __name__ == "__main__":
+
+     #TODO: set this according to dataset
+
+    model = torch.load("./experiments/pls_work2/generation_0_model_0_s6fiqsof.pt")
+    # model = torch.load("./baseline.pt")
+    model.eval_mode()
+    accs = []
+    for i in range(6):
+        dataset = StateActionEffectDataset(f"pls_work2_collection_{i}", "test")
+        acc = evaluate_dataset(model, dataset)
+        accs.append(acc)
+    print(accs)
