@@ -562,15 +562,13 @@ class BlocksWorld_v4(BlocksWorld):
 
     def state_obj_poses_and_types(self):
         N_obj = len(self.obj_dict)
-        pose = np.zeros((N_obj, 9), dtype=np.float32)
+        pose = np.zeros((N_obj, 7), dtype=np.float32)
         obj_types = np.zeros((N_obj), dtype=np.int8)
         for i in range(N_obj):
             position, quaternion = self._p.getBasePositionAndOrientation(self.obj_dict[i])
             pose[i][:3] = position
             euler_angles = self._p.getEulerFromQuaternion(quaternion)
-            pose[i][3:] = [np.cos(euler_angles[0]), np.sin(euler_angles[0]),
-                           np.cos(euler_angles[1]), np.sin(euler_angles[1]),
-                           np.cos(euler_angles[2]), np.sin(euler_angles[2])]
+            pose[i][3:] = quaternion
             obj_types[i] = self.obj_types[self.obj_dict[i]]
 
         return pose, obj_types
