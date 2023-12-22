@@ -78,7 +78,7 @@ def predict(state, action):
     travel_distance = (state[obj2, :2] + ds1) - (state[obj1, :2]+ ds2)
     is_above = (e[:,2] > 0.3 ).int().unsqueeze(-1)
     next_state = state[:,:3].clone()
-    next_state += e[:,:3] + e[:,3:]
+    next_state += e[:,:3] + e[:,7:10]
     next_state[:,:2] += travel_distance.repeat(state.shape[0],1) * is_above
     return next_state
 
@@ -101,12 +101,13 @@ if __name__ == "__main__":
 
      #TODO: set this according to dataset
 
-    model = torch.load("./experiments/pls_work2/generation_0_model_0_s6fiqsof.pt")
+    model = torch.load("./experiments/seed/generation_0_model0.pt")
     # model = torch.load("./baseline.pt")
     model.eval_mode()
     accs = []
-    for i in range(6):
-        dataset = StateActionEffectDataset(f"pls_work2_collection_{i}", "test")
+    for i in range(3):
+        dataset = StateActionEffectDataset(f"test", "asd")
         acc = evaluate_dataset(model, dataset)
+        print(acc)
         accs.append(acc)
     print(accs)
