@@ -135,8 +135,8 @@ def merge_rolls(args):
     for key in keys:
         field = torch.cat([torch.load(os.path.join(output_folder, f"{key}_{i}.pt")) for i in range(args.i)], dim=0)
         torch.save(field, os.path.join(os.path.join(output_folder, f"{key}.pt")))
-        for i in range(args.i):
-            os.remove(os.path.join(output_folder, f"{key}_{i}.pt"))
+        # for i in range(args.i):
+            # os.remove(os.path.join(output_folder, f"{key}_{i}.pt"))
     metrics_by_name(args.o)
 
 
