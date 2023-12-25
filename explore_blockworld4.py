@@ -31,7 +31,7 @@ if __name__ == "__main__":
     np.random.seed()
 
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
-    states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
+    states = torch.zeros(args.N, env.max_objects, 8, dtype=torch.float)
     # (obj_i, obj_j, from_x, from_y, to_x, to_y, rot_init, rot_final)
     actions = torch.zeros(args.N, 8, dtype=torch.int)
     # how many objects are there in the scene
@@ -41,8 +41,8 @@ if __name__ == "__main__":
     #  cos_ry_f-cos_ry_i, sin_ry_f-sin_ry_i,
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
-    effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
-    post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
+    effects = torch.zeros(args.N, env.max_objects, 14, dtype=torch.float)
+    post_states = torch.zeros(args.N, env.max_objects, 8, dtype=torch.float)
 
     prog_it = args.N
     start = time.time()
