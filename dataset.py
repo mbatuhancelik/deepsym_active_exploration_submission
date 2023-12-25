@@ -89,7 +89,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
         sample["action"][a[0], :4] = torch.tensor([1, a[2], a[3], a[6]], dtype=torch.float, device=dv)
         sample["action"][a[1], 4:] = torch.tensor([1, a[4], a[5], a[7]], dtype=torch.float, device=dv)
 
-        sample["effect"] = torch.cat([self.effect[idx][:, :3], self.effect[idx][:, 9:12]], dim=-1)
+        sample["effect"] = self.effect[idx]
         mask = torch.zeros(n_objects, dtype=torch.float, device=dv)
         mask[:self.mask[idx]] = 1.0
         sample["pad_mask"] = mask

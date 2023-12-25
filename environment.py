@@ -553,7 +553,12 @@ class BlocksWorld_v4(BlocksWorld):
             images.append(utils.get_image(self._p, eye_position=eye_position, target_position=target_position,
                                           up_vector=up_vector, height=256, width=256)[0])
         state4, _ = self.state_obj_poses_and_types()
-        effect = np.concatenate([state2 - state1, state4 - state3], axis=1)
+        effect1 = state2 - state1
+        effect2 = state4 - state3
+        for i in range(self.num_objects):
+            effect1[i, 3:] = self._p.getDifferenceQuaternion(state2[i, 3:], state1[i, 3:])
+            effect2[i, 3:] = self._p.getDifferenceQuaternion(state4[i, 3:], state3[i, 3:])
+        effect = np.concatenate([effect1, effect2], axis=1)
         self.init_agent_pose(1)
         if get_images:
             return state1, effect, types, images
