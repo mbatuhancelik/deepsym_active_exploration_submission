@@ -82,11 +82,15 @@ def get_action(env: environment.BlocksWorld_v4, council, horizon = 5, sample_siz
     
     batch_indices = torch.arange(batch_size)
     for model in council:
+        e_cummilative = None
         for a in range(horizon):
             sample["action"] = action_set[action_selection[:,a], :env.num_objects]
-    #TODO: BATCH THIS SHIT
             with torch.no_grad():
                 _,_, e_pred = model.forward(sample, eval_mode=True)
+                if e_cummilative == None:
+                    e_cummilative = e_pred.clone()
+                else:
+                    e_cummilative = torch.cat([e_cummilative, e_pred.clone()], dim = -1)
                 state = sample["state"].to(model.device)
                 action = sample["action"].to(model.device)
                 obj1 = action[:,:,0].max(dim = 1)[1]
@@ -99,16 +103,17 @@ def get_action(env: environment.BlocksWorld_v4, council, horizon = 5, sample_siz
                 state[:, :, :7] += e_pred[:, : ,:7] + e_pred[:,:,7:]
                 state[:,:, :2] += travel_distance.unsqueeze(1).repeat(1,state.shape[1], 1) * is_above
                 sample["state"] = state
-        e.append(e_pred.unsqueeze(0))
-    e = torch.cat(e, dim=0)
-    e = e.flatten(2, 3)  # nasil olsa her model ayni sirayla bakiyor, effectleri her obje icin flattenlayabiliriz (n_ensemble, n_batch, n_object*effect_dim)
-    e = e.permute(1, 0, 2)  # (n_batch, n_ensemble, n_object*effect_dim)
-    e_n = e - e.mean(dim=1, keepdim=True)  # her ensemble'a bir sample gibi davranip onlar uzerinden normalization ikinci momenti hesaplamadan once
-    cov = (e_n.transpose(1, 2) @ e_n) / (e_n.shape[1] - 1)
-    rng = torch.arange(cov.shape[1])
-    disagreement = cov[:, rng, rng].sum(dim=1)
-    _, top_acts = disagreement.topk(k=10, largest=True)
-    act = top_acts[torch.randint(0, len(top_acts), (1,))]
+        e.append(e_cummilative.unsqueeze(0))
+    with torch.nograd():
+        e = torch.cat(e, dim=0)
+        e = e.flatten(2, 3)  # nasil olsa her model ayni sirayla bakiyor, effectleri her obje icin flattenlayabiliriz (n_ensemble, n_batch, n_object*effect_dim)
+        e = e.permute(1, 0, 2)  # (n_batch, n_ensemble, n_object*effect_dim)
+        e_n = e - e.mean(dim=1, keepdim=True)  # her ensemble'a bir sample gibi davranip onlar uzerinden normalization ikinci momenti hesaplamadan once
+        cov = (e_n.transpose(1, 2) @ e_n) / (e_n.shape[1] - 1)
+        rng = torch.arange(cov.shape[1])
+        disagreement = cov[:, rng, rng].sum(dim=1)
+        _, top_acts = disagreement.topk(k=10, largest=True)
+        act = top_acts[torch.randint(0, len(top_acts), (1,))]
     for i in range(horizon):
         action_buffer.append(action_env_space[action_selection[act,i]])
     return action_buffer.pop(0)
