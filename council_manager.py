@@ -42,7 +42,7 @@ def load_generation(experiment, generation, folder, take_half=False):
                         per_page=100, 
                         order="+summary_metrics.best_val_loss")
         if take_half:
-            runs = runs[:int(len(runs)//2)]
+            runs = runs[:5]
         if not os.path.exists(folder):
             os.makedirs(folder)
         for k, run in enumerate(runs):

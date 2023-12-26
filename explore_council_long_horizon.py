@@ -104,7 +104,7 @@ def get_action(env: environment.BlocksWorld_v4, council, horizon = 5, sample_siz
                 state[:,:, :2] += travel_distance.unsqueeze(1).repeat(1,state.shape[1], 1) * is_above
                 sample["state"] = state
         e.append(e_cummilative.unsqueeze(0))
-    with torch.nograd():
+    with torch.no_grad():
         e = torch.cat(e, dim=0)
         e = e.flatten(2, 3)  # nasil olsa her model ayni sirayla bakiyor, effectleri her obje icin flattenlayabiliriz (n_ensemble, n_batch, n_object*effect_dim)
         e = e.permute(1, 0, 2)  # (n_batch, n_ensemble, n_object*effect_dim)
