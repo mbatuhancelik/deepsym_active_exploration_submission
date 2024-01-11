@@ -3,6 +3,7 @@ import torch
 import wandb
 import utils
 import argparse
+import glob
 PATH="./council"
 
 def load(path=PATH):
@@ -22,11 +23,13 @@ def get_avg_loss(experiment, generation):
 def save(council ,path=PATH):
     for i, m in enumerate(council):
         torch.save(m, f"{PATH}/{i}.pt")
-def load_experiment(num_generations, experiment):
+def download_experiment(num_generations, experiment):
     api = wandb.Api()
     try:
         os.mkdir("./experiments")
         os.mkdir(f"./experiments/{experiment}")
+    except:
+        pass
     finally:
         pass
     for i in range(num_generations):
@@ -35,7 +38,7 @@ def load_experiment(num_generations, experiment):
             model = utils.create_model_from_config(run.config)
             model.load("_best", from_wandb=True, run=run)
             torch.save(model, f"./experiments/{experiment}/generation_{i}_model{k}.pt")
-def load_generation(experiment, generation, folder, take_half=False):
+def download_generation(experiment, generation, folder, take_half=False):
         api = wandb.Api()
         runs = api.runs(path= "colorslab/active_exploration",
                         filters= {"$and": [{"config.experiment": experiment}, {"config.generation": f"{generation}"}]}, 
@@ -50,6 +53,20 @@ def load_generation(experiment, generation, folder, take_half=False):
             model.load("_best", from_wandb=True, run=run)
             model.to("cpu")
             torch.save(model, f"{folder}/generation_{generation}_model_{k}_{run.id}.pt")
+def load_generation(generation, experiment):
+    models = []
+    files = glob.glob(f"./experiments/{experiment}/generation_{generation}_*")
+    for i in range(len(files)):
+        m = torch.load(glob.glob(f"./experiments/{experiment}/generation_{generation}_model_{i}*")[0])
+        m.eval_mode()
+        m.to("cuda")
+        models.append(m)
+    return models
+def load_best(generation, experiment):
+    m = torch.load(glob.glob(f"./experiments/{experiment}/generation_{generation}_*")[0])
+    m.eval_mode()
+    m.to("cuda")
+    return[m]
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Load Council.")
@@ -60,6 +77,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     for i in range(args.generation):
-        load_generation(args.experiment, str(i), args.folder, args.take_half)
+        download_generation(args.experiment, str(i), args.folder, False)
 
         

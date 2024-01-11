@@ -13,12 +13,13 @@ class Node:
         self.heuristic = heuristic
         self.parent = parent
         self.action = action
+        self.depth = 0
 
     def __lt__(self, other):
         return (self.cost + self.heuristic) < (other.cost + other.heuristic)
 
 target = None
-def astar(start, goal, predict, heuristic, is_equal_func):
+def astar(start, goal, predict, heuristic, is_equal_func, max_depth = 3):
     open_set = []
     closed_set = set()
 
@@ -36,7 +37,7 @@ def astar(start, goal, predict, heuristic, is_equal_func):
 
         closed_set.add(current_node.state)
 
-        if current_node.parent:
+        if current_node.depth > max_depth:
             continue
         for action in action_set:
             neighbor_state = predict(current_node.state, action)
@@ -47,6 +48,7 @@ def astar(start, goal, predict, heuristic, is_equal_func):
             heuristic_value = heuristic(neighbor_state, goal)
             new_node = Node(neighbor_state, cost, heuristic_value, current_node, action)
             new_node.parent = current_node
+            new_node.depth = new_node.parent.depth + 1
 
             if new_node not in open_set and new_node.state not in closed_set:
                 heapq.heappush(open_set, new_node)
@@ -82,31 +84,32 @@ def predict(state, action):
     next_state[:,:2] += travel_distance.repeat(state.shape[0],1) * is_above
     return next_state
 
-def evaluate_dataset(model, dset): 
+def evaluate_dataset(model, dataset, max_depth): 
     counter = 0
     global action_set
     global target
-    for i in tqdm.tqdm(range(len(dataset))):
+    for i in range(len(dataset)):
         s = dataset[i]
+        t = dataset[i + max_depth]
         mask = dataset.mask[i]
         state = s["state"]
         target = s["action"][:mask]
         action_set = action_set_main[:seperators[mask-1], :mask]
-        post_state = s["post_state"]
-        x = astar(state[:mask], post_state[ :mask], predict, heuristic, is_equal)
+        post_state = t["state"]
+        x = astar(state[:mask], post_state[ :mask], predict, heuristic, is_equal, max_depth)
         if x:
             counter += 1
     return counter / len(dataset)
 if __name__ == "__main__":
 
      #TODO: set this according to dataset
-
-    model = torch.load("./experiments/seed/generation_0_model0.pt")
+    
+    model = torch.load("./council/3_generation10.pt")
     # model = torch.load("./baseline.pt")
     model.eval_mode()
     accs = []
-    for i in range(3):
-        dataset = StateActionEffectDataset(f"test", "asd")
+    for i in range(2):
+        dataset = StateActionEffectDataset(f"long_horizon_collection_4", "test")
         acc = evaluate_dataset(model, dataset)
         print(acc)
         accs.append(acc)
