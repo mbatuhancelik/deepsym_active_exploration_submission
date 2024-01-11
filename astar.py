@@ -1,9 +1,11 @@
 import heapq
 import torch
 import tqdm
+import numpy as np
 
 from explore_council import get_action_set
 from dataset import StateActionEffectDataset
+import council_manager
 action_set = []
 action_set_main,seperators,_ = get_action_set(8)
 class Node:
@@ -16,7 +18,7 @@ class Node:
         self.depth = 0
 
     def __lt__(self, other):
-        return (self.cost + self.heuristic) < (other.cost + other.heuristic)
+        return (self.heuristic) < ( other.heuristic)
 
 target = None
 def astar(start, goal, predict, heuristic, is_equal_func, max_depth = 3):
@@ -37,7 +39,7 @@ def astar(start, goal, predict, heuristic, is_equal_func, max_depth = 3):
 
         closed_set.add(current_node.state)
 
-        if current_node.depth > max_depth:
+        if current_node.depth == max_depth:
             continue
         for action in action_set:
             neighbor_state = predict(current_node.state, action)
@@ -55,11 +57,11 @@ def astar(start, goal, predict, heuristic, is_equal_func, max_depth = 3):
 
     return None
 def heuristic(state, goal):
-    return ((state[:,:3] - goal[:,:3])**2).sum(dim = -1).sqrt().sum().item()
+    return ((state[:,:3] - goal[:,:3])**2).sum(dim = -1).sqrt().max().item()
 
-def is_equal(state1, state2, error=0.05):
+def is_equal(state1, state2, error=0.1):
     # Define a function to check if two states are equal
-    return ((state1[:,:3] - state2[:,:3])**2).sum(dim = -1).sqrt().sum().item() < error* state1.shape[0]
+    return ((state1[:,:3] - state2[:,:3])**2).sum(dim = -1).sqrt().max().item() < error
 
 model = None
 def predict(state, action):
@@ -79,8 +81,8 @@ def predict(state, action):
     ds2 = action[obj2, [5,6]] * 0.075
     travel_distance = (state[obj2, :2] + ds1) - (state[obj1, :2]+ ds2)
     is_above = (e[:,2] > 0.3 ).int().unsqueeze(-1)
-    next_state = state[:,:3].clone()
-    next_state += e[:,:3] + e[:,7:10]
+    next_state = state.clone()
+    next_state[:,:7] += e[:,:7] + e[:,7:]
     next_state[:,:2] += travel_distance.repeat(state.shape[0],1) * is_above
     return next_state
 
@@ -88,29 +90,40 @@ def evaluate_dataset(model, dataset, max_depth):
     counter = 0
     global action_set
     global target
+    attempts = 0
     for i in range(len(dataset)):
         s = dataset[i]
+        if i % 10 + max_depth > 10 or (i + max_depth + 1 )> len(dataset):
+            continue
         t = dataset[i + max_depth]
         mask = dataset.mask[i]
         state = s["state"]
         target = s["action"][:mask]
         action_set = action_set_main[:seperators[mask-1], :mask]
-        post_state = t["state"]
+        action_selection = np.random.randint(0, action_set.shape[0], size=(5), dtype='l') 
+        action_set = action_set[action_selection]
+        for k in range(max_depth):
+            t = dataset[i + k]
+            action_set[k] = t["action"][:mask]
+        post_state = s["post_state"]
+        # if((state[:mask]- post_state[ :mask]).max().item() > 0.1):
+        #     print("effect found")
         x = astar(state[:mask], post_state[ :mask], predict, heuristic, is_equal, max_depth)
+        attempts += 1
         if x:
             counter += 1
-    return counter / len(dataset)
+    return counter / attempts
 if __name__ == "__main__":
 
      #TODO: set this according to dataset
     
-    model = torch.load("./council/3_generation10.pt")
+    model = council_manager.load_best(7, "random_baseline")[0]
     # model = torch.load("./baseline.pt")
     model.eval_mode()
     accs = []
     for i in range(2):
-        dataset = StateActionEffectDataset(f"long_horizon_collection_4", "test")
-        acc = evaluate_dataset(model, dataset)
+        dataset = StateActionEffectDataset(f"random_baseline_collection_6", "test")
+        acc = evaluate_dataset(model, dataset, max_depth= 1)
         print(acc)
         accs.append(acc)
     print(accs)
