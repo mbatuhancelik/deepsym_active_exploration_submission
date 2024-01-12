@@ -13,9 +13,15 @@ keys = ["action", "effect", "mask", "state", "post_state"]
 
 output_folder = os.path.join("./data", args.o)
 for key in keys:
-    field = torch.cat([torch.load(os.path.join(output_folder, f"{key}_{i}.pt")) for i in range(args.i)], dim=0)
-    torch.save(field, os.path.join(os.path.join(output_folder, f"{key}.pt")))
+    tensors = []
     for i in range(args.i):
-        os.remove(os.path.join(output_folder, f"{key}_{i}.pt"))
+        try:
+            tensors.append(torch.load(os.path.join(output_folder, f"{key}_{i}.pt")))
+        except:
+            continue
+        finally:
+            pass
+    field = torch.cat(tensors, dim=0)
+    torch.save(field, os.path.join(os.path.join(output_folder, f"{key}.pt")))
 
 metrics_by_name(args.o)
