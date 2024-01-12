@@ -1,7 +1,7 @@
 #!/usr/bin/zsh
 
 # Number of processes to run
-num_trainers=3
+num_trainers=5
 
 # Your command to run (replace with your actual command)
 

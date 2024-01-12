@@ -82,7 +82,7 @@ def predict(state, action):
     travel_distance = (state[obj2, :2] + ds1) - (state[obj1, :2]+ ds2)
     is_above = (e[:,2] > 0.3 ).int().unsqueeze(-1)
     next_state = state.clone()
-    next_state[:,:7] += e[:,:7] + e[:,7:]
+    next_state[:,:3] += e[:,:3] + e[:,3:]
     next_state[:,:2] += travel_distance.repeat(state.shape[0],1) * is_above
     return next_state
 
@@ -117,12 +117,12 @@ if __name__ == "__main__":
 
      #TODO: set this according to dataset
     
-    model = council_manager.load_best(7, "random_baseline")[0]
+    model = council_manager.load_best(7, "manipulator")[0]
     # model = torch.load("./baseline.pt")
     model.eval_mode()
     accs = []
     for i in range(2):
-        dataset = StateActionEffectDataset(f"random_baseline_collection_6", "test")
+        dataset = StateActionEffectDataset(f"random_baseline_collection_7", "test")
         acc = evaluate_dataset(model, dataset, max_depth= 1)
         print(acc)
         accs.append(acc)

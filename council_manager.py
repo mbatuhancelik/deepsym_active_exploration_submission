@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("take_half", type=bool)
 
     args = parser.parse_args()
-    for i in range(args.generation):
+    for i in range( args.generation):
         download_generation(args.experiment, str(i), args.folder, False)
 
         

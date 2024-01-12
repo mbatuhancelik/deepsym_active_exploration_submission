@@ -58,11 +58,17 @@ def get_action_set(num_objects):
 def current_state_batch(env: environment.BlocksWorld_v4):
     state , types = env.state_obj_poses_and_types()
     sample = {}
-    state = torch.tensor(state)
+    sample["state"] = torch.zeros((state.shape[0], 9))
+    sample["state"][:,:3] = torch.tensor(state[:,:3])
+    for i in range(state.shape[0]):
+        euler_angles = env._p.getEulerFromQuaternion(state[i,3:])
+        sample["state"][i, 3:] = torch.tensor([np.cos(euler_angles[0]), np.sin(euler_angles[0]),
+                        np.cos(euler_angles[1]), np.sin(euler_angles[1]),
+                        np.cos(euler_angles[2]), np.sin(euler_angles[2]), ])
     types = torch.tensor(types)
-    state = torch.cat([state, StateActionEffectDataset.binary[[types.long()]]], dim=-1)
-    sample["state"] = state.unsqueeze(0)
-    mask = torch.zeros(state.shape[0], dtype=torch.float, device=state.device)
+    sample["state"]= torch.cat([sample["state"], StateActionEffectDataset.binary[[types.long()]]], dim=-1)
+    sample["state"] = sample["state"].unsqueeze(0)
+    mask = torch.zeros(sample["state"].shape[1], dtype=torch.float, device="cuda")
     mask[:env.num_objects] = 1.0
     sample["pad_mask"] = mask
     return sample
@@ -109,13 +115,13 @@ if __name__ == "__main__":
     parser.add_argument("-T", help="interaction per episode", type=int, required=True)
     parser.add_argument("-o", help="output folder", type=str, required=True)
     parser.add_argument("-i", help="offset index", type=int, required=True)
-    parser.add_argument("-d", help="accelerator", type=str, required=False, default="cuda")
-    parser.add_argument("-id", help="model id", type=str, required=False)
+    # parser.add_argument("-d", help="accelerator", type=str, required=False, default="cuda")
+    parser.add_argument("-gen", help="generation", type=int, required=True)
     args = parser.parse_args()
 
-    council = council_manager.load()
+    council = council_manager.load_generation(args.gen +3, "manipulator")[:5]
     for m in council:
-        m.to(args.d)
+        m.to("cuda")
         m.eval_mode()
     if not os.path.exists(args.o):
         try:
@@ -124,11 +130,11 @@ if __name__ == "__main__":
             pass
 
 
-    env = environment.BlocksWorld_v4(gui=1, min_objects=8, max_objects=12)
+    env = environment.BlocksWorld_v4(gui=0, min_objects=6, max_objects=10)
     np.random.seed()
     action_set = get_action_set(env.max_objects)    
     # (x, y, z, cos_rx, sin_rx, cos_ry, sin_ry, cos_rz, sin_rz, type)
-    states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
+    states = torch.zeros(args.N, env.max_objects, 8, dtype=torch.float)
     # (obj_i, obj_j, from_x, from_y, to_x, to_y, rot_init, rot_final)
     actions = torch.zeros(args.N, 8, dtype=torch.int)
     # how many objects are there in the scene
@@ -138,9 +144,8 @@ if __name__ == "__main__":
     #  cos_ry_f-cos_ry_i, sin_ry_f-sin_ry_i,
     #  cos_rz_f-cos_rz_i, sin_rz_f-sin_rz_i)
     # for before picking and after releasing
-    effects = torch.zeros(args.N, env.max_objects, 18, dtype=torch.float)
-    post_states = torch.zeros(args.N, env.max_objects, 10, dtype=torch.float)
-
+    effects = torch.zeros(args.N, env.max_objects, 14, dtype=torch.float)
+    post_states = torch.zeros(args.N, env.max_objects, 8, dtype=torch.float)
     prog_it = args.N
     start = time.time()
     env_it = 0
@@ -176,7 +181,7 @@ if __name__ == "__main__":
     #                     action_env_space.append(a)
     #                     counter += 1
     #     action_seperators.append(counter)
-    action_set, action_seperators, action_env_space = torch.cat(action_set, dim=0)
+    action_set, action_seperators, action_env_space = action_set
 
 
     while i < args.N:

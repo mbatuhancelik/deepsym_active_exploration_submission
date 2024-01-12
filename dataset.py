@@ -4,8 +4,8 @@ import torch
 import wandb
 
 from utils import preprocess
-
-
+from environment import BlocksWorld_v4
+import numpy as np
 class SymbolForwardDataset(torch.utils.data.Dataset):
     def __init__(self, path, prefix, wandb={}):
         if len(wandb) == 0:
@@ -15,7 +15,7 @@ class SymbolForwardDataset(torch.utils.data.Dataset):
             self.precond = torch.load(wandb["Z"].name)
             self.effect = torch.load(wandb["E"].name)
         self.mask = torch.load(os.path.join(path, prefix+"mask.pt"))
-
+        
     def __len__(self):
         return len(self.precond)
 
@@ -32,6 +32,7 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
                             [0, 1, 0, 0],
                             [1, 0, 0, 0]])
     def __init__(self, name, split="train", sample_subset=False):
+        self.env= BlocksWorld_v4()
         path = os.path.join("data", name)
         self.state = torch.load(os.path.join(path, "state.pt"))
         self.action = torch.load(os.path.join(path, "action.pt"))
@@ -76,7 +77,13 @@ class StateActionEffectDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         sample = {}
-        sample["state"] = self.state[idx]
+        sample["state"] = torch.zeros((self.state.shape[1], 10))
+        sample["state"][:,:3] = self.state[idx][:,:3]
+        for i in range(self.state.shape[1]):
+            euler_angles = self.env._p.getEulerFromQuaternion(self.state[idx][i,3:7])
+            sample["state"][i, 3:] = torch.tensor([np.cos(euler_angles[0]), np.sin(euler_angles[0]),
+                           np.cos(euler_angles[1]), np.sin(euler_angles[1]),
+                           np.cos(euler_angles[2]), np.sin(euler_angles[2]), self.state[idx][i,-1]])
         a = self.action[idx]
         sample["mask"] = self.mask[idx]
         sample["state"] = torch.cat([sample["state"][:, :-1], self.binary[[sample["state"][:, -1].long()]]], dim=-1)

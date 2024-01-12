@@ -17,12 +17,12 @@ python config_manager.py set_experiment -c $config_name -e $experiment_name
 # Start processes in the background
 for ((i=0; i<=generations; i++)); do
     python config_manager.py set_generation -g $i -c $config_name
-    ./scripts/train_active.sh $config_name "generation"$i 
-    ./scripts/collect_active.sh $experiment_name"_collection_"$i "generation"$i 
-    python dataset_utils.py merge_datasets -o $experiment_name"_generation_"$i -l $experiment_name"_collection_"$i -s $initial_dataset
-    python config_manager.py set_dataset -c $config_name -d $experiment_name"_generation_"$i
-    initial_dataset=$experiment_name"_generation_"$i
-    python config_manager.py set_generation -g $i -c $config_name
+    # ./scripts/train_active.sh $config_name "generation"$i 
+    ./scripts/collect_active.sh $experiment_name"_collection_"$i "generation"$i  $i
+    # python dataset_utils.py merge_datasets -o $experiment_name"_generation_"$i -l $experiment_name"_collection_"$i -s $initial_dataset
+    # python config_manager.py set_dataset -c $config_name -d $experiment_name"_generation_"$i
+    # initial_dataset=$experiment_name"_generation_"$i
+    # python config_manager.py set_generation -g $i -c $config_name
 done
 # ./scripts/train_active.sh $config_name "generation"$((i+1))
 
