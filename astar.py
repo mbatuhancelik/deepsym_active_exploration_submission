@@ -117,12 +117,13 @@ if __name__ == "__main__":
 
      #TODO: set this according to dataset
     
-    model = council_manager.load_best(7, "manipulator")[0]
+    model = council_manager.load_best(10, "manipulator")[0]
     # model = torch.load("./baseline.pt")
     model.eval_mode()
     accs = []
+    dataset = StateActionEffectDataset(f"single_horizon_collection_7", "test")
+    action_set_main,seperators,_ = get_action_set(dataset.state.shape[1])
     for i in range(2):
-        dataset = StateActionEffectDataset(f"random_baseline_collection_7", "test")
         acc = evaluate_dataset(model, dataset, max_depth= 1)
         print(acc)
         accs.append(acc)
