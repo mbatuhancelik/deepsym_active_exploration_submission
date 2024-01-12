@@ -33,7 +33,8 @@ if __name__ == "__main__":
     
     result_map = {}
     for i in range(args.i):
-        models = load_generation(i, args.m)
+        print(f"gen {i + 3} processing")
+        models = load_generation(i+3, args.m)
         threads = []
         for k, model in enumerate(models):
             # evaluate_model_on_dataset(model, (i,k), args.init, result_map)

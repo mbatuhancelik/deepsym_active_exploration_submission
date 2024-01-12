@@ -7,7 +7,7 @@ from explore_council import get_action_set
 from dataset import StateActionEffectDataset
 import council_manager
 action_set = []
-action_set_main,seperators,_ = get_action_set(8)
+action_set_main,seperators,_ = get_action_set(10)
 class Node:
     def __init__(self, state, cost, heuristic, parent, action):
         self.state = state
