@@ -9,7 +9,7 @@ import astar
 
 def evaluate_model_on_dataset(model, model_name, dataset_name, result_map):
     astar.model = model
-    dataset = StateActionEffectDataset(dataset_name, "test")
+    dataset = StateActionEffectDataset(dataset_name , "none")
     result_map[(model_name[0],model_name[1],dataset_name)] = astar.evaluate_dataset(model, dataset, max_depth= 1)
 def evaluate_model_on_collection_datasets(model,model_name, data_experiment_name, num_generations, result_map):
     for i in range(num_generations):
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     
     result_map = {}
     for i in range(args.i):
-        print(f"gen {i + 3} processing")
-        models = load_generation(i+3, args.m)
+        print(f"gen {i } processing")
+        models = load_generation(i, args.m)
         threads = []
         for k, model in enumerate(models):
             # evaluate_model_on_dataset(model, (i,k), args.init, result_map)
